@@ -1,0 +1,126 @@
+You will work in a loop until the task meets the bar.
+
+TASK:
+docs/design-rubric-loop-mcp.md（rubric ループ実行 MCP サーバ 設計書 v1.0.0 / rev.3）から、
+その設計書を実装するための「実装計画」を作れ。
+
+成果物は次の2本のみ。コードは1行も書かない。
+  (1) docs/plans/rubric-loop-implementation-plan.json
+      設計書 §19.5.2 の `artifact_kind:"plan"` スキーマに適合する JSON（これが判定対象）。
+  (2) docs/plans/rubric-loop-implementation-plan.md
+      同じ内容の人間向け Markdown（監査用の添付。判定対象ではない）。
+
+このループは、設計書が定義している `loop_mode:"plan"` のセッションを、
+MCP サーバがまだ存在しない状態で手で回すものである（設計書 §10.3 の縮退動作に相当）。
+したがってサーバの代わりに、お前自身が毎周スキーマ検査と機械検査をコマンドで実行し、
+その出力を根拠として貼ること。「たぶん通る」は根拠にならない。
+
+前提（動かせない）:
+- 上流成果物は docs/design-rubric-loop-mcp.md **のみ**であり、内容は確定・凍結されている。
+  設計書の記述と計画が食い違ったら、直すのは計画のほうである。
+  設計書の欠陥を見つけた場合は計画に辻褄合わせを書かず、末尾の KICKBACK 節に
+  「該当節 / 欠陥 / 提案」を分離して書く（設計書は書き換えない）。
+- 各タスクの `design_refs` は設計書に**実在する見出しまたは節番号**（"§6.4", "19.5.2",
+  "## 8. 状態の外部化（永続層）" 等）でなければならない。実在しない参照は
+  設計書 §19.5.2 の `E_PLAN_DESIGN_REF` に相当する即死条件とする。
+- 実装対象は Agent Plugins 1.0.0 準拠の可搬パッケージ（§9.1 の構成: plugin.json /
+  mcp.json / server/ / skills/ / presets/）であり、コンポーネントは skills/ と mcp.json の2種のみ。
+- ツールは7本（loop_open / loop_state / artifact_commit / score_submit / rubric_amend /
+  escalate / audit_export）から**増やさない**。3モード対応は既存ツールの引数追加で表現する（§6.1, §19.6）。
+- transport は stdio 既定、streamable-http は選択可、legacy SSE には依存しない。
+- MCP 2026-07-28（ステートレス改訂）が第一の対象。プロトコルセッションに依存せず、
+  跨り状態はサーバ発行ハンドル（session_id）を通常のツール引数で渡す（§18）。
+- 計画は「何を作るか」だけでなく「どの順で作れば途中で止まっても安全か」まで決め切る。
+
+計画 JSON の必須形（§19.5.2 の抜粋。full schema は設計書を見ること）:
+  { "plan_version": 1,
+    "summary": "40文字以上4000文字以下",
+    "assumptions": ["…"],
+    "tasks": [ { "id": "T001",                       // ^T[0-9]{3}$ 一意
+                 "title": "…",
+                 "intent": "20文字以上",
+                 "design_refs": ["§6.4", …],          // 1件以上・実在必須
+                 "depends_on": ["T000"],              // 実在必須・循環禁止
+                 "changes": [{"path":"server/state.js","kind":"add"}],   // 1件以上
+                 "acceptance": ["真偽が判定できる文（10文字以上）"],      // 1件以上
+                 "verify": [{"command":"node --test test/state.test.js",
+                             "expect_exit_code": 0}],                    // 1件以上
+                 "estimate_rounds": 2 } ] }
+
+RUBRIC（固定。10点満点。合格は「全基準9以上」かつ「加重平均9.0以上」）:
+
+| id                    | 重み | 何を見るか | 9点のアンカー | 検証 |
+|---|---|---|---|---|
+| design_coverage       | 3 | 上流設計書の実装を要する決定が、すべていずれかのタスクで覆われている | 設計書の全節（§0–§20、19.x の小節を含む）について、対応タスク id または「実装不要」の明示的な判断がある。design_refs の集合が見出し集合を覆うことをコマンド出力で示せる | auto |
+| dependency_soundness  | 3 | タスクの依存が有向非巡回で、実行順が一意に決まる | トポロジカルソートが通り、幽霊依存・孤立タスク・循環が0件であることをコマンド出力で示せる | auto |
+| acceptance_testability| 3 | 各タスクの受け入れ条件が真偽を判定できる文になっている | 全タスクの全 acceptance が、実行可能な検証手段または観測可能な事実に還元されている。「正しく動くこと」の類が0件 | manual |
+| verify_commands       | 3 | 各タスクに成否を分ける検証コマンドと期待終了コードがある | 全タスクに command + expect_exit_code があり、コマンドが実在のツール（node / node --test / jq / sha256sum 等）を指し、対象ファイルが changes か既存に存在する | auto |
+| tool_surface_fidelity | 3 | 7ツールの入出力スキーマとエラーコードが、実装タスクと1対1で対応している | §6.4 の7ツール全部と §6.3 + §19.6.6 のエラーコード全件について、それを返す実装タスクと、それを踏むテストタスクが特定できる | auto |
+| anti_cheat_coverage   | 3 | 設計書 §2 の失敗モード F1–F20 を塞ぐ機構が実装タスクになっている | F1–F20 の各行に対応する実装タスク id と、その機構が本当に発火することを示すテストタスク id が両方ある | manual |
+| acceptance_test_mapping| 2 | §13 の受け入れテスト AT-1〜AT-18 が実行可能なテストとして計画に入っている | AT-1〜AT-18 の各シナリオに対応するテストタスクがあり、verify のコマンドで individually 実行できる | auto |
+| task_granularity      | 2 | 1タスクが1〜2周のループで終わる粒度に割れている | 全タスクが estimate_rounds ≤ 3、changes のファイル数が1タスクあたり概ね5以下。「サーバを実装する」級の塊が0件 | manual |
+| no_scope_creep        | 2 | 設計書に無い作業が計画に混入していない | 全タスクの design_refs が設計書に実在する（部分一致検査でヒット0件が無い）。CI・配布・レンダリング等 §1.3 のスコープ外作業が0件 | auto |
+| risk_and_order        | 2 | 不確実性の高いタスクが前倒しされ、後戻りコストが小さい順序になっている | ホスト差の吸収（§11）・PLUGIN_DATA 解決（§8.2）・原子的書き込みとロック（§8.4）・MCP 版差（§18）といった前提が怪しい部分が依存の許す範囲で最前に置かれ、その理由が summary に書かれている | manual |
+| rollback_and_partial  | 1 | 途中で止まった場合にどこまで安全に残せるかが定義されている | 各タスク完了時点でビルド可能・テスト green であることが保証されるか、そうでないタスクが明示され、その理由と復旧手順が書かれている | manual |
+| degraded_paths        | 1 | 判定に関わる縮退が「明示的な格下げ or 停止」として実装タスクになっている | EPHEMERAL 起動（§8.2）・ロック競合 E_CONCURRENT（§8.4）・PLUGIN_ROOT 解決不能（§11.1）・サーバ未起動時のスキル単独動作（§10.3）の4つに、実装タスクと確認手段がある | manual |
+| no_deferral           | 1 | 「実装時に決める」で逃げていない | 既定値・境界値・上限（pass_score=9 / max_rounds=12（plan は8）/ stall_window / max_score_jump=3 / files 5000件 / manifest 2MB / content 1MB / lock 60秒 等）が、それを設定する具体的なタスクとファイルに落ちている | manual |
+
+LOOP POLICY（設計書 §19.7.2 presets/plan.json の policy に合わせる。書き換え不可）:
+  pass_score = 9, pass_weighted_mean = 9.0, max_rounds = 8,
+  stall_window = 2, stall_epsilon = 0.25, max_score_jump = 3
+
+LOOP PROTOCOL, repeat every turn:
+1. PLAN   - 次の1手だけを述べる。前周 VERIFY の最低点基準を必ず含める。
+2. DO     - 計画 JSON と Markdown を作る／良くする。毎周かならず**全文**を出す（差分で済ませない）。
+3. VERIFY - 下の CHECKS を全部実行し、コマンド・終了コード・出力の抜粋を貼る。
+            そのうえで各基準を1-10で採点する。残酷なほど正直に。
+            各スコアには「点数 / 40文字以上の理由 / まだ弱い点 / 根拠」を必ず付ける。
+              - verification=auto の基準の根拠は、実行したコマンドとその出力のみ。
+              - verification=manual の基準の根拠は、計画 JSON の該当箇所の引用（タスク id を明示）。
+4. DECIDE - 全基準9以上 かつ 加重平均9.0以上なら PASS と出力して停止。
+            そうでなければ REVISE と出力し、must_fix（最低点の基準3件を昇順）を挙げて次周へ。
+
+CHECKS（毎周、VERIFY の冒頭で実行する。パスは workspace ルート相対）:
+  C1 スキーマ適合:
+     node -e '…' もしくは python -c で §19.5.2 のスキーマ検査。
+     必須キー欠落・pattern 違反・minItems 違反・additionalProperties を全部落とすこと。
+  C2 id 一意性 / 幽霊依存 / 循環 / 孤立:
+     jq -r '.tasks[].id' plan.json | sort | uniq -d           # 出力が空であること
+     jq -r '.tasks[] | .id as $i | .depends_on[] | "\($i) \(.)"' plan.json  # 参照先の実在確認
+     トポロジカルソートを実行し、順序を1本印字する（循環があれば残余タスク id を出す）。
+  C3 design_refs の実在:
+     jq -r '.tasks[].design_refs[]' plan.json | sort -u を、
+     grep -n '^#\{1,4\} ' docs/design-rubric-loop-mcp.md の見出し集合に対して照合し、
+     **ヒット0件の参照を列挙する（0件であること）**。
+  C4 設計書側からの被覆:
+     設計書の §2桁見出しと §19.x / §20.x 小節を列挙し、各々を design_refs が覆っているかを表にする。
+     覆われていない節は「実装不要」の判断を計画の assumptions か Markdown に明記していること。
+  C5 verify の形式:
+     jq -e 'all(.tasks[]; (.verify|length)>=1
+              and all(.verify[]; (.command|length)>=3 and (.expect_exit_code|type)=="number"))' plan.json
+  C6 粒度:
+     jq -r '.tasks[] | "\(.id) \(.estimate_rounds // 99) \(.changes|length)"' plan.json
+     estimate_rounds > 3 または changes > 5 のタスクを列挙する（0件であること）。
+  C7 被覆の全数表:
+     ツール7本 / エラーコード全件 / 失敗モード F1–F20 / 受け入れテスト AT-1–AT-18 について、
+     「対応する実装タスク id」「対応するテストタスク id」の2列を埋めた表を出す。空欄0件であること。
+
+RULES:
+- 全基準が9以上になるまで完了と呼ばない。PASS はこのプロトコルの語であり、
+  MCP サーバが返す `FINAL` ではない。成果物の冒頭に必ず
+  `UNVERIFIED-COMPLETE: rubric-loop server unavailable` と書き、
+  「マージしてよい」「実装に着手してよい」とは主張しない（§10.3）。
+- 各周は前回 VERIFY の最低点を必ず動かす。動かせなかった周は、その理由を明示する。
+- 1周で1基準あたり +3 を超えて点を上げない。超えるなら auto 検証コマンド2件以上の出力を根拠に添える。
+- 前周と同一の根拠（同じコマンド出力・同じ引用箇所）でスコアを上げない。
+  計画が変わっていないのにスコアだけ上げない。
+- RUBRIC そのものを書き換えて通そうとしない。基準・重み・閾値は固定、直すのは計画だけ。
+  設計書に照らして基準が足りないと気づいた場合は、**基準の追加のみ**許す（削除・重み減・9点アンカーの緩和は禁止）。
+- 設計書に無い作業をタスクに足さない。必要だと考えたなら、それは設計書の不足なので
+  KICKBACK 節に書く（計画には入れない）。
+- 「詳細は実装時に決める」で逃げない。既定値・境界値・ファイル名まで決め切って書く。
+- 私に質問しない。妥当な仮定を置いて進め、置いた仮定は計画 JSON の assumptions に明記する。
+- 8周（max_rounds）で合格しなかったら STALLED と出力して停止し、
+  「どの基準が / なぜ / 人間に何を決めてほしいか」を3行以内で書く。勝手に閾値を下げて終わらない。
+
+Begin.
