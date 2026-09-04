@@ -6,29 +6,28 @@ UNVERIFIED-COMPLETE: rubric-loop server unavailable
 
 rubric ループ実行 MCP サーバが利用できない状態で作成したため、本計画は機械判定を受けていない。「マージしてよい」「実装に着手してよい」とは主張しない（設計書 10.3）。
 
-- 上流: `docs/design-rubric-loop-mcp.md`（v1.0.0 rev.3、凍結）
+- 上流: `docs/design-rubric-loop-mcp.md`（v1.0.0 rev.4）
 - `plan_version`: 1
 - タスク数: 76（T001–T076）
 
 ## サマリ
 
-UNVERIFIED-COMPLETE: rubric-loop server unavailable。本計画は設計書 v1.0.0 rev.3 を唯一の上流として、Agent Plugins 1.0.0 可搬パッケージ rubric-loop/ を76 タスクに分解した実装計画である。ツールは 7 本のまま増やさず、3 モード対応は引数の追加で表現する。順序は、後から差し替えると波及が最大になるもの（ホスト差の吸収・PLUGIN_DATA 解決・原子的書き込みとロック・MCP 2026-07-28 のステートレス前提）を T001 から T020 に前倒しし、以降を 7 ツール・連鎖・監査・スキルの順に積む。各タスクは単独でビルド可能かつテスト緑を保ち、途中で停止しても壊れた状態が残らないように分割してある。rubric ループのサーバが不在のため本計画は機械判定を受けておらず、マージ可否や実装着手可否は主張しない。
+UNVERIFIED-COMPLETE: rubric-loop server unavailable。本計画は設計書 v1.0.0 rev.4 を唯一の上流として、Agent Plugins 1.0.0 可搬パッケージ rubric-loop/ を76 タスクに分解した実装計画である。ツールは 7 本のまま増やさず、3 モード対応は引数の追加で表現する。順序は、後から差し替えると波及が最大になるもの（ホスト差の吸収・PLUGIN_DATA 解決・原子的書き込みとロック・MCP 2026-07-28 のステートレス前提）を T001 から T020 に前倒しし、以降を 7 ツール・連鎖・監査・スキルの順に積む。各タスクは単独でビルド可能かつテスト緑を保ち、途中で停止しても壊れた状態が残らないように分割してある。rubric ループのサーバが不在のため本計画は機械判定を受けておらず、マージ可否や実装着手可否は主張しない。
 
 ## 置いた仮定
 
-- 本計画は rubric ループ実行 MCP サーバの設計書 v1.0.0 rev.3 のみを上流とし、設計書は凍結されているものとして扱った。設計書と本計画が食い違う場合は本計画を直す。設計書側の欠陥は本計画に混ぜず、併載の Markdown 末尾の KICKBACK 節に分離して記載した。
+- 本計画は rubric ループ実行 MCP サーバの設計書 v1.0.0 rev.4 のみを上流とする。rev.3 に対して差し戻した設計書側の欠陥 KB-1 から KB-7 は rev.4 ですべて解消されたため、本計画は rev.4 の記述をそのまま実装対象とする。差し戻しの記録と解消結果は併載の Markdown 末尾の KICKBACK 節に残してある。設計書と本計画が今後食い違う場合は本計画を直す。
 - design_refs の表記は設計書の見出し行から先頭の # を除いた文字列そのものとした。設計書 19.5.2 の照合規則が正規化後の部分一致であるため、この表記は節番号形式（例: 6.4.1）でも見出し全文でも一致する。
 - 設計書 1.3 のスコープ外に触れないため、.gitignore・CI 設定・配布スクリプト・レンダリング設定はどのタスクの changes にも含めていない。パッケージに置くファイルは 9.1 の構成図に現れるもの（plugin.json / mcp.json / skills/ / presets/ / server/）と、その実装およびテストのみである。
 - 実装先のパッケージルートはリポジトリ直下の rubric-loop/ とした。設計書 9.1 の構成図がパッケージルートを rubric-loop/ と書いているため、それをそのままディレクトリ名に採用した。
 - サーバ実装言語は Node.js とした。設計書 9.3 の mcp.json が command:"node" と args:["${PLUGIN_ROOT}/server/main.js"] を実物として固定しているため、他の選択肢は取れない。
 - テストランナーは Node.js 標準の node --test とした。設計書は特定のテストフレームワークを指定しておらず、追加依存を持ち込まないことがスコープ外（1.3）の配布・CI に触れない唯一の選択であるため。
-- streamable-http 版の mcp.json は mcp.http.json という別ファイル名で置いた。設計書 9.3 と 9.4 が同名 mcp.json の2版を示しているが、1パッケージに同名ファイルは1つしか置けないため、既定を mcp.json、任意版を mcp.http.json とした。
-- boot_id は Linux では /proc/sys/kernel/random/boot_id、それ以外ではプロセス起動時に生成し PLUGIN_DATA 直下に保持する UUID とした。設計書 8.4 は boot_id を LOCK に含めるとだけ述べ取得方法を規定していないため。
+- rev.3 の時点で置いていた仮定のうち2件は、rev.4 で設計書側に規定されたため仮定ではなくなった。(1) streamable-http 版のファイル名は 9.1 と 9.4 が mcp.http.json と定め、既定は mcp.json、切り替えは利用者のリネームであることも規定された。(2) boot_id の取得は 8.4 が OS 起動識別子 / 起動時刻の UUIDv5 / instance_id 代用の3経路と boot_id_source の記録を規定した。どちらも設計書の規定をそのまま採り、本計画側で選び直していない。
 - 実装不要: 「rubric ループ実行 MCP サーバ 設計書」— 文書のタイトル行であり実装対象を持たない。
 - 実装不要: 「目次」— 文書内ナビゲーションであり実装対象を持たない。
 - 実装不要: 「14. セルフホスティング検証：この設計書自身をこのツール列で作る」およびその小節「14.1 トレースで見つかった穴と、設計へ反映した修正」「14.2 回ることの確認（穴が無いこと）」「14.3 3モードでのセルフホスティング（この改訂作業そのもの）」「14.3.1 design モード — この改訂を回す」「14.3.2 plan モード — 実装計画を回す」「14.3.3 回らなかった箇所と、それを受けて直したこと」「14.3.4 この改訂に実際に走らせた機械検査（auto 基準の根拠の実物）」— 設計書自身を検証した記録であり、成果物側に実装すべき機能を含まない。ここで見つかった穴の反映結果は 6.4.3 の addresses と 6.4.1 のハンドル発行として本計画の T026 と T021 に入っている。
 - 実装不要: 「15. 却下した代替案」— 採用しなかった設計の記録であり、実装対象を持たない。
-- 実装不要: 「20. 改訂履歴」およびその小節「20.1 この改訂で足したもの（新規）」「20.2 この改訂で**変えた**もの（既存の決定の変更）」「20.3 この改訂で**変えなかった**もの（意図的に維持）」「20.4 既存の表への反映漏れが無いことの確認」— 版管理の記録であり実装対象を持たない。20.2 が指す冪等性と ULID ハンドルの変更は本計画の T018 と T021 に入っている。
+- 実装不要: 「20. 改訂履歴」およびその小節「20.1 この改訂で足したもの（新規）」「20.2 この改訂で**変えた**もの（既存の決定の変更）」「20.3 この改訂で**変えなかった**もの（意図的に維持）」「20.4 既存の表への反映漏れが無いことの確認」「20.5 rev.4 — 下流（実装計画）からの差し戻し（KICKBACK）7件の反映」— 版管理の記録であり実装対象を持たない。20.2 が指す冪等性と ULID ハンドルの変更は本計画の T018 と T021 に入っている。
 - 設計書 7.1 のアルゴリズム擬似コード内にある「入力: submitted[] ...」「既定値: pass_score=9, ...」の3行は、Markdown の見出し記法に見えるがコードフェンス内のコメント行であり節ではない。被覆の母集合から除外し、内容は T035 と T020 で実装対象にした。
 - 設計書 10.2 の SKILL.md 実物はコードフェンス内にあり、その中の見出し（原則 / モードの選び方 / 手順 / 上流が変わったと言われたら / 上流が間違っていると気づいたら / 文脈を失ったとき / ツールが使えないとき（縮退））は成果物 SKILL.md の節そのものである。T048 と T049 で実装対象にした。
 - 各タスクは単独で「ビルド可能かつテスト緑」を保つ。76 タスクのうち 74 タスクは changes が add のみで、取り消しは追加ファイルの削除で足りる。add 以外を含むのは T049（SKILL.md に縮退節を追記）と T076（server/package.json の scripts に test を追記）の2件だけで、いずれも追記行の削除で元に戻る。delete を含むタスクは0件である。
@@ -149,22 +148,29 @@ UNVERIFIED-COMPLETE: rubric-loop server unavailable。本計画は設計書 v1.0
 
 **見積**: 2 周
 
-### T005 排他ロック LOCK と 60 秒の陳腐化回収、E_CONCURRENT を実装する
+### T005 排他ロック LOCK と boot_id の3経路取得、60 秒の陳腐化回収、E_CONCURRENT を実装する
 
-**狙い**: O_EXCL で LOCK を作り {pid, boot_id, acquired_at} を書く。acquired_at から 60 秒を超えた LOCK は陳腐化として回収する。取得できなければ E_CONCURRENT を返す。並行破壊は復旧が高くつくので早期に潰す。セッションの取り違えと並行上書き（F12）をここで塞ぐ。
+**狙い**: O_EXCL で LOCK を作り {pid, boot_id, boot_id_source, acquired_at} を書く。boot_id は 8.4 の3経路（OS の起動識別子 / 起動時刻を丸めた UUIDv5 / PLUGIN_DATA 直下の instance_id による代用）で求め、採った経路を boot_id_source に記録する。代用経路では陳腐化判定を acquired_at からの 60 秒経過のみに縮退させる。取得できなければ E_CONCURRENT を返す。並行破壊は復旧が高くつくので早期に潰す。セッションの取り違えと並行上書き（F12）をここで塞ぐ。
 
-**設計書参照**: `8.4 書き込みの原子性と並行性`
+**設計書参照**: `8.4 書き込みの原子性と並行性` / `8.1 ディレクトリ構成`
 
 **依存**: T004
 
 **変更**:
 
+- `rubric-loop/server/src/store/boot_id.js` (add)  — resolveBootId(env, platform) -> {boot_id, boot_id_source}。source は os / instance の2値
 - `rubric-loop/server/src/store/lock.js` (add)  — acquireLock/releaseLock。stale_ms=60000 固定
-- `rubric-loop/server/test/lock.test.js` (add)  — 二重取得の拒否と 60 秒回収を検査
+- `rubric-loop/server/test/lock.test.js` (add)  — 二重取得の拒否・60 秒回収・boot_id 3経路と縮退を検査
 
 **受け入れ条件**:
 
-- LOCK が存在しないとき acquireLock が成功し、LOCK に pid と boot_id と acquired_at の3キーが書かれること
+- LOCK が存在しないとき acquireLock が成功し、LOCK に pid と boot_id と boot_id_source と acquired_at の4キーが書かれること
+- /proc/sys/kernel/random/boot_id が読めるホストではその値を boot_id とし boot_id_source が "os" になること
+- 起動識別子が無く起動時刻だけ取れるホストでは now-uptime を秒精度 ISO 8601 に丸めた文字列の UUIDv5 を boot_id とし、同一起動中に2回呼んでも同値になること
+- どちらも取れないとき PLUGIN_DATA 直下の instance_id を読み（無ければ UUIDv4 を生成して原子的に作成し）boot_id_source が "instance" になること
+- boot_id_source が "instance" のとき pid の生存確認を陳腐化判定に使わず、acquired_at からの 60 秒経過のみで判定し、応答の warnings に lock_staleness_time_only が入ること
+- boot_id_source が異なる2つの LOCK を比較するとき同一 boot_id とみなさず、時間のみで陳腐化を判定すること
+- boot_id の経路が起動時に1度だけ決まり、同一プロセス内で後から変わらないこと
 - LOCK 保持中に別プロセスが acquireLock すると E_CONCURRENT が返ること
 - acquired_at が現在時刻より 60000 ミリ秒以上前の LOCK は回収され、取得が成功すること
 - acquired_at が 59000 ミリ秒前の LOCK は回収されず E_CONCURRENT になること
@@ -174,7 +180,7 @@ UNVERIFIED-COMPLETE: rubric-loop server unavailable。本計画は設計書 v1.0
 
 - `node --test rubric-loop/server/test/lock.test.js` → 終了コード 0
 
-**見積**: 2 周
+**見積**: 3 周
 
 ### T006 正規化つき SHA-256 ダイジェストを実装する
 
@@ -263,11 +269,11 @@ UNVERIFIED-COMPLETE: rubric-loop server unavailable。本計画は設計書 v1.0
 
 **見積**: 2 周
 
-### T009 streamable-http 版 mcp.json と transport 非依存を実装する
+### T009 streamable-http 版のひな型 mcp.http.json と transport 非依存を実装する
 
-**狙い**: url http://127.0.0.1:8971/mcp の streamable-http 版 mcp.json を別ファイルで用意し、サーバ本体が transport を知らずに同じツール実装を提供することを担保する。レガシー SSE には依存しない。
+**狙い**: url http://127.0.0.1:8971/mcp の streamable-http 版を 9.4 の規定どおり mcp.http.json というひな型として同梱し、既定の transport 宣言は固定位置の mcp.json（stdio）のままにする。切り替えは利用者のリネーム操作だけで済ませ、サーバ本体は transport を知らずに同じツール実装を提供する。レガシー SSE には依存しない。
 
-**設計書参照**: `9.4 `mcp.json`（streamable-http 版）` / `9.5 transport 差への非依存` / `11.3 transport 差`
+**設計書参照**: `9.4 `mcp.http.json`（streamable-http 版のひな型）` / `9.5 transport 差への非依存` / `11.3 transport 差`
 
 **依存**: T008
 
@@ -281,6 +287,8 @@ UNVERIFIED-COMPLETE: rubric-loop server unavailable。本計画は設計書 v1.0
 
 - mcp.http.json の url が http://127.0.0.1:8971/mcp であること
 - mcp.http.json に headers キーが存在しないこと（資格情報を置く場所を作らない）
+- mcp.http.json を同梱した状態でも既定の transport 宣言は mcp.json（stdio）のままで、mcp.http.json はコンポーネントとして発見されないこと
+- streamable-http への切り替えが mcp.json の退避と mcp.http.json のリネームだけで完了し、実行時に transport を選ぶ分岐がサーバ側に1件も無いこと
 - 同一のツール呼び出しが stdio と streamable-http で同一の結果 JSON を返すこと
 - SSE のストリーム再開 API を1箇所も参照していないこと（ソース grep で 0 件）
 - ツール実装モジュールが transport 実装を import する行が0件であること（依存の向きが一方向）
@@ -315,6 +323,8 @@ UNVERIFIED-COMPLETE: rubric-loop server unavailable。本計画は設計書 v1.0
 - 全エラーが JSON-RPC の -32020 から -32099 を使わず、structuredContent.error.code に文字列として現れること
 - 想定外の例外はすべて E_INTERNAL に落ち、スタックトレースを応答に含めないこと
 - E_STATE_VIOLATION が detail.expected_tools を持つこと
+- 19.6.7 の総覧が定める「共通エラー条件を含む全数（E_INTERNAL のみ除外）」の割り当てに従い、E_VALIDATION が7ツールすべてに割り当てられていること
+- ツール別の割り当て件数が 19.6.7 の総覧と一致すること（loop_open 13 / loop_state 2 / artifact_commit 13 / score_submit 19 / rubric_amend 5 / escalate 7 / audit_export 2、いずれも E_INTERNAL を除く）
 
 **検証コマンド**:
 
@@ -754,6 +764,8 @@ UNVERIFIED-COMPLETE: rubric-loop server unavailable。本計画は設計書 v1.0
 - 直前が ITERATING のとき最低点3基準の全文アンカーが応答に含まれること
 - 応答に upstream ピンと chain_id と chain の周回集計が含まれること
 - 存在しない session_id で E_SESSION_NOT_FOUND になること
+- include に未知の値を渡すなど入力スキーマに違反したとき E_VALIDATION になること（19.6.7 の総覧どおり loop_state が返しうるのは E_VALIDATION と E_SESSION_NOT_FOUND の2件のみ）
+- 上流を持たない design セッションに include:["upstream"] を渡してもエラーにせず、upstream_artifact を省いて warnings に no_upstream を返すこと
 - loop_state が状態を一切変更しないこと（呼び出し前後で session.json のダイジェストが不変）
 
 **検証コマンド**:
@@ -821,7 +833,7 @@ UNVERIFIED-COMPLETE: rubric-loop server unavailable。本計画は設計書 v1.0
 
 ### T028 artifact_kind:"plan" のスキーマ検査（E_PLAN_SCHEMA）を実装する
 
-**狙い**: 19.5.2 の JSON Schema を実物として持ち、plan 成果物を検証する。plan_version / summary / tasks の必須、id の ^T[0-9]{3}$、tasks の 1 から 200 件、additionalProperties:false 違反をすべて E_PLAN_SCHEMA で弾く。
+**狙い**: 19.5.2 の JSON Schema を実物として持ち、plan 成果物を検証する。plan_version / summary / tasks の必須、task の design_refs を含む8キーの必須、id の ^T[0-9]{3}$、tasks の 1 から 200 件、additionalProperties:false 違反をすべて E_PLAN_SCHEMA で弾く。design_refs の欠落と空配列はここで止まり、T030 の実在照合までは到達しない。
 
 **設計書参照**: `19.5.2 `artifact_kind: "plan"` — 計画の型`
 
@@ -841,10 +853,14 @@ UNVERIFIED-COMPLETE: rubric-loop server unavailable。本計画は設計書 v1.0
 - task に未知キーを足すと additionalProperties 違反で E_PLAN_SCHEMA になること
 - summary が 39 文字のとき E_PLAN_SCHEMA、40 文字は通ること
 - changes / acceptance / verify のいずれかが 0 件のとき E_PLAN_SCHEMA になること
+- task が design_refs を持たないとき required 違反として E_PLAN_SCHEMA になり detail.path が /tasks/<i>/design_refs、detail.reason が required になること
+- design_refs が空配列のとき minItems 違反として E_PLAN_SCHEMA になり detail.reason が min_items になること
+- task スキーマの required が id / title / intent / design_refs / depends_on / changes / acceptance / verify の8件であること
 
 **検証コマンド**:
 
 - `jq -e '.required==["plan_version","summary","tasks"] and .additionalProperties==false' rubric-loop/server/schemas/plan.json` → 終了コード 0
+- `jq -e '.properties.tasks.items.required==["id","title","intent","design_refs","depends_on","changes","acceptance","verify"]' rubric-loop/server/schemas/plan.json` → 終了コード 0（design_refs が required に入っていることの実物確認）
 - `node --test rubric-loop/server/test/plan_schema.test.js` → 終了コード 0
 
 **見積**: 3 周
@@ -896,6 +912,7 @@ UNVERIFIED-COMPLETE: rubric-loop server unavailable。本計画は設計書 v1.0
 - エラーの detail に task_id と ref が両方入ること
 - CRLF・行末空白・NFD の差異があっても正規化後に一致すれば通ること
 - 照合対象がピンした上流の artifact_digest に対応する本文であり、現在の上流最新版ではないこと
+- design_refs の欠落・空配列は T028 のスキーマ検査で E_PLAN_SCHEMA になり、この照合器には到達しないこと（欠落はスキーマ違反、実在しない参照は E_PLAN_DESIGN_REF という役割分担）
 
 **検証コマンド**:
 
@@ -1442,17 +1459,17 @@ UNVERIFIED-COMPLETE: rubric-loop server unavailable。本計画は設計書 v1.0
 
 設計書 13 の受け入れテストを1本1タスクで実装する。各タスクは単独で実行できる verify コマンドを持つ。
 
-### T050 テスト: AT-1 正常収束（1本）
+### T050 テスト: AT-1: 正常収束
 
 **狙い**: 設計書 AT-1 の呼び出し列を上から実行し、期待どおり FINAL に到達することを確かめる。判定を出すのがサーバだけであることを正常系で固定する。
 
-**設計書参照**: `13. 受け入れテスト` / `AT-1 正常収束（1本）`
+**設計書参照**: `13. 受け入れテスト` / `AT-1: 正常収束`
 
 **依存**: T035, T045
 
 **変更**:
 
-- `rubric-loop/server/test/at/at01.test.js` (add)  — AT-1 の呼び出し列と期待返り値をそのまま実行する
+- `rubric-loop/server/test/at/at01.test.js` (add)  — AT-1: の呼び出し列と期待返り値をそのまま実行する
 
 **受け入れ条件**:
 
@@ -1467,17 +1484,17 @@ UNVERIFIED-COMPLETE: rubric-loop server unavailable。本計画は設計書 v1.0
 
 **見積**: 2 周
 
-### T051 テスト: AT-2 ごまかし検出①：成果物不変でスコアだけ上昇（1本）
+### T051 テスト: AT-2: ごまかし検出①：成果物不変でスコアだけ上昇
 
 **狙い**: 失敗モード F5 の受け入れテスト。artifact_digest を変えずにスコアだけ上げた提出が E_SCORE_INFLATION で拒否され、拒否記録が残ることを確かめる。
 
-**設計書参照**: `13. 受け入れテスト` / `AT-2 ごまかし検出①：成果物不変でスコアだけ上昇（1本）`
+**設計書参照**: `13. 受け入れテスト` / `AT-2: ごまかし検出①：成果物不変でスコアだけ上昇`
 
 **依存**: T036
 
 **変更**:
 
-- `rubric-loop/server/test/at/at02.test.js` (add)  — AT-2 の呼び出し列と期待返り値をそのまま実行する
+- `rubric-loop/server/test/at/at02.test.js` (add)  — AT-2: の呼び出し列と期待返り値をそのまま実行する
 
 **受け入れ条件**:
 
@@ -1492,17 +1509,17 @@ UNVERIFIED-COMPLETE: rubric-loop server unavailable。本計画は設計書 v1.0
 
 **見積**: 2 周
 
-### T052 テスト: AT-3 ごまかし検出②：根拠の捏造と使い回し（1本）
+### T052 テスト: AT-3: ごまかし検出②：根拠の捏造と使い回し
 
 **狙い**: 失敗モード F8 と F11 の受け入れテスト。成果物に存在しない引用と、前周と同一の evidence_digest の再利用がそれぞれ拒否されることを確かめる。
 
-**設計書参照**: `13. 受け入れテスト` / `AT-3 ごまかし検出②：根拠の捏造と使い回し（1本）`
+**設計書参照**: `13. 受け入れテスト` / `AT-3: ごまかし検出②：根拠の捏造と使い回し`
 
 **依存**: T036, T034
 
 **変更**:
 
-- `rubric-loop/server/test/at/at03.test.js` (add)  — AT-3 の呼び出し列と期待返り値をそのまま実行する
+- `rubric-loop/server/test/at/at03.test.js` (add)  — AT-3: の呼び出し列と期待返り値をそのまま実行する
 
 **受け入れ条件**:
 
@@ -1516,17 +1533,17 @@ UNVERIFIED-COMPLETE: rubric-loop server unavailable。本計画は設計書 v1.0
 
 **見積**: 2 周
 
-### T053 テスト: AT-4 停滞打ち切り（1本）
+### T053 テスト: AT-4: 停滞打ち切り
 
 **狙い**: 失敗モード F7 の受け入れテスト。改善量が stall_epsilon 未満の周が stall_window 連続したとき STALLED になり、escalate 以外の道が塞がることを確かめる。
 
-**設計書参照**: `13. 受け入れテスト` / `AT-4 停滞打ち切り（1本）`
+**設計書参照**: `13. 受け入れテスト` / `AT-4: 停滞打ち切り`
 
 **依存**: T038
 
 **変更**:
 
-- `rubric-loop/server/test/at/at04.test.js` (add)  — AT-4 の呼び出し列と期待返り値をそのまま実行する
+- `rubric-loop/server/test/at/at04.test.js` (add)  — AT-4: の呼び出し列と期待返り値をそのまま実行する
 
 **受け入れ条件**:
 
@@ -1541,17 +1558,17 @@ UNVERIFIED-COMPLETE: rubric-loop server unavailable。本計画は設計書 v1.0
 
 **見積**: 2 周
 
-### T054 テスト: AT-5 max_rounds 到達（1本）
+### T054 テスト: AT-5: max_rounds 到達
 
 **狙い**: 失敗モード F7 のもう一系統の受け入れテスト。round が max_rounds に達したとき、改善が続いていても STALLED になることを確かめる。
 
-**設計書参照**: `13. 受け入れテスト` / `AT-5 max_rounds 到達（1本）`
+**設計書参照**: `13. 受け入れテスト` / `AT-5: max_rounds 到達`
 
 **依存**: T038
 
 **変更**:
 
-- `rubric-loop/server/test/at/at05.test.js` (add)  — AT-5 の呼び出し列と期待返り値をそのまま実行する
+- `rubric-loop/server/test/at/at05.test.js` (add)  — AT-5: の呼び出し列と期待返り値をそのまま実行する
 
 **受け入れ条件**:
 
@@ -1566,17 +1583,17 @@ UNVERIFIED-COMPLETE: rubric-loop server unavailable。本計画は設計書 v1.0
 
 **見積**: 2 周
 
-### T055 テスト: AT-6 セッション再開（1本）
+### T055 テスト: AT-6: セッション再開
 
 **狙い**: 失敗モード F2 と F3 の受け入れテスト。サーバを再起動しハンドル1個だけで再開したとき、rubric 全文と履歴と must_fix が復元されることを確かめる。
 
-**設計書参照**: `13. 受け入れテスト` / `AT-6 セッション再開（1本）`
+**設計書参照**: `13. 受け入れテスト` / `AT-6: セッション再開`
 
 **依存**: T022, T025
 
 **変更**:
 
-- `rubric-loop/server/test/at/at06.test.js` (add)  — AT-6 の呼び出し列と期待返り値をそのまま実行する
+- `rubric-loop/server/test/at/at06.test.js` (add)  — AT-6: の呼び出し列と期待返り値をそのまま実行する
 
 **受け入れ条件**:
 
@@ -1591,17 +1608,17 @@ UNVERIFIED-COMPLETE: rubric-loop server unavailable。本計画は設計書 v1.0
 
 **見積**: 2 周
 
-### T056 テスト: AT-7 rubric の緩和を検出してエスカレーション（1本）
+### T056 テスト: AT-7: rubric の緩和を検出してエスカレーション
 
 **狙い**: 失敗モード F4 の受け入れテスト。重みを下げる rubric_amend の後は FINAL に到達できず、ESCALATED(relaxation_pending_approval) になることを確かめる。
 
-**設計書参照**: `13. 受け入れテスト` / `AT-7 rubric の緩和を検出してエスカレーション（1本）`
+**設計書参照**: `13. 受け入れテスト` / `AT-7: rubric の緩和を検出してエスカレーション`
 
 **依存**: T039, T040
 
 **変更**:
 
-- `rubric-loop/server/test/at/at07.test.js` (add)  — AT-7 の呼び出し列と期待返り値をそのまま実行する
+- `rubric-loop/server/test/at/at07.test.js` (add)  — AT-7: の呼び出し列と期待返り値をそのまま実行する
 
 **受け入れ条件**:
 
@@ -1616,17 +1633,17 @@ UNVERIFIED-COMPLETE: rubric-loop server unavailable。本計画は設計書 v1.0
 
 **見積**: 2 周
 
-### T057 テスト: AT-8 モデルの自己申告を無効化する（1本）
+### T057 テスト: AT-8: モデルの自己申告を無効化する
 
 **狙い**: 失敗モード F1 と F6 の受け入れテスト。self_verdict_note に FINAL と書いても判定が変わらず、根拠なしのスコアが拒否されることを確かめる。
 
-**設計書参照**: `13. 受け入れテスト` / `AT-8 モデルの自己申告を無効化する（1本）`
+**設計書参照**: `13. 受け入れテスト` / `AT-8: モデルの自己申告を無効化する`
 
 **依存**: T035, T034
 
 **変更**:
 
-- `rubric-loop/server/test/at/at08.test.js` (add)  — AT-8 の呼び出し列と期待返り値をそのまま実行する
+- `rubric-loop/server/test/at/at08.test.js` (add)  — AT-8: の呼び出し列と期待返り値をそのまま実行する
 
 **受け入れ条件**:
 
@@ -1641,17 +1658,17 @@ UNVERIFIED-COMPLETE: rubric-loop server unavailable。本計画は設計書 v1.0
 
 **見積**: 2 周
 
-### T058 テスト: AT-9 サーバ起動失敗時のスキル単独動作（1本）
+### T058 テスト: AT-9: サーバ起動失敗時のスキル単独動作
 
 **狙い**: 失敗モード F13 の受け入れテスト。MCP サーバが起動しない状況で、スキルが FINAL を名乗らず UNVERIFIED-COMPLETE に格下げして journal を残すことを確かめる。
 
-**設計書参照**: `13. 受け入れテスト` / `AT-9 サーバ起動失敗時のスキル単独動作（1本）`
+**設計書参照**: `13. 受け入れテスト` / `AT-9: サーバ起動失敗時のスキル単独動作`
 
 **依存**: T049
 
 **変更**:
 
-- `rubric-loop/server/test/at/at09.test.js` (add)  — AT-9 の呼び出し列と期待返り値をそのまま実行する
+- `rubric-loop/server/test/at/at09.test.js` (add)  — AT-9: の呼び出し列と期待返り値をそのまま実行する
 
 **受け入れ条件**:
 
@@ -2139,48 +2156,65 @@ UNVERIFIED-COMPLETE: rubric-loop server unavailable。本計画は設計書 v1.0
 
 **見積**: 2 周
 
-## KICKBACK（設計書側の欠陥。本計画には反映していない）
+## KICKBACK（設計書 rev.3 へ差し戻した欠陥7件。rev.4 で全件解消済み）
 
-以下は上流設計書の記述に見つかった不整合である。設計書は凍結されているため本計画では辻褄合わせをせず、ここに分離して記載する。いずれも本計画のタスクには影響していない（該当箇所は設計書の記述どおりに実装する）。
+以下は設計書 rev.3 の記述に見つかった不整合である。当時は設計書が凍結されていたため本計画では辻褄合わせをせず、ここに分離して記載した。7件はすべて設計書 rev.4（20.5）で解消され、本計画は rev.4 の記述に追随済みである。記録として、何を差し戻し、上流がどう直したかを残す。
 
-### KB-1
+| # | 該当節（rev.3 時点） | 状態 |
+|---|---|---|
+| KB-1 | 2. 何を潰すのか — 失敗モードと対策の1対1対応 | rev.4 で解消 |
+| KB-2 | 9.3 `mcp.json`（実物・stdio 既定） / 9.4 `mcp.json`（streamable-http 版） | rev.4 で解消 |
+| KB-3 | 8.4 書き込みの原子性と並行性 | rev.4 で解消 |
+| KB-4 | 19.5.2 `artifact_kind: "plan"` — 計画の型 | rev.4 で解消 |
+| KB-5 | 19.6.7 全7ツール総覧（名前・目的・入力／出力スキーマの所在・エラー条件の全数） | rev.4 で解消 |
+| KB-6 | 13. 受け入れテスト | rev.4 で解消 |
+| KB-7 | 16. 既定値まとめ（実装時に決め直さない） / 7.2 既定値と根拠 | rev.4 で解消 |
 
-- **該当節**: 2. 何を潰すのか — 失敗モードと対策の1対1対応
+### KB-1（解消済み）
+
+- **該当節（rev.3 時点）**: 2. 何を潰すのか — 失敗モードと対策の1対1対応
 - **欠陥**: 失敗モード表の行が F1…F12, F14, F13, F15… の順に並んでおり、F14 が F13 より前にある。番号で参照する箇所（19.8.2 など）と読み合わせるときに行を取り違える。
-- **提案**: F13 と F14 の行を入れ替えて昇順にする。番号を振り直すと既存の参照が全部ずれるので、行順のみを直す。
+- **差し戻し時の提案**: F13 と F14 の行を入れ替えて昇順にする。番号を振り直すと既存の参照が全部ずれるので、行順のみを直す。
+- **rev.4 での解消**: F13 と F14 の行順を入れ替えて昇順にした。番号は振り直していないので既存の参照はすべて有効。
 
-### KB-2
+### KB-2（解消済み）
 
-- **該当節**: 9.3 `mcp.json`（実物・stdio 既定） / 9.4 `mcp.json`（streamable-http 版）
+- **該当節（rev.3 時点）**: 9.3 `mcp.json`（実物・stdio 既定） / 9.4 `mcp.json`（streamable-http 版）
 - **欠陥**: 同名 `mcp.json` の実物が2つ示されているが、9.1 のパッケージ構成では `mcp.json` は固定位置に1つしか置けない。streamable-http 版をどのファイル名で同梱するのか、あるいは同梱せず手順書だけにするのかが未規定。
-- **提案**: 9.1 の構成図に任意版のファイル名（例: `mcp.http.json`）を追記し、既定は `mcp.json` であること、切り替えは利用者がリネームすることを 9.4 に明記する。
+- **差し戻し時の提案**: 9.1 の構成図に任意版のファイル名（例: `mcp.http.json`）を追記し、既定は `mcp.json` であること、切り替えは利用者がリネームすることを 9.4 に明記する。
+- **rev.4 での解消**: 9.1 の構成図に `mcp.http.json` を追加し、既定は `mcp.json`（stdio）、切り替えは利用者のリネームであることを 9.4 に明記した。`mcp.http.json` は固定位置ではないためコンポーネントとして発見されない。本計画では T009 が採用している。
 
-### KB-3
+### KB-3（解消済み）
 
-- **該当節**: 8.4 書き込みの原子性と並行性
+- **該当節（rev.3 時点）**: 8.4 書き込みの原子性と並行性
 - **欠陥**: LOCK に含める `boot_id` の取得方法が規定されていない。Linux の /proc/sys/kernel/random/boot_id は移植性が無く、Windows と macOS での定義が無いまま「再起動をまたいだ陳腐 LOCK の判別」を要求している。
-- **提案**: boot_id を「OS が提供する場合はそれを使い、無い場合は PLUGIN_DATA 直下に起動時 UUID を保存して代用する」と 8.4 に定義し、代用時は陳腐化判定が 60 秒のみに縮退することを明記する。
+- **差し戻し時の提案**: boot_id を「OS が提供する場合はそれを使い、無い場合は PLUGIN_DATA 直下に起動時 UUID を保存して代用する」と 8.4 に定義し、代用時は陳腐化判定が 60 秒のみに縮退することを明記する。
+- **rev.4 での解消**: 8.4 に boot_id の3経路（OS 起動識別子 / 起動時刻の UUIDv5 / `PLUGIN_DATA/instance_id` 代用）と `boot_id_source` の記録を定義し、代用時は陳腐化判定が 60 秒経過のみに縮退することと `warnings` に `lock_staleness_time_only` を出すことを明記した。本計画では T005 が実装する。
 
-### KB-4
+### KB-4（解消済み）
 
-- **該当節**: 19.5.2 `artifact_kind: "plan"` — 計画の型
+- **該当節（rev.3 時点）**: 19.5.2 `artifact_kind: "plan"` — 計画の型
 - **欠陥**: task スキーマの `required` に `design_refs` が入っていないのに、同節の機械検査は「すべての `design_refs` が上流に実在すること」を求めている。`design_refs` を持たないタスクが合法なのか、`E_PLAN_INVALID` なのかが決まっていない。
-- **提案**: `design_refs` を `required` に加えるか、機械検査側に「`design_refs` 欠落は `E_PLAN_INVALID`」を1行足すかを選び、どちらかに確定する。設計外作業の混入（F18）を塞ぐ意図からは前者が整合する。
+- **差し戻し時の提案**: `design_refs` を `required` に加えるか、機械検査側に「`design_refs` 欠落は `E_PLAN_INVALID`」を1行足すかを選び、どちらかに確定する。設計外作業の混入（F18）を塞ぐ意図からは前者が整合する。
+- **rev.4 での解消**: `design_refs` を task スキーマの `required` に加えた（提案のうち前者を採用）。欠落・空配列は `E_PLAN_SCHEMA`、実在しない参照は `E_PLAN_DESIGN_REF` と役割が分かれた。本計画では T028 と T030 に反映済み。
 
-### KB-5
+### KB-5（解消済み）
 
-- **該当節**: 19.6.7 全7ツール総覧（名前・目的・入力／出力スキーマの所在・エラー条件の全数）
+- **該当節（rev.3 時点）**: 19.6.7 全7ツール総覧（名前・目的・入力／出力スキーマの所在・エラー条件の全数）
 - **欠陥**: `score_submit` の18件に `E_VALIDATION` が無い。一方 6.3 の共通エラー条件は `E_VALIDATION` を全ツール共通として挙げており、rationale 40 文字未満のような入力不備がどのコードになるのかが2節で食い違う。
-- **提案**: 総覧の各行が「共通6件を含む全数」なのか「ツール固有の追加分」なのかを 19.6.7 の冒頭で定義し、`score_submit` の行に `E_VALIDATION` を含めるか除くかを明示する。
+- **差し戻し時の提案**: 総覧の各行が「共通6件を含む全数」なのか「ツール固有の追加分」なのかを 19.6.7 の冒頭で定義し、`score_submit` の行に `E_VALIDATION` を含めるか除くかを明示する。
+- **rev.4 での解消**: 19.6.7 の冒頭に「共通エラー条件を含む全数（`E_INTERNAL` のみ除外）」という行の定義を置き、`score_submit` を18件→19件、`loop_state` を1件→2件にして `E_VALIDATION` を追加した。定義済み42件は不変。本計画では T010 と T025 に反映済み。
 
-### KB-6
+### KB-6（解消済み）
 
-- **該当節**: 13. 受け入れテスト
+- **該当節（rev.3 時点）**: 13. 受け入れテスト
 - **欠陥**: AT-1 から AT-9 の見出しが「AT-1 正常収束（1本）」形式、AT-10 から AT-18 が「AT-10: 3モード連鎖の正常系」形式で、区切り文字と本数表記が揃っていない。見出し文字列で機械照合するときに規則を2つ持たされる。
-- **提案**: どちらかの記法に統一する。既存の参照は節番号ではなく AT 番号で行われているため、見出し文字列だけを揃えれば参照は壊れない。
+- **差し戻し時の提案**: どちらかの記法に統一する。既存の参照は節番号ではなく AT 番号で行われているため、見出し文字列だけを揃えれば参照は壊れない。
+- **rev.4 での解消**: 全18件を `AT-<番号>: <目的>` の一形式に統一した（`（1本）` は「1 AT = 1本」として 13 の冒頭に集約）。本計画の T050–T058 の design_refs もこの表記に追随させた。
 
-### KB-7
+### KB-7（解消済み）
 
-- **該当節**: 16. 既定値まとめ（実装時に決め直さない） / 7.2 既定値と根拠
+- **該当節（rev.3 時点）**: 16. 既定値まとめ（実装時に決め直さない） / 7.2 既定値と根拠
 - **欠陥**: `stall_epsilon` は 16 で implement のみ 0.20 と定められているが、7.2 の根拠表は 0.25 の理由しか述べておらず、0.20 を選んだ理由が文書内に無い。19.10.1 のモード別の値と理由にも 0.20 の根拠が見当たらない。
-- **提案**: 19.10.1 に implement の `stall_epsilon` を 0.20 にした理由（1周あたりの改善幅が設計・計画より小さいなど）を1行足す。値そのものは変えない。
+- **差し戻し時の提案**: 19.10.1 に implement の `stall_epsilon` を 0.20 にした理由（1周あたりの改善幅が設計・計画より小さいなど）を1行足す。値そのものは変えない。
+- **rev.4 での解消**: 19.10.1 にモード別の値と理由の表を置き、0.20 を重み配置から導出して示した（implement は重み合計22なので「重み2と3の基準が各 +1」= 5/22 ≒ 0.227 が 0.25 では停滞と誤判定される）。7.2 と 16 からも 19.10.1 を参照するようにした。値は変わっていないので本計画に影響は無い。

@@ -38,3 +38,38 @@ docs\design-rubric-loop-mcp.md は
 
 ### 2-3 機能追加rublicループを実施
 docs/design-rubric-loop-modes.txt を実施
+→docs\design-rubric-loop-mcp.md 更新
+
+## 3 実装計画を作るためのルールを作る
+### 3-1 冗長だが、実装計画を作るためのrubricループを作成
+docs\design-rubric-loop-mcp.md
+の実装計画を立てるためのrubricループプロンプトを作って
+→ docs\plan-rubric-loop-mcp.txt
+
+## 4 実装計画を作る
+docs\plan-rubric-loop-mcp.txt  を実施
+→docs\plans\rubric-loop-implementation-plan.md
+KICKBACK（設計書側の欠陥・計画には反映せず）の指摘、提案があった
+
+### 4-1 KICKBACKで再設計
+docs\plans\rubric-loop-implementation-plan.md
+のKICKBACK（設計書側の欠陥・計画には反映せず）を読んで、
+docs\design-rubric-loop-mcp.md を修正して(ループではなく鵜呑み)
+→docs\design-rubric-loop-mcp.md更新
+
+### 4-2 設計の修正を実装計画作成rubricループに反映
+docs\design-rubric-loop-mcp.md の更新に伴って、
+docs\plans\rubric-loop-implementation-plan.md も更新して（ループでない）
+
+
+## 5 実装
+docs\plans\rubric-loop-implementation-plan.md を読んで実装に進んでください
+
+
+
+## 6 未実装確認
+これどうしようかね
+これはルブリックループじゃなくていいかな？
+
+## 7 補完設計を作るためのルールを作る
+ここからはドッグフーディングしたい

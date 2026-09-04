@@ -1,7 +1,7 @@
 # rubric ループ実行 MCP サーバ 設計書
 
 **パッケージ名**: `rubric-loop`
-**版**: 1.0.0（設計書 rev.3）
+**版**: 1.0.0（設計書 rev.4）
 **配布形態**: Agent Plugins 1.0.0 準拠 可搬プラグインパッケージ
 **目的**: 「PLAN → DO → VERIFY → DECIDE を全基準9点以上まで回す」ワンショット・プロンプトの挙動を、**モデルの自制心ではなくサーバ側の永続状態と閾値判定**で成立させる。
 
@@ -106,8 +106,8 @@
 | F10 | **成果物の差し替えごまかし** | 採点後に成果物だけ静かに書き換えて「その版で9点でした」と主張 | `artifact_commit` → `score_submit` の順序を状態機械が強制。`score_submit` は `artifact_digest` を必須引数で受け、サーバ保持値と不一致なら拒否 | `E_DIGEST_MISMATCH` |
 | F11 | **評価の空洞化（引用が成果物に無い）** | 存在しない章を根拠として引用 | `locator` 根拠は `excerpt` 必須。サーバは保存済み成果物本文に対し**正規化後の部分一致**を検証。見つからなければ拒否 | `E_EVIDENCE_NOT_FOUND` |
 | F12 | **セッションの取り違え／並行上書き** | 別ウィンドウの同名セッションが状態を壊す | `expected_round` による楽観ロック + `PLUGIN_DATA` 上の排他ロック | `E_CONCURRENT` |
-| F14 | **通信断による二重採点** | ストリームが切れて結果が届かず、同じ `score_submit` を再送 → 周回が2つ進む／停滞カウンタが狂う | `artifact_commit` / `score_submit` に冪等キー `submission_id` を必須化。既出なら保存済み応答をそのまま返す（§7.1 手順 0）。MCP 2026-07-28 はストリーム再開を廃止し再送を前提とするため必須 | （再送は成功扱い。二重適用なし） |
 | F13 | **サーバ不在で無検証の完了宣言** | MCP 起動失敗時にモデルが素の自己採点で FINAL を出す | `SKILL.md` が縮退規約を持つ：ツールが無い周回では **`FINAL` を名乗ることを禁止**し `UNVERIFIED-COMPLETE` に格下げ、フォールバック journal を残す（§10.3） | （スキル側の規約） |
+| F14 | **通信断による二重採点** | ストリームが切れて結果が届かず、同じ `score_submit` を再送 → 周回が2つ進む／停滞カウンタが狂う | `artifact_commit` / `score_submit` に冪等キー `submission_id` を必須化。既出なら保存済み応答をそのまま返す（§7.1 手順 0）。MCP 2026-07-28 はストリーム再開を廃止し再送を前提とするため必須 | （再送は成功扱い。二重適用なし） |
 | F15 | **上流の版を知らずに下流を始める** | 「設計書は読んだ」と称して、どの版に対する計画なのか記録せずに計画を書き始める | `loop_open` が `upstream:{session_id, artifact_digest}` を **plan/implement で必須**にし、digest が上流の確定成果物と一致しなければセッションを作らない（§19.2.1） | `E_UPSTREAM_REQUIRED` / `E_UPSTREAM_DIGEST_MISMATCH` |
 | F16 | **上流が変わったのに下流が古い合格のまま残る** | 設計を直したのに、その設計から出た実装が `FINAL` のまま放置される | 全ツール呼び出しの入口でピンと上流の現在の確定 digest を比較し、不一致なら下流を `SUPERSEDED` に落とす。`FINAL` でも容赦なく落ちる（§19.3.2） | `state:"SUPERSEDED"` / `E_SUPERSEDED` |
 | F17 | **上流の欠陥を下流で辻褄合わせする** | 計画の依存順が間違っているのに、実装側で順番を勝手に変えて設計書と乖離させる | `escalate(action:"kickback")` で上流を再オープンし、下流は `FROZEN` になる。下流だけ進める経路が無い（§19.4） | `E_FROZEN` |
@@ -691,7 +691,7 @@ MCP 2026-07-28 で `inputSchema` / `outputSchema` は JSON Schema 2020-12 の任
 }
 ```
 
-**エラー条件**: `E_SESSION_NOT_FOUND` / `E_INTERNAL`。状態違反は起こらない（全状態で許可）。`include:["upstream"]` を上流を持たない design セッションで指定した場合はエラーにせず、`upstream_artifact` を省いて `warnings:["no_upstream"]` を返す（復帰口が状態によって失敗すると、文脈が飛んだときの唯一の出口が塞がるため）。
+**エラー条件**: `E_VALIDATION`（入力スキーマ違反。未知の `include` 値など） / `E_SESSION_NOT_FOUND` / `E_INTERNAL`。状態違反は起こらない（全状態で許可）。`include:["upstream"]` を上流を持たない design セッションで指定した場合はエラーにせず、`upstream_artifact` を省いて `warnings:["no_upstream"]` を返す（復帰口が状態によって失敗すると、文脈が飛んだときの唯一の出口が塞がるため）。
 
 ---
 
@@ -1065,6 +1065,7 @@ MCP 2026-07-28 で `inputSchema` / `outputSchema` は JSON Schema 2020-12 の任
 
 | code | 条件 | 返す詳細 |
 |---|---|---|
+| `E_VALIDATION` | 入力 JSON Schema 違反（`rationale` が 40 文字未満、未知フィールド、`scores` の型不正など）。**以下のごまかし検出はすべてスキーマ通過後に評価する** | `path`, `reason` |
 | `E_STATE_VIOLATION` | `SCORING` 以外 | `expected_tools` |
 | `E_CONCURRENT` | `expected_round` 不一致 | サーバ側 `round` |
 | `E_DIGEST_MISMATCH` | `artifact_digest` が登録済みの最新 commit と不一致 | 期待 digest |
@@ -1433,7 +1434,7 @@ MCP 2026-07-28 で `inputSchema` / `outputSchema` は JSON Schema 2020-12 の任
 | `pass_weighted_mean` | 9.0 | 全基準9なら加重平均も9以上。重み付き平均だけで通る抜け道を作らない（両方を AND） |
 | `max_rounds` | 12 | 実測で 8–10 周で収束するタスクが多く、余裕を2–4周持たせた値。超えたら人間を呼ぶ方が安い |
 | `stall_window` | 3 | 2 は誤検知（構成の作り直し周は一時的に伸びない）、4 以上は無駄が多い |
-| `stall_epsilon` | 0.25 | 10点尺度・重み付き平均で「実質的な前進」と言える最小幅。0.1 未満は誤差、0.5 は前進を止めすぎ |
+| `stall_epsilon` | 0.25 | 10点尺度・重み付き平均で「実質的な前進」と言える最小幅。0.1 未満は誤差、0.5 は前進を止めすぎ。**implement モードのみ 0.20 に下げる**（auto 基準が多く加重平均が階段状に動くため。根拠は §19.10.1） |
 | `max_score_jump` | 3 | 5→9 のような一気通貫を禁じ、4→7→9 の2周に分ける。1周1点では収束が遅すぎる |
 | `extra_rounds`（escalate continue） | 3 | 人間が「もう少し」と言うときの現実的な追加量 |
 
@@ -1468,11 +1469,12 @@ ESCALATED から戻る道は human_token 必須:
 ```
 $PLUGIN_DATA/rubric-loop/
 ├── index.json                       # session_id -> {state, round, updated_at} の一覧、label 逆引き、chain_id 逆引き
+├── instance_id                      # OS 起動識別子が無いホストでの boot_id 代用（§8.4）。初回起動時に1度だけ生成
 ├── chains/<chain_id>/
 │   └── chain.json                  # 連鎖の台帳（追記のみ。§19.11.1）
 └── sessions/<session_id>/
     ├── session.json                 # 状態機械の現在値（下記 8.3）
-    ├── LOCK                         # 排他ロック（pid + boot_id + acquired_at）
+    ├── LOCK                         # 排他ロック（pid + boot_id + boot_id_source + acquired_at）
     ├── rubric/
     │   ├── 1.json                   # rubric 全文（版ごと）
     │   └── 2.json
@@ -1563,7 +1565,17 @@ $PLUGIN_DATA/rubric-loop/
 ### 8.4 書き込みの原子性と並行性
 
 - 全書き込みは `write(tmp) → fsync(tmp) → rename(tmp, dst) → fsync(dir)`。途中でクラッシュしても **`session.json` は必ず一貫した旧版か新版のどちらか**になる。
-- `LOCK` は `O_EXCL` で作成し `{pid, boot_id, acquired_at}` を書く。同一 `boot_id` で生存していないプロセスのロックは 60 秒後に奪取可（stale lock 回収）。
+- `LOCK` は `O_EXCL` で作成し `{pid, boot_id, boot_id_source, acquired_at}` を書く。同一 `boot_id` で生存していないプロセスのロックは 60 秒後に奪取可（stale lock 回収）。
+- **`boot_id` の求め方**（OS 非依存に規定する。`boot_id_source` に採った経路を必ず記録する）:
+
+| 経路 | 取得元 | `boot_id_source` |
+|---|---|---|
+| OS が起動識別子を持つ | Linux: `/proc/sys/kernel/random/boot_id` を読む | `"os"` |
+| OS が起動時刻を持つ | Windows / macOS: 起動時刻（`now - uptime`）を秒精度の ISO 8601 に丸めた文字列を UUIDv5 化する。同一起動中は同値、再起動で必ず別値になる | `"os"` |
+| どちらも取れない | `PLUGIN_DATA` 直下の `instance_id`（無ければ起動時に UUIDv4 を生成して原子的に作成、あれば読むだけ）で代用する | `"instance"` |
+
+- 代用時（`boot_id_source:"instance"`）は `instance_id` が再起動をまたいで残るため、**「別の起動で作られた LOCK」を判別できない**。この場合の陳腐化判定は `acquired_at` からの **60 秒経過のみ**に縮退する（pid 生存確認は再起動後に pid が再利用されうるため根拠にしない）。縮退していることは `loop_state` の `warnings` に `"lock_staleness_time_only"` を入れて可視化する（出力スキーマは既存の `warnings: string[]` をそのまま使う。新しいフィールドは足さない）。
+- 経路は起動時に1度だけ決め、プロセスの生涯にわたって変えない。`boot_id_source` の異なる LOCK どうしを比較する必要が生じた場合（プラグイン更新をまたいだ等）は、同一 `boot_id` とはみなさず時間のみで判定する。
 - 加えて全 mutation ツールは `expected_round` を必須にした**楽観ロック**。ロックが取れても round がずれていれば `E_CONCURRENT`（F12）。
 - 成果物は内容アドレスなので、同一内容の再 commit はファイルを増やさず `unchanged:true` を返すだけ。
 
@@ -1592,7 +1604,8 @@ $PLUGIN_DATA/rubric-loop/
 ```
 rubric-loop/
 ├── plugin.json                     # 固定位置
-├── mcp.json                        # 固定位置
+├── mcp.json                        # 固定位置。既定の transport 宣言（stdio・§9.3）
+├── mcp.http.json                   # 任意。streamable-http 版のひな型（§9.4）。この名前ではコンポーネントとして発見されない
 ├── skills/
 │   └── rubric-loop/
 │       └── SKILL.md                # 固定位置
@@ -1605,7 +1618,7 @@ rubric-loop/
     └── package.json
 ```
 
-`skills/` と `mcp.json` 以外はコンポーネントとして発見されない。`server/` は `mcp.json` から `${PLUGIN_ROOT}` 経由で参照されるだけの実装本体であり、`presets/` はサーバが `${PLUGIN_ROOT}` 配下から読む読み取り専用データである。**コンポーネントの種類は増えていない**（skills/ と mcp.json のまま）ので、Agent Plugins 1.0.0 への適合は変わらない。
+`skills/` と `mcp.json` 以外はコンポーネントとして発見されない（`mcp.http.json` も**発見されない**。固定位置の名前は `mcp.json` ただ1つであり、ひな型を同梱しても transport 宣言が2つ有効になることはない）。`server/` は `mcp.json` から `${PLUGIN_ROOT}` 経由で参照されるだけの実装本体であり、`presets/` はサーバが `${PLUGIN_ROOT}` 配下から読む読み取り専用データである。**コンポーネントの種類は増えていない**（skills/ と mcp.json のまま）ので、Agent Plugins 1.0.0 への適合は変わらない。
 
 ### 9.2 `plugin.json`（実物）
 
@@ -1681,9 +1694,14 @@ rubric-loop/
 
 `./` 始まりのプラグイン相対パスも単一トークンなので適合。**どちらを採るかはパッケージのビルド構成の選択であり、実行時のフォールバックではない**（フォールバック経路は仕様に無い）。
 
-### 9.4 `mcp.json`（streamable-http 版）
+### 9.4 `mcp.http.json`（streamable-http 版のひな型）
 
-自前でサーバを常駐させる運用向け。**同じパッケージには同梱しない**（1つのサーバ名に1つの transport 宣言）。配布時にどちらかを選ぶ。
+自前でサーバを常駐させる運用向け。**固定位置の `mcp.json` として同時に有効化はできない**（1つのサーバ名に1つの transport 宣言）。そこでファイル名を分け、次のように規定する。
+
+- **既定は `mcp.json`（stdio・§9.3）**。プラグインを展開したままの状態ではこれだけが読まれる。
+- streamable-http 版は `mcp.http.json` という**別名でパッケージに同梱する**。この名前は固定位置ではないため、コンポーネントとして発見されず、既定の動作を一切変えない。
+- **切り替えは利用者のリネーム操作で行う**：`mcp.json` を退避（例: `mcp.stdio.json`）してから `mcp.http.json` を `mcp.json` にリネームし、クライアントを再起動する。サーバ側にも設計にも transport を選ぶ実行時の分岐は無い（§9.5）。
+- リネーム後の `mcp.json` にも §9.3 の適合性チェック表のうち transport 非依存な行（`$schema` 一致、最上位キー、資格情報を置かない、legacy SSE 非依存）がそのまま適用される。
 
 ```json
 {
@@ -2042,9 +2060,9 @@ Claude Code は互換クライアント一覧に無く独自のプラグイン�
 
 各シナリオは「呼ぶツール列 → 期待される返り値」まで書く。`S` はセッション id、応答は要点のみ抜粋。
 
-AT-1〜AT-9 は単一モード（`loop_mode:"design"` 相当）のループ、AT-10〜AT-18 は3モード連鎖のシナリオである。
+AT-1〜AT-9 は単一モード（`loop_mode:"design"` 相当）のループ、AT-10〜AT-18 は3モード連鎖のシナリオである。見出しは全件 `### AT-<番号>: <一行の目的>` の一形式に統一してあり、**1つの AT が1本のテストに対応する**（合計18本）。機械照合はこの1規則だけで足りる。
 
-### AT-1 正常収束（1本）
+### AT-1: 正常収束
 
 | # | 呼び出し | 期待される返り値 |
 |---|---|---|
@@ -2057,7 +2075,7 @@ AT-1〜AT-9 は単一モード（`loop_mode:"design"` 相当）のループ、AT
 | 7 | `artifact_commit{S, 3, …}`（FINAL 後の追記を試す） | `E_STATE_VIOLATION`, `expected_tools:["loop_state","audit_export"]` |
 | 8 | `audit_export{S}` | `export.path:".../exports/audit-…json"`, `summary.final_verdict:"FINAL"`, `summary.rejected_submissions:0` |
 
-### AT-2 ごまかし検出①：成果物不変でスコアだけ上昇（1本）
+### AT-2: ごまかし検出①：成果物不変でスコアだけ上昇
 
 | # | 呼び出し | 期待される返り値 |
 |---|---|---|
@@ -2066,7 +2084,7 @@ AT-1〜AT-9 は単一モード（`loop_mode:"design"` 相当）のループ、AT
 | 3 | `score_submit{S, 2, <同digest>, scores(全て前周と同点)}` | `ok:true`, `verdict:"ITERATING"`, `improvement:0.0`, `stall.rounds_without_improvement:1` |
 | 4 | `audit_export{S}` | `rejected_submissions[0].error_code:"E_SCORE_INFLATION"` |
 
-### AT-3 ごまかし検出②：根拠の捏造と使い回し（1本）
+### AT-3: ごまかし検出②：根拠の捏造と使い回し
 
 | # | 呼び出し | 期待される返り値 |
 |---|---|---|
@@ -2077,7 +2095,7 @@ AT-1〜AT-9 は単一モード（`loop_mode:"design"` 相当）のループ、AT
 | 5 | `score_submit{…, acceptance-tests: 4→9（delta 5）, evidence:[command 1件]}` | **`E_SCORE_JUMP`**, `detail.delta:5`, `detail.max_score_jump:3`, `detail.required:"exit_code:0 の command 根拠 2件以上"` |
 | 6 | `score_submit{…, 正しい根拠一式}` | `ok:true`, `verdict:"ITERATING"` または `"FINAL"` |
 
-### AT-4 停滞打ち切り（1本）
+### AT-4: 停滞打ち切り
 
 前提: `stall_window:3`, `stall_epsilon:0.25`。round 4 時点の `weighted_mean:8.10`。
 
@@ -2091,7 +2109,7 @@ AT-1〜AT-9 は単一モード（`loop_mode:"design"` 相当）のループ、AT
 | 6 | `escalate{S, action:"resolve", resolution:"continue", human_token:"<誤った値>", note:"続行"}` | **`E_TOKEN_INVALID`**, `state:"ESCALATED"` のまま |
 | 7 | `escalate{S, action:"resolve", resolution:"continue", human_token:"<ファイルの値>", extra_rounds:3, note:"self-hosting の解釈を人間が指定した。続行してよい"}` | `state:"DRAFTING"`, `round:8`, `policy 実効 max_rounds:15`, `stall.rounds_without_improvement:0`, トークンは消費済み（再利用は `E_TOKEN_INVALID`） |
 
-### AT-5 max_rounds 到達（1本）
+### AT-5: max_rounds 到達
 
 | # | 呼び出し | 期待される返り値 |
 |---|---|---|
@@ -2099,7 +2117,7 @@ AT-1〜AT-9 は単一モード（`loop_mode:"design"` 相当）のループ、AT
 | 2 | `escalate{S, action:"abort", note:"要件自体を見直すため中断する"}` | `state:"ABORTED"`（終端）, `next_action.tool:"audit_export"` |
 | 3 | `escalate{S, action:"request_human", note:"やっぱり続けたい"}` | `E_STATE_VIOLATION`（`ABORTED` は終端） |
 
-### AT-6 セッション再開（1本）
+### AT-6: セッション再開
 
 前提: round 5 の `DRAFTING` 状態でホストを再起動。モデルのコンテキストは空。
 
@@ -2114,7 +2132,7 @@ AT-1〜AT-9 は単一モード（`loop_mode:"design"` 相当）のループ、AT
 | 7 | `score_submit{S, submission_id:"s5-1", …}` → 応答が届かず再送 `score_submit{S, submission_id:"s5-1", …}` | 2回目も**1回目と同じ `verdict` と同じ `round`** を返す。周回は1つしか進まない |
 | 8 | `loop_open{mode:"create", session_id:"rl_01J…", task, rubric}` | **`E_HANDLE_NOT_ACCEPTED`**（ハンドルはサーバが発行する） |
 
-### AT-7 rubric の緩和を検出してエスカレーション（1本）
+### AT-7: rubric の緩和を検出してエスカレーション
 
 | # | 呼び出し | 期待される返り値 |
 |---|---|---|
@@ -2126,7 +2144,7 @@ AT-1〜AT-9 は単一モード（`loop_mode:"design"` 相当）のループ、AT
 | 6 | round 7: `artifact_commit` → `score_submit`（全9以上） | `verdict:"FINAL_WITH_RELAXATION"`, `state:"FINAL_WITH_RELAXATION"` |
 | 7 | `audit_export{S}` | `rubric_versions[1].classification:"relaxation"`, `escalations[0].resolution:"approve_relaxation"`, `summary.relaxations:1`。**緩めた事実が監査に残る** |
 
-### AT-8 モデルの自己申告を無効化する（1本）
+### AT-8: モデルの自己申告を無効化する
 
 | # | 呼び出し | 期待される返り値 |
 |---|---|---|
@@ -2135,7 +2153,7 @@ AT-1〜AT-9 は単一モード（`loop_mode:"design"` 相当）のループ、AT
 | 3 | `score_submit`（`DRAFTING` 中に、`artifact_commit` を飛ばして呼ぶ） | `E_STATE_VIOLATION`, `expected_tools:["artifact_commit", …]`。**採点前に必ず版が確定する**ことの確認 |
 | 4 | `score_submit{…, artifact_digest:"sha256:<前周の digest>"}` | `E_DIGEST_MISMATCH`, `detail.expected:"sha256:<今周の digest>"` |
 
-### AT-9 サーバ起動失敗時のスキル単独動作（1本）
+### AT-9: サーバ起動失敗時のスキル単独動作
 
 前提: `mcp.json` のサーバが起動失敗（`node` が無い等）。Agent Plugins ではコンポーネント障害は非致命なので `skills/` はロード済み。
 
@@ -2685,7 +2703,7 @@ design プリセットは `interface_completeness` / `packaging_conformance` / `
 | 既定 `artifact_kind` | design→`markdown` / plan→`plan` / implement→`fileset` |
 | `max_rounds`（モード別） | design 12 / plan 8 / implement 16 |
 | `stall_window`（モード別） | design 3 / plan 2 / implement 4 |
-| `stall_epsilon`（モード別） | design 0.25 / plan 0.25 / implement 0.20 |
+| `stall_epsilon`（モード別） | design 0.25 / plan 0.25 / implement 0.20（implement を下げた理由は §19.10.1） |
 | チェーン予算 `chain_max_rounds` | 28（単純合計 36 より小さく取る。§19.10.2） |
 | チェーン上乗せ `chain_extra_rounds` | 6（人間承認で**1回だけ**） |
 | 差し戻し上限 `chain_max_kickbacks` | 2 |
@@ -3002,7 +3020,7 @@ FROZEN ──escalate{action:"abort"}──▶ ABORTED（下流を捨てる判�
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "title", "intent", "depends_on", "changes", "acceptance", "verify"],
+        "required": ["id", "title", "intent", "design_refs", "depends_on", "changes", "acceptance", "verify"],
         "properties": {
           "id": { "type": "string", "pattern": "^T[0-9]{3}$" },
           "title": { "type": "string", "minLength": 1, "maxLength": 200 },
@@ -3010,7 +3028,7 @@ FROZEN ──escalate{action:"abort"}──▶ ABORTED（下流を捨てる判�
           "design_refs": {
             "type": "array", "minItems": 1,
             "items": { "type": "string", "minLength": 1, "maxLength": 200 },
-            "description": "上流設計書の節番号や見出し。plan モードでは1件以上を必須にし、設計に無い作業が紛れ込むのを防ぐ"
+            "description": "上流設計書の節番号や見出し。plan モードでは required かつ 1件以上を必須にし、設計に無い作業が紛れ込むのを防ぐ（F18）"
           },
           "depends_on": {
             "type": "array", "uniqueItems": true,
@@ -3067,6 +3085,8 @@ FROZEN ──escalate{action:"abort"}──▶ ABORTED（下流を捨てる判�
 | `design_refs` の各文字列が**ピンされた上流設計書に存在する**（正規化後の部分一致） | **設計に無い作業の混入を機械的に弾く**。存在しなければ `E_PLAN_DESIGN_REF`（`detail.task_id`, `detail.ref`） |
 
 最後の1件が効く。「設計に書いていない機能を計画に足す」という典型的な逸脱が、`E_PLAN_DESIGN_REF` で自動的に止まる。
+
+**`design_refs` を持たないタスクは合法ではない**。`design_refs` は task の `required` に含まれるので、欠落・空配列（`minItems:1` 違反）はスキーマ段階で `E_PLAN_SCHEMA`（`detail.path:"/tasks/<i>/design_refs"`, `detail.reason:"required"` または `"min_items"`）となり、上表の機械検査（`E_PLAN_INVALID` / `E_PLAN_DESIGN_REF`）まで到達しない。すなわち、**欠落はスキーマ違反、実在しない参照は `E_PLAN_DESIGN_REF`** と役割が分かれる。F18 は「全タスクに `design_refs` を必須化」と述べており、この配置がその要求そのものである。
 
 計画の人間向け Markdown が欲しい場合は `files[]` に併記してよい（`artifact_kind:"plan"` でも `files` は任意で受け付ける）。ただし**判定対象は JSON のみ**であり、Markdown は監査用の添付である。
 
@@ -3212,19 +3232,26 @@ FROZEN ──escalate{action:"abort"}──▶ ABORTED（下流を捨てる判�
 
 #### 19.6.7 全7ツール総覧（名前・目的・入力／出力スキーマの所在・エラー条件の全数）
 
-3モード対応後の**確定した表面**。スキーマの実物は §6.4 にあり、この表はそこへの索引と、各ツールが返しうるエラーコードの**全数**である（`E_INTERNAL` は全ツール共通なので個別には数えない）。
+3モード対応後の**確定した表面**。スキーマの実物は §6.4 にあり、この表はそこへの索引と、各ツールが返しうるエラーコードの**全数**である。
+
+**「全数」の定義**（この表の読み方。ツール固有の追加分だけを挙げた表ではない）:
+
+- 各行は、そのツールが返しうるコードを**§6.3 の共通エラー条件を含めて**すべて挙げる。共通だからといって省略しない。
+- ただし `E_INTERNAL` だけは例外で、7ツール全部に一様に付くため行には書かず件数にも数えない。行末の件数は `E_INTERNAL` を除いた数である。
+- したがって、入力 JSON Schema 違反として返る `E_VALIDATION` は **7ツール全部の行に現れる**。`score_submit` の `rationale` が 40 文字未満、`loop_state` の `include` が未知の値、といった入力不備はすべて `E_VALIDATION` であり、ツール固有のごまかし検出コード（`E_EVIDENCE_*` など）はスキーマを通過した入力に対してのみ発生する。
+- 逆に、その状態機械上ありえないコードは書かない（例: 全状態で呼べる `loop_state` に `E_STATE_VIOLATION` は無い）。
 
 | # | name | 目的 | 入力スキーマ | 出力スキーマ | 返しうるエラー（`E_INTERNAL` を除く全数） |
 |---|---|---|---|---|---|
 | 1 | `loop_open` | セッションを作成／再開し、rubric・policy・`loop_mode`・上流ピンを固定する | §6.4.1 | §6.4.1 | `E_VALIDATION`, `E_HANDLE_NOT_ACCEPTED`, `E_SESSION_NOT_FOUND`, `E_AMBIGUOUS_LABEL`, `E_NO_PERSISTENCE`, `E_RUBRIC_ON_RESUME`, `E_UPSTREAM_REQUIRED`, `E_UPSTREAM_NOT_ALLOWED`, `E_UPSTREAM_NOT_FOUND`, `E_UPSTREAM_NOT_FINAL`, `E_UPSTREAM_MODE_MISMATCH`, `E_UPSTREAM_DIGEST_MISMATCH`, `E_CHAIN_BUDGET_EXHAUSTED`（13件） |
-| 2 | `loop_state` | 状態・rubric 全文・履歴・`must_fix`・上流・チェーンを返す。文脈が飛んだ時の唯一の復帰口 | §6.4.2 | §6.4.2 | `E_SESSION_NOT_FOUND`（1件。全状態で呼べるので状態違反は起きない） |
+| 2 | `loop_state` | 状態・rubric 全文・履歴・`must_fix`・上流・チェーンを返す。文脈が飛んだ時の唯一の復帰口 | §6.4.2 | §6.4.2 | `E_VALIDATION`, `E_SESSION_NOT_FOUND`（2件。全状態で呼べるので状態違反は起きない） |
 | 3 | `artifact_commit` | 成果物（`content` または `files`）を登録し digest を確定して `SCORING` へ遷移する | §6.4.3 | §6.4.3 | `E_STATE_VIOLATION`, `E_CONCURRENT`, `E_VALIDATION`, `E_ADDRESS_MISSING`, `E_ARTIFACT_KIND_MISMATCH`, `E_MANIFEST_UNVERIFIABLE`, `E_TEST_INVENTORY_REQUIRED`, `E_TEST_MUTATED_WITHOUT_DIFF`, `E_PLAN_SCHEMA`, `E_PLAN_INVALID`, `E_PLAN_DESIGN_REF`, `E_FROZEN`, `E_SUPERSEDED`（13件） |
-| 4 | `score_submit` | 全基準のスコアと根拠を提出する。**判定を返す唯一のツール** | §6.4.4 | §6.4.4 | `E_STATE_VIOLATION`, `E_CONCURRENT`, `E_DIGEST_MISMATCH`, `E_INCOMPLETE_SCORES`, `E_EVIDENCE_REQUIRED`, `E_EVIDENCE_KIND`, `E_EVIDENCE_NOT_FOUND`, `E_EVIDENCE_STALE`, `E_EVIDENCE_TARGET`, `E_SCORE_INFLATION`, `E_SCORE_JUMP`, `E_WEAKNESS_REQUIRED`, `E_TEST_REGRESSION`, `E_TEST_NOT_GREEN`, `E_UPSTREAM_NOT_ALLOWED`, `E_FROZEN`, `E_SUPERSEDED`, `E_CHAIN_BUDGET_EXHAUSTED`（18件） |
+| 4 | `score_submit` | 全基準のスコアと根拠を提出する。**判定を返す唯一のツール** | §6.4.4 | §6.4.4 | `E_VALIDATION`, `E_STATE_VIOLATION`, `E_CONCURRENT`, `E_DIGEST_MISMATCH`, `E_INCOMPLETE_SCORES`, `E_EVIDENCE_REQUIRED`, `E_EVIDENCE_KIND`, `E_EVIDENCE_NOT_FOUND`, `E_EVIDENCE_STALE`, `E_EVIDENCE_TARGET`, `E_SCORE_INFLATION`, `E_SCORE_JUMP`, `E_WEAKNESS_REQUIRED`, `E_TEST_REGRESSION`, `E_TEST_NOT_GREEN`, `E_UPSTREAM_NOT_ALLOWED`, `E_FROZEN`, `E_SUPERSEDED`, `E_CHAIN_BUDGET_EXHAUSTED`（19件） |
 | 5 | `rubric_amend` | rubric を新しい版として変更し、緩和方向の変更を監査に残す | §6.4.5 | §6.4.5 | `E_STATE_VIOLATION`, `E_CONCURRENT`, `E_THRESHOLD_IMMUTABLE`, `E_RELAXATION_UNACKNOWLEDGED`, `E_VALIDATION`（5件） |
 | 6 | `escalate` | 正常フロー外の判断（人間呼び出し・解決・打ち切り・再開・rebase・差し戻し）を記録つきで行う | §6.4.6 | §6.4.6 | `E_STATE_VIOLATION`, `E_TOKEN_INVALID`, `E_RESOLUTION_NOT_APPLICABLE`, `E_VALIDATION`, `E_UPSTREAM_NOT_FOUND`, `E_UPSTREAM_DIGEST_MISMATCH`, `E_CHAIN_BUDGET_EXHAUSTED`（7件） |
 | 7 | `audit_export` | 監査 JSON をセッション単位またはチェーン単位で書き出す | §6.4.7 | §6.4.7 | `E_SESSION_NOT_FOUND`, `E_VALIDATION`（`scope:"chain"` で `chain_id` を解決できない）（2件） |
 
-**エラーコードの総数の突き合わせ**: 本書で定義されているコードは、§6.3 の共通6件 ＋ 各ツールの個別エラー表17件 ＋ §19.6.6 の3モード追加19件 ＝ **42件**。上の表に列挙したのべ件数は59で、差の18は複数ツールで共有されるコード（`E_VALIDATION` / `E_STATE_VIOLATION` / `E_CONCURRENT` / `E_SESSION_NOT_FOUND` / `E_UPSTREAM_*` / `E_FROZEN` / `E_SUPERSEDED` / `E_CHAIN_BUDGET_EXHAUSTED`）の重複である。重複を除くと41件で、これに全ツール共通の `E_INTERNAL` を足すと定義済み42件と一致する。**定義されているのに使われないコードも、使われているのに定義が無いコードも無い**（検査コマンドは §14.3.4）。
+**エラーコードの総数の突き合わせ**: 本書で定義されているコードは、§6.3 の共通6件 ＋ 各ツールの個別エラー表17件 ＋ §19.6.6 の3モード追加19件 ＝ **42件**。上の表に列挙したのべ件数は61で、差の20は複数ツールで共有されるコード（`E_VALIDATION` / `E_STATE_VIOLATION` / `E_CONCURRENT` / `E_SESSION_NOT_FOUND` / `E_UPSTREAM_*` / `E_FROZEN` / `E_SUPERSEDED` / `E_CHAIN_BUDGET_EXHAUSTED`）の重複である。重複を除くと41件で、これに全ツール共通の `E_INTERNAL` を足すと定義済み42件と一致する。**定義されているのに使われないコードも、使われているのに定義が無いコードも無い**（検査コマンドは §14.3.4）。
 
 **この表が満たしている性質**:
 
@@ -3811,7 +3838,17 @@ R5: changed_test_files のうち、test_inventory.diffs[] に対応する file �
 
 #### 19.10.1 モード別の値と理由
 
-§19.1 の表のとおり（design 12/3/0.25、plan 8/2/0.25、implement 16/4/0.20）。
+§19.1 の表のとおり（`max_rounds`/`stall_window`/`stall_epsilon` = design 12/3/0.25、plan 8/2/0.25、implement 16/4/0.20）。値を動かした3件の理由を再掲する（§19.1「閾値をモードで変えた理由」と同一。値そのものは §7.2 の単一ループ既定から変えていないものは省く）:
+
+| 値 | 単一ループ既定（§7.2） | モード別 | 下げた／上げた理由 |
+|---|---|---|---|
+| `plan.max_rounds` | 12 | **8** | 設計が確定している以上、探索空間は設計モードより狭い。8周で収束しないのは「設計が決まっていない」信号であり、周回を増やすより差し戻し（§19.4）が正しい |
+| `plan.stall_window` | 3 | **2** | 計画は文章量が少なく1周あたりの情報量が大きいので、2周動かなければ本質的に詰まっている |
+| `implement.max_rounds` | 12 | **16** | テスト環境・依存関係・フレーキーな失敗など**外部要因で足踏みする**周が入る。12 では正常な作業が打ち切られる |
+| `implement.stall_window` | 3 | **4** | リファクタ周は一時的にスコアが伸びない |
+| `implement.stall_epsilon` | 0.25 | **0.20** | 実装モードは auto 基準が 7/9 と多く、加重平均が**階段状**（テストが通るか通らないか）に動く。1周あたりの改善幅が設計・計画より小さく刻まれるため、0.25 のままだと「小さいが確実な前進」を停滞と誤検知して `STALLED` に落としてしまう。0.20 という値は重み配置から出る。implement プリセットは重み合計 22（§19.7.3）なので、**重み2と重み3の基準が各 +1 点**という「1周ぶんの最小の実質的前進」は `(2+3)/22 ≒ 0.227` にしかならず、0.25 では停滞と判定されてしまう。同じ動きは plan（重み合計 19）なら `5/19 ≒ 0.263` で 0.25 を超えるため、plan は 0.25 のままでよい。0.20 はこの 0.227 を拾い、かつ単一基準 +1（最大でも `3/22 ≒ 0.136`）は拾わない位置にある |
+
+`pass_score` / `pass_weighted_mean` / `max_score_jump` / `require_command_evidence_for` は3モードとも §7.2 の既定のまま動かしていない（合格の厳しさをモードで変えない、§19.1 末尾）。
 
 #### 19.10.2 チェーン予算
 
@@ -4435,3 +4472,17 @@ loop_open{ mode:"resume", submission_id:"…", session_id:"rl_01JQA…CCC" }
 | §17 注記 | 3モードで決め切った項目と、正直に書いた限界を追加 |
 | §18.1 表 | #6（冪等キーの適用範囲拡大）と #7（ツール本数不変）を更新 |
 | 目次 | §19 / §20 を追加、F件数と AT 本数を修正 |
+
+### 20.5 rev.4 — 下流（実装計画）からの差し戻し（KICKBACK）7件の反映
+
+計画側で見つかった本書の不整合 KB-1〜KB-7 を修正した。**仕様・既定値・ツール本数・状態機械は一切変えていない**（記述の不整合と未規定の解消のみ）。
+
+| # | 箇所 | 何が壊れていたか | どう直したか |
+|---|---|---|---|
+| KB-1 | §2 失敗モード表 | 行順が F12, F14, F13, F15 と昇順でなく、番号参照（§19.8.2 など）と読み合わせると行を取り違える | F13 と F14 の**行順のみ**を入れ替えた。番号の振り直しはしていないので既存の参照は全て有効 |
+| KB-2 | §9.1 / §9.4 | 同名 `mcp.json` の実物が2つあり、固定位置に1つしか置けないのにどちらをどう同梱するかが未規定 | streamable-http 版のファイル名を **`mcp.http.json`** と定め、§9.1 の構成図に追加。既定は `mcp.json`（stdio）で、切り替えは利用者のリネームであることを §9.4 に明記。`mcp.http.json` はコンポーネントとして発見されないため既定動作は不変 |
+| KB-3 | §8.4 | LOCK に入れる `boot_id` の取得方法が未規定（`/proc/sys/kernel/random/boot_id` は Linux 限定） | OS 起動識別子 → 起動時刻の UUIDv5 → `PLUGIN_DATA/instance_id` の3経路を表で定義し、採った経路を `boot_id_source` に記録。代用時は陳腐化判定が**60秒経過のみに縮退**することと、`loop_state` の `warnings` に `"lock_staleness_time_only"` を出すことを明記。§8.1 のレイアウトに `instance_id` を追加 |
+| KB-4 | §19.5.2 | task スキーマの `required` に `design_refs` が無いのに、機械検査は全 `design_refs` の上流実在を要求していた（欠落タスクが合法か不明） | `design_refs` を **`required` に追加**（F18「全タスクに必須化」と整合）。欠落・空配列は `E_PLAN_SCHEMA`、実在しない参照は `E_PLAN_DESIGN_REF` と役割分担を明記 |
+| KB-5 | §19.6.7 / §6.3 / §6.4.4 | 総覧の各行が「共通6件込みの全数」なのか「固有の追加分」なのか未定義で、`score_submit` の行だけ `E_VALIDATION` が抜けていた | 冒頭に**「共通エラー条件を含む全数（`E_INTERNAL` のみ除外）」**と定義。`score_submit`（18→19件）と `loop_state`（1→2件）に `E_VALIDATION` を追加し、§6.4.2 / §6.4.4 のエラー表も揃えた。のべ 59→61、重複除去 41 と `E_INTERNAL` で定義済み42件は不変 |
+| KB-6 | §13 | AT-1〜9 が「AT-1 正常収束（1本）」、AT-10〜18 が「AT-10: …」と2記法混在で、見出しの機械照合に規則が2つ要る | 全18件を **`### AT-<番号>: <目的>`** に統一（`（1本）` は「1 AT = 1本」を §13 冒頭に書いて削除）。AT 番号は変えていないので既存の参照は全て有効 |
+| KB-7 | §19.10.1 / §7.2 / §16 | `implement.stall_epsilon = 0.20` の根拠が §19.1 にしかなく、値をまとめている節から辿れない | §19.10.1 にモード別の値と理由の表を置き、0.20 を**重み配置から導出**して示した（implement は重み合計22なので「重み2と3の基準が各 +1」= `5/22 ≒ 0.227` が 0.25 では停滞と誤判定される。plan は重み合計19で `5/19 ≒ 0.263` のため 0.25 のままでよい）。§7.2 と §16 から §19.10.1 への参照を追加。**値は変えていない** |
