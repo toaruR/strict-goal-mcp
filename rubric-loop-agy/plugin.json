@@ -1,0 +1,11 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/v1.0.0/plugin.json",
+  "name": "rubric-loop",
+  "version": "1.0.0",
+  "description": "rubric evaluation loop for iterative artifacts",
+  "license": "MIT",
+  "components": {
+    "skills": "./skills",
+    "mcpServers": "./mcp.json"
+  }
+}
