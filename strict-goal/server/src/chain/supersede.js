@@ -1,4 +1,5 @@
-import { readSession, sessionExists, writeSession } from '../store/session_store.js';
+import { readSession, sessionExists } from '../store/session_store.js';
+import { persistSession } from '../store/persist.js';
 
 const FINAL_STATES = new Set(['FINAL', 'FINAL_WITH_RELAXATION']);
 
@@ -49,7 +50,7 @@ export function checkSupersede(dataDir, session, toolName) {
   if (session.state !== target.state) {
     session.state = target.state;
     session.updated_at = new Date().toISOString();
-    writeSession(dataDir, session);
+    persistSession(dataDir, session);
   }
 
   if (ALWAYS_ALLOWED_TOOLS.has(toolName)) return session;

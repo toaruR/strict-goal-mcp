@@ -2,7 +2,8 @@ import { validate } from '../schema/validate.js';
 import { TOOL_SCHEMAS } from '../schema/tools_schema.js';
 import { withIdempotency } from '../idempotency/guard.js';
 import { checkStateTransition } from '../fsm/guard.js';
-import { readSession, writeSession, sessionDir, sessionExists } from '../store/session_store.js';
+import { readSession, sessionDir, sessionExists } from '../store/session_store.js';
+import { persistSession } from '../store/persist.js';
 import { createEscalation, createMrtrEscalation, resolveMrtrEscalation, consumeToken, recordSystemEvent } from '../escalation/token.js';
 import { checkSupersede } from '../chain/supersede.js';
 import { performRebase } from '../chain/rebase.js';
@@ -117,7 +118,7 @@ export function escalate({ input, persistence, meta }) {
           const { escalationId, record } = createMrtrEscalation(sDir, { reason, summaryForHuman });
           session.state = 'ESCALATED';
           session.updated_at = new Date().toISOString();
-          writeSession(dataDir, session);
+          persistSession(dataDir, session);
           return buildElicitationRequest(escalationId, record.summary_for_human);
         }
 
@@ -171,7 +172,7 @@ export function escalate({ input, persistence, meta }) {
     }
 
     session.updated_at = new Date().toISOString();
-    writeSession(dataDir, session);
+    persistSession(dataDir, session);
 
     return buildEnvelope({
       ok: true,

@@ -174,6 +174,16 @@ Claude Code、Antigravity、Codex CLI 等で以下のコマンドを実行する
 - アクション: 設計書にエラーハンドリング節を追加して再コミットします...
 ```
 
+### 4. HTMLダッシュボード
+ブラウザで `<data_dir>/dashboard/index.html` を開くだけで確認できます。
+`session_id` を覚えている必要も、専用ツールを呼ぶ必要もありません。状態変更を伴うツール
+（`loop_open` / `artifact_commit` / `score_submit` / `escalate` / `rubric_amend`）が呼ばれるたびに、
+`<data_dir>/dashboard/` 以下の静的HTMLが自動的に最新化されます:
+
+- `index.html` — 既知の全セッションをチェーンごとにまとめた一覧（loop_mode/state/round/taskが一目でわかる）
+- `<session_id>.html` — 個別セッションの詳細（周回・状態・判定・基準ごとのスコアと弱点・`must_fix`・次に呼ぶべきツール）
+
+
 ---
 
 ## 補助CLIツール (`strict-goal/server/helper.js`)

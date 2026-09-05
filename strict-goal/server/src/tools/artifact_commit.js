@@ -2,7 +2,8 @@ import { validate } from '../schema/validate.js';
 import { TOOL_SCHEMAS } from '../schema/tools_schema.js';
 import { withIdempotency } from '../idempotency/guard.js';
 import { checkStateTransition } from '../fsm/guard.js';
-import { readSession, writeSession, sessionDir, sessionExists } from '../store/session_store.js';
+import { readSession, sessionDir, sessionExists } from '../store/session_store.js';
+import { persistSession } from '../store/persist.js';
 import {
   saveContentArtifact,
   saveFilesetArtifact,
@@ -186,7 +187,7 @@ export function artifactCommit({ input, persistence }) {
     session.state = 'SCORING';
     session.current_artifact = currentArtifactState;
     session.updated_at = new Date().toISOString();
-    writeSession(dataDir, session);
+    persistSession(dataDir, session);
 
     return buildEnvelope({
       ok: true,

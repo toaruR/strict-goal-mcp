@@ -1,4 +1,5 @@
-import { readSession, writeSession, sessionExists } from '../store/session_store.js';
+import { readSession, sessionExists } from '../store/session_store.js';
+import { persistSession } from '../store/persist.js';
 import { sessionDir } from '../store/session_store.js';
 import { loadRubric } from '../rubric/store.js';
 import { readChain, appendKickback } from './store.js';
@@ -62,7 +63,7 @@ export function performKickback(dataDir, session, { targetCriteria, note }) {
     );
   }
   upstreamSession.updated_at = now;
-  writeSession(dataDir, upstreamSession);
+  persistSession(dataDir, upstreamSession);
 
   session.state = 'FROZEN';
 

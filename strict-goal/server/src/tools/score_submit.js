@@ -2,7 +2,8 @@ import { validate } from '../schema/validate.js';
 import { TOOL_SCHEMAS } from '../schema/tools_schema.js';
 import { withIdempotency } from '../idempotency/guard.js';
 import { checkStateTransition } from '../fsm/guard.js';
-import { readSession, writeSession, sessionDir, sessionExists } from '../store/session_store.js';
+import { readSession, sessionDir, sessionExists } from '../store/session_store.js';
+import { persistSession } from '../store/persist.js';
 import { loadRubric } from '../rubric/store.js';
 import { readArtifactContent } from '../artifact/store.js';
 import { validateEvidenceShape, computeEvidenceDigest } from '../evidence/model.js';
@@ -228,7 +229,7 @@ export function scoreSubmit({ input, persistence }) {
       session.state = verdict === 'ITERATING' ? 'DRAFTING' : verdict;
       if (verdict === 'ITERATING') session.round += 1;
       session.updated_at = new Date().toISOString();
-      writeSession(dataDir, session);
+      persistSession(dataDir, session);
 
       // 緩和承認待ちの自動 ESCALATED（§7.1 手順12）は STALLED と違い escalate(request_human) を
       // 経由しないので、ここでトークンを発行しておく(escalate.js の resolve が読む)。

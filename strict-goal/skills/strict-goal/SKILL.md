@@ -1,6 +1,6 @@
 ---
 name: strict-goal
-description: Enforces iterative rubric validation until server-verified FINAL verdict to prevent compromises or shortcuts. Triggered by natural language requests or command syntax like "strict-goal [design|plan|implement|設計|計画|実装] <target/instruction>" or "/strict-goal <goal>".
+description: Enforces iterative rubric validation until the server itself returns a passing verdict, preventing compromises or shortcuts. Triggered by natural language requests or command syntax like "strict-goal [design|plan|implement|設計|計画|実装] <target/instruction>" or "/strict-goal <goal>".
 ---
 
 ## Principles
@@ -10,16 +10,16 @@ self-score them with evidence, and resolve the must_fix items the server returns
 Never decide on your own that "this is good enough."
 FINAL is a verdict only the server can issue; the model is forbidden from declaring FINAL itself.
 
-## Command Syntax & Modes
+## Command Syntax & Mode Selection (モードの選び方)
 
 Users can invoke either the full chain or a single targeted phase using English or Japanese keywords:
 
 | Command Syntax | Target Phase | Behavior |
 |---|---|---|
-| `strict-goal design <instruction>`<br>`strict-goal 設計 <指示>` | `design` only | Creates specification document. Runs rubric iteration loop until server returns `FINAL`, then stops (does not advance to plan/implement). |
-| `strict-goal plan <design_doc_path> [instruction]`<br>`strict-goal 計画 <設計書パス> [指示]` | `plan` only | Reads the given design document, generates task DAG & acceptance criteria (JSON), and iterates until server returns `FINAL`, then stops (does not advance to implement). If no upstream design session exists, immediately creates and finalizes a minimal design session referencing the document to satisfy server chain integrity. |
-| `strict-goal implement <plan_doc_path> [instruction]`<br>`strict-goal 実装 <計画書パス> [指示]` | `implement` only | Reads the given implementation plan, implements code & tests, runs test verification, and iterates until server returns `FINAL`, then stops. If no upstream plan session exists, registers the plan to satisfy upstream digest requirements. |
-| `strict-goal <goal>`<br>`/strict-goal <goal>`<br>`/goal <goal>` | `design` → `plan` → `implement` | Default: Executes the entire sequential pipeline until the final implement phase reaches `FINAL`. |
+| `strict-goal design <instruction>`<br>`strict-goal 設計 <指示>` | `design` only | Creates specification document. Runs rubric iteration loop until server returns FINAL, then stops (does not advance to plan/implement). |
+| `strict-goal plan <design_doc_path> [instruction]`<br>`strict-goal 計画 <設計書パス> [指示]` | `plan` only | Reads the given design document, generates task DAG & acceptance criteria (JSON), and iterates until server returns FINAL, then stops (does not advance to implement). If no upstream design session exists, immediately creates and finalizes a minimal design session referencing the document to satisfy server chain integrity. |
+| `strict-goal implement <plan_doc_path> [instruction]`<br>`strict-goal 実装 <計画書パス> [指示]` | `implement` only | Reads the given implementation plan, implements code & tests, runs test verification, and iterates until server returns FINAL, then stops. If no upstream plan session exists, registers the plan to satisfy upstream digest requirements. |
+| `strict-goal <goal>`<br>`/strict-goal <goal>`<br>`/goal <goal>` | `design` → `plan` → `implement` | Default: Executes the entire sequential pipeline until the final implement phase's server returns FINAL. |
 
 ### Pipeline Overview
 
@@ -70,6 +70,14 @@ human approval. Your session is frozen and resumes once upstream is fixed.
 
 Call loop_state with just the session_id. Everything you need comes back. Don't try to recall
 from memory.
+
+## Human-Readable Dashboard
+
+Every state-changing call (loop_open/artifact_commit/score_submit/escalate/rubric_amend)
+auto-regenerates a static HTML dashboard under `<data_dir>/dashboard/`: `index.html` lists every
+known session grouped by chain, and `<session_id>.html` shows round, state, verdict,
+per-criterion scores/weakness, must_fix, and next_action for one session. No tool call is
+needed to see current progress — just open the file in a browser.
 
 ## When the Tool Is Unavailable (Degraded Mode)
 

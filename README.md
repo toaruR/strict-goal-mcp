@@ -175,6 +175,17 @@ After each evaluation round, the agent automatically outputs a structured Japane
 - Action: Adding error handling section to specification before committing...
 ```
 
+### 4. Zero-Call HTML Dashboard
+Just open `<data_dir>/dashboard/index.html` in a browser.
+You don't need to know a `session_id` or call any tool to check progress. Every state-changing
+call (`loop_open` / `artifact_commit` / `score_submit` / `escalate` / `rubric_amend`)
+automatically regenerates a static HTML dashboard under `<data_dir>/dashboard/`:
+
+- `index.html` — every known session grouped by chain, with loop_mode/state/round/task at a glance.
+- `<session_id>.html` — per-session detail: round, state, verdict, per-criterion scores &
+  weaknesses, `must_fix`, and the suggested next tool call.
+
+
 ---
 
 ## CLI Helper Tool (`strict-goal/server/helper.js`)

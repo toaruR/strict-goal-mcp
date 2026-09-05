@@ -9,7 +9,8 @@ import { loadPreset } from '../rubric/presets.js';
 import { convertInputRubric } from '../rubric/from_input.js';
 import { validateRubric } from '../rubric/schema.js';
 import { saveRubric } from '../rubric/store.js';
-import { writeSession, sessionDir } from '../store/session_store.js';
+import { sessionDir } from '../store/session_store.js';
+import { persistSession } from '../store/persist.js';
 import { generateSessionId, generateChainId } from '../id/ulid.js';
 import { buildEnvelope } from '../mcp/envelope.js';
 import { ARTIFACT_KIND_BY_MODE } from '../config/defaults.js';
@@ -140,7 +141,7 @@ export function loopOpenCreate({ input, pluginRoot, pluginRootSource, persistenc
       },
     };
 
-    writeSession(dataDir, session);
+    persistSession(dataDir, session);
 
     return buildEnvelope({
       ok: true,
