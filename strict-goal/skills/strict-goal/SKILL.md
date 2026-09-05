@@ -1,6 +1,6 @@
 ---
 name: strict-goal
-description: AIの妥協やサボりを防ぎ、客観的なルーブリック検証を満たすまで厳格にゴール完遂を強制する反復改善ループ。設計書作成、実装計画策定、コード実装・テスト時に使用する。
+description: Enforces iterative rubric validation until server-verified FINAL verdict to prevent compromises or shortcuts. Triggered by natural language requests or command syntax like "strict-goal [design|plan|implement|設計|計画|実装] <target/instruction>" or "/strict-goal <goal>".
 ---
 
 ## Principles
@@ -10,21 +10,27 @@ self-score them with evidence, and resolve the must_fix items the server returns
 Never decide on your own that "this is good enough."
 FINAL is a verdict only the server can issue; the model is forbidden from declaring FINAL itself.
 
-## Choosing a Mode
+## Command Syntax & Modes
 
-When given a goal by a user (via natural language or `/goal <task>` / `/strict-goal <task>`):
-- For new features, complex refactors, or unclear requirements: run the full chain `design` → `plan` → `implement`.
-- For planning an existing design: run `plan` (requires finalized `design` upstream).
-- For writing code/tests against an approved plan: run `implement` (requires finalized `plan` upstream).
+Users can invoke either the full chain or a single targeted phase using English or Japanese keywords:
 
-| Task | loop_mode | Upstream |
+| Command Syntax | Target Phase | Behavior |
 |---|---|---|
-| Write a design document from requirements | design | none |
-| Write an implementation plan from a finalized design | plan | design session's handle and artifact digest |
-| Write code and tests from a finalized plan | implement | plan session's handle and artifact digest |
+| `strict-goal design <instruction>`<br>`strict-goal 設計 <指示>` | `design` only | Creates specification document. Runs rubric iteration loop until server returns `FINAL`, then stops (does not advance to plan/implement). |
+| `strict-goal plan <design_doc_path> [instruction]`<br>`strict-goal 計画 <設計書パス> [指示]` | `plan` only | Reads the given design document, generates task DAG & acceptance criteria (JSON), and iterates until server returns `FINAL`, then stops (does not advance to implement). If no upstream design session exists, immediately creates and finalizes a minimal design session referencing the document to satisfy server chain integrity. |
+| `strict-goal implement <plan_doc_path> [instruction]`<br>`strict-goal 実装 <計画書パス> [指示]` | `implement` only | Reads the given implementation plan, implements code & tests, runs test verification, and iterates until server returns `FINAL`, then stops. If no upstream plan session exists, registers the plan to satisfy upstream digest requirements. |
+| `strict-goal <goal>`<br>`/strict-goal <goal>`<br>`/goal <goal>` | `design` → `plan` → `implement` | Default: Executes the entire sequential pipeline until the final implement phase reaches `FINAL`. |
 
-If you don't know the upstream digest, call loop_state on the upstream session to get it.
-Never guess it (the server rejects a wrong guess with E_UPSTREAM_DIGEST_MISMATCH).
+### Pipeline Overview
+
+| Task | loop_mode | Upstream | Output |
+|---|---|---|---|
+| Write a design document from requirements | design | none | Specification Markdown |
+| Write an implementation plan from a finalized design | plan | design session handle & artifact digest | Task DAG (JSON) |
+| Write code and tests from a finalized plan | implement | plan session handle & artifact digest | Fileset + Test Inventory |
+
+If you don't know the upstream digest, call `loop_state` on the upstream session to get it.
+Never guess it (the server rejects a wrong guess with `E_UPSTREAM_DIGEST_MISMATCH`).
 
 ## Procedure
 
