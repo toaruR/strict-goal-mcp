@@ -235,7 +235,7 @@ node strict-goal/server/verify_audit.js ./path/to/audit.json
 ## Directory Structure
 
 ```
-rubric-loop-mcp/
+strict-goal-mcp/
 ├── strict-goal/              # Core Agent Plugin package
 │   ├── plugin.json           # Agent Plugins 1.0.0 manifest
 │   ├── mcp.json              # stdio MCP configuration
@@ -251,6 +251,7 @@ rubric-loop-mcp/
 ├── docs/                     # Design documents, specs, and execution plans
 │   ├── design-rubric-loop-mcp.md
 │   └── plans/
+├── LICENSE                   # MIT License
 ├── README.md                 # English documentation (this file)
 └── README.ja.md              # Japanese documentation
 ```

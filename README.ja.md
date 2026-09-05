@@ -236,7 +236,7 @@ node strict-goal/server/verify_audit.js ./path/to/audit.json
 ## ディレクトリ構成
 
 ```
-rubric-loop-mcp/
+strict-goal-mcp/
 ├── strict-goal/              # コア Agent Plugin パッケージ
 │   ├── plugin.json           # Agent Plugins 1.0.0 マニフェスト
 │   ├── mcp.json              # stdio MCP 設定
@@ -252,6 +252,7 @@ rubric-loop-mcp/
 ├── docs/                     # アーキテクチャ設計書・仕様書・分割実行計画書
 │   ├── design-rubric-loop-mcp.md
 │   └── plans/
+├── LICENSE                   # MIT ライセンス
 ├── README.md                 # 英語版ドキュメント
 └── README.ja.md              # 日本語版ドキュメント（本ファイル）
 ```
@@ -260,4 +261,4 @@ rubric-loop-mcp/
 
 ## ライセンス
 
-MIT License。詳細は `plugin.json` またはリポジトリのライセンス表記を参照してください。
+[MIT License](./LICENSE)。詳細は [LICENSE](./LICENSE) または `plugin.json` を参照してください。
