@@ -1,0 +1,7 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/v1.0.0/plugin.json",
+  "name": "rubric-loop",
+  "version": "1.0.0",
+  "description": "rubric ベースの反復改善ループを、サーバ側の状態と閾値判定で強制する MCP サーバとスキル",
+  "license": "MIT"
+}
