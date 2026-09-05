@@ -197,7 +197,7 @@ test('F13: SKILL.md がツール不在時に UNVERIFIED-COMPLETE への格下げ
   const skillPath = path.resolve(__dirname, '..', '..', 'skills', 'rubric-loop', 'SKILL.md');
   const skill = readFileSync(skillPath, 'utf8');
   assert.match(skill, /UNVERIFIED-COMPLETE: rubric-loop server unavailable/);
-  assert.match(skill, /FINAL を名乗らない/);
+  assert.match(skill, /FINAL を名乗らない|forbidden from declaring FINAL/);
   for (const mode of ['design', 'plan', 'implement']) {
     assert.ok(skill.includes(`- ${mode} `) || skill.includes(`- ${mode} —`), `${mode} の縮退要件が明記されている`);
   }

@@ -16,3 +16,4 @@ __pycache__/
 .sandbox-kit/
 .knowledge-kit/source.json
 docs/knowledge-kit-usage.md
+.rubric-loop-data/

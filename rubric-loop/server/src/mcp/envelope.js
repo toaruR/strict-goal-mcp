@@ -40,6 +40,7 @@ export function buildEnvelope({
   finalReachable,
   relaxationCount,
   escalation,
+  reopened,
   exportInfo,
 } = {}) {
   const envelope = {
@@ -77,6 +78,7 @@ export function buildEnvelope({
   if (finalReachable !== undefined) envelope.final_reachable = finalReachable;
   if (relaxationCount !== undefined) envelope.relaxation_count = relaxationCount;
   if (escalation !== undefined) envelope.escalation = escalation;
+  if (reopened !== undefined) envelope.reopened = reopened;
   if (exportInfo !== undefined) envelope.export = exportInfo;
   return envelope;
 }

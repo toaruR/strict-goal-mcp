@@ -9,6 +9,7 @@ import { loopState } from '../src/tools/loop_state.js';
 import { artifactCommit } from '../src/tools/artifact_commit.js';
 import { scoreSubmit } from '../src/tools/score_submit.js';
 import { escalate } from '../src/tools/escalate.js';
+import { readSession } from '../src/store/session_store.js';
 
 function tmpDataDir() {
   return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-supersede-'));
@@ -70,13 +71,32 @@ function createPlan(persistence, upstream) {
   });
 }
 
+const VALID_PLAN_CONTENT = JSON.stringify({
+  plan_version: 1,
+  summary: 'これはsupersedeテスト用の実装計画書であり、40文字以上の長さを確保するための文章です。' + EXCERPT,
+  tasks: [
+    {
+      id: 'T001',
+      title: '初期タスクの実装',
+      intent: '初期タスクの実装を行うための十分な文字数の意図説明文である。' + EXCERPT,
+      depends_on: [],
+      design_refs: ['# 文書'],
+      changes: [{ path: 'src/main.js', kind: 'add' }],
+      acceptance: ['初期機能が正常に動作することを確認するための受け入れ条件である'],
+      verify: [{ command: 'npm test', expect_exit_code: 0 }],
+    },
+  ],
+});
+
 function commitAndFinalize(persistence, sessionId) {
+  const session = readSession(persistence.dir, sessionId);
+  const content = session.artifact_kind === 'plan' ? VALID_PLAN_CONTENT : CONTENT;
   const c1 = artifactCommit({
     input: {
       session_id: sessionId,
       submission_id: submissionId(),
       expected_round: 1,
-      content: CONTENT,
+      content,
       change_note: 'これは20文字以上ある変更理由の説明文です',
     },
     persistence,
@@ -247,7 +267,7 @@ test('上流が変わっていなければ下流は通常どおり動く(誤検�
       session_id: plan.session_id,
       submission_id: submissionId(),
       expected_round: 1,
-      content: CONTENT,
+      content: VALID_PLAN_CONTENT,
       change_note: 'これは20文字以上ある変更理由の説明文です',
     },
     persistence,

@@ -29,7 +29,22 @@ const SENTENCE_KEEP = '実装は完全に動作することを実行ログで確
 const SENTENCE_REMOVE = '古い設計方針に基づく暫定的な確認記録がここに書かれている。';
 const DESIGN_CONTENT_V1 = `# 設計\n${SENTENCE_KEEP}\n${SENTENCE_REMOVE}`;
 const DESIGN_CONTENT_V2 = `# 設計\n${SENTENCE_KEEP}\n新しい方針に基づく別の確認記録に置き換えられている。`;
-const PLAN_CONTENT = '# 計画\n実装計画がここに詳細に記述されている一つの文章です。';
+const PLAN_CONTENT = JSON.stringify({
+  plan_version: 1,
+  summary: 'これはrebaseテスト用の実装計画書であり、40文字以上の長さを確保するための文章です。',
+  tasks: [
+    {
+      id: 'T001',
+      title: '初期タスクの実装',
+      intent: '初期タスクの実装を行うための十分な文字数の意図説明文である。',
+      depends_on: [],
+      design_refs: ['# 設計'],
+      changes: [{ path: 'src/main.js', kind: 'add' }],
+      acceptance: ['初期機能が正常に動作することを確認するための受け入れ条件である'],
+      verify: [{ command: 'npm test', expect_exit_code: 0 }],
+    },
+  ],
+});
 
 function planRubric() {
   return {

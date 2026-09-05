@@ -42,7 +42,7 @@ test('E_STATE_VIOLATION は detail.expected_tools を持てる', () => {
 test('ツール別のエラーコード割り当て件数が実装の到達可能性と一致する', () => {
   assert.equal(TOOL_ERRORS.loop_open.length, 13);
   assert.equal(TOOL_ERRORS.loop_state.length, 2);
-  assert.equal(TOOL_ERRORS.artifact_commit.length, 13);
+  assert.equal(TOOL_ERRORS.artifact_commit.length, 16);
   assert.equal(TOOL_ERRORS.score_submit.length, 17);
   assert.equal(TOOL_ERRORS.rubric_amend.length, 8);
   assert.equal(TOOL_ERRORS.escalate.length, 8);

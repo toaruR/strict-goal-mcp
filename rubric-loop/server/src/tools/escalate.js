@@ -149,7 +149,23 @@ export function escalate({ input, persistence, meta }) {
       // request_human を経由できずペンディングトークンが存在し得ないため、実トークンとの照合は
       // T044(MRTR)側の責務とし、ここではスキーマの存在検査(assertActionInputs)のみで扱う。
       const { upstreamSessionId } = performKickback(dataDir, session, { targetCriteria: input.target_criteria, note: input.note });
-      escalationInfo = { escalation_id: `kickback_${upstreamSessionId}`, created_at: new Date().toISOString(), token_path: '', reason: 'kicked_back' };
+    } else if (input.action === 'reopen') {
+      if (session.state !== 'FINAL' && session.state !== 'FINAL_WITH_RELAXATION') {
+        fail('E_STATE_VIOLATION', 'reopen is only valid in FINAL or FINAL_WITH_RELAXATION', {
+          state: session.state,
+        });
+      }
+      const previousFinalDigest = session.current_artifact?.digest ?? null;
+      session.state = 'DRAFTING';
+      session.round += 1;
+      session.reopened = [
+        ...(session.reopened ?? []),
+        { at: new Date().toISOString(), by: 'human', reason: input.note, previous_final_digest: previousFinalDigest },
+      ];
+      // A10: FINAL からは request_human を経由できずペンディングトークンが存在し得ないため、
+      // kickback と同じく実トークン照合はせず system event を記録する（存在検査は assertActionInputs 済み）。
+      const { record } = recordSystemEvent(sDir, { reason: 'reopen', resolution: 'reopen' });
+      escalationInfo = toEscalationInfo(record, '');
     } else {
       fail('E_INTERNAL', `action not implemented in this build: ${input.action}`, { action: input.action });
     }
@@ -166,6 +182,7 @@ export function escalate({ input, persistence, meta }) {
       persistence: persistence.mode,
       warnings: mrtrUnavailable ? ['mrtr_unavailable'] : [],
       escalation: escalationInfo,
+      reopened: session.reopened,
     });
   });
 }

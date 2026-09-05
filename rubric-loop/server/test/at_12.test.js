@@ -1,6 +1,5 @@
 // AT-12: 上流変更による下流の失効と部分再検証。docs/design-rubric-loop-mcp.md §13 AT-12。
-// escalate action:"reopen"(T042)は未実装のため、上流の reopen/再FINAL化は
-// supersede.test.js / rebase.test.js と同じ手法(session.json 直接書き換え)で再現する。
+// escalate action:"reopen" は公開ツールとして実装済み。上流の reopen は escalate 経由で実行する。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
@@ -32,7 +31,22 @@ const SENTENCE_KEEP = '実装は完全に動作することを実行ログで確
 const SENTENCE_REMOVE = '古い設計方針に基づく暫定的な確認記録がここに書かれている。';
 const DESIGN_CONTENT_V1 = `# 設計\n${SENTENCE_KEEP}\n${SENTENCE_REMOVE}`;
 const DESIGN_CONTENT_V2 = `# 設計\n${SENTENCE_KEEP}\n新しい方針に基づく別の確認記録に置き換えられている。`;
-const PLAN_CONTENT = '# 計画\n実装計画がここに詳細に記述されている一つの文章です。';
+const PLAN_CONTENT = JSON.stringify({
+  plan_version: 1,
+  summary: 'これはAT-12テスト用の実装計画書であり、40文字以上の長さを確保するための文章です。',
+  tasks: [
+    {
+      id: 'T001',
+      title: '初期タスクの実装',
+      intent: '初期タスクの実装を行うための十分な文字数の意図説明文である。',
+      depends_on: [],
+      design_refs: ['# 設計'],
+      changes: [{ path: 'src/main.js', kind: 'add' }],
+      acceptance: ['初期機能が正常に動作することを確認するための受け入れ条件である'],
+      verify: [{ command: 'npm test', expect_exit_code: 0 }],
+    },
+  ],
+});
 
 function planRubric() {
   return {
@@ -208,8 +222,21 @@ test('AT-12: 上流reopenで下流FROZEN、上流再FINALでSUPERSEDED、rebase�
   const planDigest = finalizePlan(persistence, plan.session_id);
   assert.equal(readSessionRaw(persistence, plan.session_id).state, 'FINAL');
 
-  // 1. 上流(design)がreopen相当でDRAFTINGに戻る
-  mutateUpstreamReopened(persistence, design.session_id);
+  // 1. 上流(design)を escalate(action:"reopen") で DRAFTING に差し戻す
+  const reopenRes = escalate({
+    input: {
+      session_id: design.session_id,
+      submission_id: submissionId(),
+      action: 'reopen',
+      human_token: 'token-human-reopen-design-001',
+      note: '設計を全面的に見直すため差し戻しを行う。これは40文字以上の詳細な説明文である。',
+    },
+    persistence,
+  });
+  assert.equal(reopenRes.state, 'DRAFTING');
+  assert.equal(reopenRes.round, 2);
+  assert.ok(reopenRes.reopened?.length > 0);
+  assert.equal(reopenRes.reopened[0].previous_final_digest, designDigestV1);
 
   // 2. loop_state{session_id:plan} → FROZEN, freeze_reason相当のE_FROZEN検査対象になる
   const state1 = loopState({ input: { session_id: plan.session_id }, persistence });
@@ -274,13 +301,14 @@ test('AT-12: 上流reopenで下流FROZEN、上流再FINALでSUPERSEDED、rebase�
   const mustFixEntry = sessionAfter.last_evaluation.must_fix.find((m) => m.criterion_id === 'crit_remove');
   assert.equal(mustFixEntry.previous_score ?? null, null);
 
-  // 7. invalidatedの再採点はprevious_scoreがnullなのでE_SCORE_INFLATION/E_SCORE_JUMPは走らない(9→9でも通る)
+  const planV2 = JSON.parse(PLAN_CONTENT);
+  planV2.summary = 'これはAT-12テスト用の改訂版実装計画書であり、40文字以上の長さを確保するための文章です。';
   const c2 = artifactCommit({
     input: {
       session_id: plan.session_id,
       submission_id: submissionId(),
       expected_round: sessionAfter.round,
-      content: `${PLAN_CONTENT}\n新しい依存関係の記述を追加した。`,
+      content: JSON.stringify(planV2),
       change_note: 'これは20文字以上ある変更理由の説明文です',
       addresses: ['crit_remove'],
     },
@@ -312,4 +340,23 @@ test('AT-12: 上流reopenで下流FROZEN、上流再FINALでSUPERSEDED、rebase�
     persistence,
   });
   assert.equal(r2.verdict, 'FINAL');
+});
+
+test('escalate(reopen): 非 FINAL または FINAL_WITH_RELAXATION から呼ぶと E_STATE_VIOLATION', () => {
+  const persistence = durablePersistence();
+  const design = createDesign(persistence);
+  assert.throws(
+    () =>
+      escalate({
+        input: {
+          session_id: design.session_id,
+          submission_id: submissionId(),
+          action: 'reopen',
+          human_token: 'token-human-reopen-invalid-01',
+          note: 'DRAFTINGから直接reopenを呼んで失敗させるための40文字以上の説明文である。',
+        },
+        persistence,
+      }),
+    { code: 'E_STATE_VIOLATION' },
+  );
 });

@@ -202,6 +202,7 @@ export function scoreSubmit({ input, persistence }) {
       const scoredRound = session.round;
       const record = {
         round: scoredRound,
+        rubric_version: session.rubric_version,
         submission_id: input.submission_id,
         submitted_at: new Date().toISOString(),
         artifact_digest: input.artifact_digest,

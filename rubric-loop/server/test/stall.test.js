@@ -8,6 +8,7 @@ import { checkStateTransition } from '../src/fsm/guard.js';
 import { loopOpenCreate } from '../src/tools/loop_open_create.js';
 import { artifactCommit } from '../src/tools/artifact_commit.js';
 import { scoreSubmit } from '../src/tools/score_submit.js';
+import { readSession } from '../src/store/session_store.js';
 
 function tmpDataDir() {
   return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-stall-'));
@@ -64,13 +65,32 @@ function createFinalUpstream(persistence) {
 const CONTENT = '# 設計書\n実装は一部だけ動作することを目視で確認したという記録がある。';
 const EXCERPT = '実装は一部だけ動作することを目視で確認したという記録がある。';
 
+const VALID_PLAN_CONTENT = JSON.stringify({
+  plan_version: 1,
+  summary: 'これはstallテスト用の実装計画書であり、40文字以上の長さを確保するための文章です。' + EXCERPT,
+  tasks: [
+    {
+      id: 'T001',
+      title: '初期タスクの実装',
+      intent: '初期タスクの実装を行うための十分な文字数の意図説明文である。' + EXCERPT,
+      depends_on: [],
+      design_refs: ['# 設計書'],
+      changes: [{ path: 'src/main.js', kind: 'add' }],
+      acceptance: ['初期機能が正常に動作することを確認するための受け入れ条件である'],
+      verify: [{ command: 'npm test', expect_exit_code: 0 }],
+    },
+  ],
+});
+
 function commit(persistence, sessionId, expectedRound) {
+  const session = readSession(persistence.dir, sessionId);
+  const content = session.artifact_kind === 'plan' ? VALID_PLAN_CONTENT : CONTENT;
   return artifactCommit({
     input: {
       session_id: sessionId,
       submission_id: submissionId(),
       expected_round: expectedRound,
-      content: CONTENT,
+      content,
       change_note: 'これは20文字以上ある変更理由の説明文です',
       ...(expectedRound > 1 ? { addresses: ['impl_works'] } : {}),
     },

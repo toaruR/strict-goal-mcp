@@ -13,6 +13,9 @@ import {
 import { validateFilesetManifest, computeFilesetDiff } from '../artifact/fileset.js';
 import { assertTestInventoryRequired, checkTestInventoryOnCommit } from '../implement/test_inventory.js';
 import { checkAssertMutation, honestLimitWarnings } from '../implement/assert_mutation.js';
+import { parsePlanContent } from '../artifact/plan_schema.js';
+import { checkPlan } from '../artifact/plan_checks.js';
+import { checkDesignRefs } from '../artifact/design_refs.js';
 import { checkSupersede } from '../chain/supersede.js';
 import { recordCommitForRound } from '../judge/round_store.js';
 import { CHANGE_NOTE_MIN_LENGTH, ARTIFACT_MAX_BYTES } from '../config/defaults.js';
@@ -142,6 +145,13 @@ export function artifactCommit({ input, persistence }) {
         test_inventory: input.test_inventory,
       };
     } else {
+      if (session.artifact_kind === 'plan') {
+        const plan = parsePlanContent(input.content);
+        checkPlan(plan);
+        if (session.upstream) {
+          checkDesignRefs(dataDir, plan, session.upstream);
+        }
+      }
       ({ digest, bytes } = saveContentArtifact(sDir, session.artifact_kind, input.content));
       const unchanged = previousDigest === digest;
 

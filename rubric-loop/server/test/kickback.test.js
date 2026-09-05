@@ -27,7 +27,22 @@ const NOTE = 'a'.repeat(45);
 const HUMAN_TOKEN = 'human-approval-token-placeholder';
 const DESIGN_CONTENT = '# 設計\n実装は完全に動作することを実行ログで確認したという記録がある。';
 const DESIGN_EXCERPT = '実装は完全に動作することを実行ログで確認したという記録がある。';
-const PLAN_CONTENT = '# 計画\n実装計画がここに詳細に記述されている一つの文章です。';
+const PLAN_CONTENT = JSON.stringify({
+  plan_version: 1,
+  summary: 'これはテスト用の有効な計画サマリー文字列であり、長さが40文字以上になるように長めに記述しています。',
+  tasks: [
+    {
+      id: 'T001',
+      title: 'タスク1のタイトル',
+      intent: 'タスク1の意図を20文字以上で記述するための文字列です',
+      depends_on: [],
+      design_refs: ['# 設計'],
+      changes: [{ path: 'src/a.js', kind: 'add' }],
+      acceptance: ['受け入れ条件1が10文字以上'],
+      verify: [{ command: 'node --test', expect_exit_code: 0 }],
+    },
+  ],
+});
 
 function oneCriterionRubric() {
   return {

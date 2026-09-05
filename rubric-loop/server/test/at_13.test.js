@@ -33,7 +33,22 @@ const NOTE = 'T004 が T007 の成果物を前提にしているが依存が逆�
 const HUMAN_TOKEN = 'human-approval-token-placeholder';
 const DESIGN_CONTENT = '# 設計\n実装は完全に動作することを実行ログで確認したという記録がある。';
 const DESIGN_EXCERPT = '実装は完全に動作することを実行ログで確認したという記録がある。';
-const PLAN_CONTENT = '# 計画\n実装計画がここに詳細に記述されている一つの文章です。';
+const PLAN_CONTENT = JSON.stringify({
+  plan_version: 1,
+  summary: 'これはAT-13テスト用の実装計画書であり、40文字以上の長さを確保するための文章です。',
+  tasks: [
+    {
+      id: 'T001',
+      title: '初期タスクの実装',
+      intent: '初期タスクの実装を行うための十分な文字数の意図説明文である。',
+      depends_on: [],
+      design_refs: ['# 設計'],
+      changes: [{ path: 'src/main.js', kind: 'add' }],
+      acceptance: ['初期機能が正常に動作することを確認するための受け入れ条件である'],
+      verify: [{ command: 'npm test', expect_exit_code: 0 }],
+    },
+  ],
+});
 
 function oneCriterionRubric(criterionId, statement) {
   return {
