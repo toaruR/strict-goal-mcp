@@ -1,9 +1,0 @@
-{
-  "$schema": "https://agent-plugins.org/schemas/v1.0.0/mcp.json",
-  "mcpServers": {
-    "rubric-loop": {
-      "type": "streamable-http",
-      "url": "http://127.0.0.1:8971/mcp"
-    }
-  }
-}
