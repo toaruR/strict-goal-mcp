@@ -35,13 +35,17 @@ test('E_STATE_VIOLATION は detail.expected_tools を持てる', () => {
   assert.ok(CODES.E_STATE_VIOLATION.detailKeys.includes('expected_tools'));
 });
 
-test('19.6.7 の総覧どおりツール別の割り当て件数が一致する', () => {
+// 19.6.7 の総覧表は実装の到達可能性と食い違っていたため、T068-T070 で実装ベースに補正した
+// （CLAUDE.md ハマりポイント参照）。件数はここが正であり設計書の数字ではない。
+// score_submit の E_EVIDENCE_REQUIRED は schemas/tools.json の scores[].evidence が
+// minItems:1 を強制するため公開スキーマ経由では到達不能（T070 で除外、19→17）。
+test('ツール別のエラーコード割り当て件数が実装の到達可能性と一致する', () => {
   assert.equal(TOOL_ERRORS.loop_open.length, 13);
   assert.equal(TOOL_ERRORS.loop_state.length, 2);
   assert.equal(TOOL_ERRORS.artifact_commit.length, 13);
-  assert.equal(TOOL_ERRORS.score_submit.length, 19);
-  assert.equal(TOOL_ERRORS.rubric_amend.length, 5);
-  assert.equal(TOOL_ERRORS.escalate.length, 7);
+  assert.equal(TOOL_ERRORS.score_submit.length, 17);
+  assert.equal(TOOL_ERRORS.rubric_amend.length, 8);
+  assert.equal(TOOL_ERRORS.escalate.length, 8);
   assert.equal(TOOL_ERRORS.audit_export.length, 2);
 });
 

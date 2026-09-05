@@ -4,6 +4,8 @@ import { resolvePluginData } from './src/paths/plugin_data.js';
 import { createRouter } from './src/mcp/router.js';
 import { handleDiscover } from './src/mcp/discover.js';
 import { handleToolsList } from './src/mcp/tools_list.js';
+import { handleToolsCall } from './src/mcp/tools_call.js';
+import { handleInitialize } from './src/mcp/initialize.js';
 import { startStdioServer } from './src/mcp/transport_stdio.js';
 
 function parseArgs(argv) {
@@ -18,14 +20,21 @@ function parseArgs(argv) {
 }
 
 export function buildRouter({ env = process.env, argv1 = process.argv[1], dataDir } = {}) {
-  const pluginRoot = resolvePluginRoot(env, argv1);
+  const pluginRootResult = resolvePluginRoot(env, argv1);
   const pluginData = dataDir
     ? { dir: dataDir, mode: 'persistent', source: 'cli', warnings: [] }
     : resolvePluginData(env);
 
+  const pluginRoot = pluginRootResult.root;
+  const pluginRootSource = pluginRootResult.source;
+
   const router = createRouter();
+  router.register('initialize', (params) => handleInitialize(params));
+  router.register('notifications/initialized', () => ({}));
+  router.register('ping', () => ({}));
   router.register('server/discover', () => handleDiscover());
   router.register('tools/list', () => handleToolsList());
+  router.register('tools/call', (params) => handleToolsCall(params, { pluginRoot, pluginRootSource, persistence: pluginData }));
 
   return { router, pluginRoot, pluginData };
 }
