@@ -1,0 +1,324 @@
+{
+  "plan_version": 1,
+  "summary": "Phase 3: 全数被覆テスト・クリーンアップ。原典 rubric-loop-implementation-plan.json (T068–T076) の分割実行計画。",
+  "assumptions": [
+    "本計画は原典計画の Phase 3: 全数被覆テスト・クリーンアップ を独立実行するための分割計画である。",
+    "先行する Phase 2 までの全タスクが実装完了・テスト green であることを前提とする。"
+  ],
+  "tasks": [
+    {
+      "id": "T068",
+      "title": "テスト: loop_open のエラー13件を全数検査する",
+      "intent": "19.6.7 の総覧が loop_open について挙げる13件のエラーを1件ずつ再現し、E_INTERNAL 以外に14件目が出ないことも確かめる。ツール表面のエラー全数をテスト側から固定する。",
+      "design_refs": [
+        "19.6.7 全7ツール総覧（名前・目的・入力／出力スキーマの所在・エラー条件の全数）",
+        "6.4.1 `loop_open`"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/errors_loop_open.test.js",
+          "kind": "add",
+          "note": "13件の再現ケース"
+        }
+      ],
+      "acceptance": [
+        "E_VALIDATION, E_HANDLE_NOT_ACCEPTED, E_SESSION_NOT_FOUND, E_AMBIGUOUS_LABEL, E_NO_PERSISTENCE, E_RUBRIC_ON_RESUME の6件が再現されること",
+        "E_UPSTREAM_REQUIRED, E_UPSTREAM_NOT_ALLOWED, E_UPSTREAM_NOT_FOUND, E_UPSTREAM_NOT_FINAL, E_UPSTREAM_MODE_MISMATCH, E_UPSTREAM_DIGEST_MISMATCH, E_CHAIN_BUDGET_EXHAUSTED の7件が再現されること",
+        "テストが列挙するエラーコード集合が13件ちょうどであること",
+        "想定外の入力でも E_INTERNAL 以外の未知コードが出ないこと"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/errors_loop_open.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 3
+    },
+    {
+      "id": "T069",
+      "title": "テスト: artifact_commit のエラー13件を全数検査する",
+      "intent": "19.6.7 の総覧が artifact_commit について挙げる13件のエラーを1件ずつ再現する。plan / fileset 固有の検査エラーも含めてツール表面を固定する。",
+      "design_refs": [
+        "19.6.7 全7ツール総覧（名前・目的・入力／出力スキーマの所在・エラー条件の全数）",
+        "6.4.3 `artifact_commit`"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/errors_artifact_commit.test.js",
+          "kind": "add",
+          "note": "13件の再現ケース"
+        }
+      ],
+      "acceptance": [
+        "E_STATE_VIOLATION, E_CONCURRENT, E_VALIDATION, E_ADDRESS_MISSING, E_ARTIFACT_KIND_MISMATCH, E_MANIFEST_UNVERIFIABLE, E_TEST_INVENTORY_REQUIRED の7件が再現されること",
+        "E_TEST_MUTATED_WITHOUT_DIFF, E_PLAN_SCHEMA, E_PLAN_INVALID, E_PLAN_DESIGN_REF, E_FROZEN, E_SUPERSEDED の6件が再現されること",
+        "テストが列挙するエラーコード集合が13件ちょうどであること",
+        "拒否時に成果物が artifacts/ に保存されないこと"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/errors_artifact_commit.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 3
+    },
+    {
+      "id": "T070",
+      "title": "テスト: score_submit のエラー18件を全数検査する",
+      "intent": "19.6.7 の総覧が score_submit について挙げる18件のエラーを1件ずつ再現する。判定を返す唯一のツールなので、拒否条件の全数をテストで固定する。",
+      "design_refs": [
+        "19.6.7 全7ツール総覧（名前・目的・入力／出力スキーマの所在・エラー条件の全数）",
+        "6.4.4 `score_submit`"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/errors_score_submit.test.js",
+          "kind": "add",
+          "note": "18件の再現ケース"
+        }
+      ],
+      "acceptance": [
+        "E_STATE_VIOLATION, E_CONCURRENT, E_DIGEST_MISMATCH, E_INCOMPLETE_SCORES, E_EVIDENCE_REQUIRED, E_EVIDENCE_KIND の6件が再現されること",
+        "E_EVIDENCE_NOT_FOUND, E_EVIDENCE_STALE, E_EVIDENCE_TARGET, E_SCORE_INFLATION, E_SCORE_JUMP, E_WEAKNESS_REQUIRED の6件が再現されること",
+        "E_TEST_REGRESSION, E_TEST_NOT_GREEN, E_UPSTREAM_NOT_ALLOWED, E_FROZEN, E_SUPERSEDED, E_CHAIN_BUDGET_EXHAUSTED の6件が再現されること",
+        "テストが列挙するエラーコード集合が18件ちょうどであること",
+        "拒否時に round が進まないこと"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/errors_score_submit.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 3
+    },
+    {
+      "id": "T071",
+      "title": "テスト: 残る4ツールのエラー15件を全数検査する",
+      "intent": "loop_state 1件、rubric_amend 5件、escalate 7件、audit_export 2件を1件ずつ再現し、7ツール分の総和が 19.6.7 の記載と一致することを確かめる。",
+      "design_refs": [
+        "19.6.7 全7ツール総覧（名前・目的・入力／出力スキーマの所在・エラー条件の全数）",
+        "6.4.2 `loop_state`",
+        "6.4.5 `rubric_amend`",
+        "6.4.6 `escalate`",
+        "6.4.7 `audit_export`"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/errors_rest.test.js",
+          "kind": "add",
+          "note": "15件の再現ケース"
+        }
+      ],
+      "acceptance": [
+        "loop_state の E_SESSION_NOT_FOUND が再現され、状態違反が構造的に起きないことが確認されること",
+        "rubric_amend の E_STATE_VIOLATION, E_CONCURRENT, E_THRESHOLD_IMMUTABLE, E_RELAXATION_UNACKNOWLEDGED, E_VALIDATION の5件が再現されること",
+        "escalate の E_STATE_VIOLATION, E_TOKEN_INVALID, E_RESOLUTION_NOT_APPLICABLE, E_VALIDATION, E_UPSTREAM_NOT_FOUND, E_UPSTREAM_DIGEST_MISMATCH, E_CHAIN_BUDGET_EXHAUSTED の7件が再現されること",
+        "audit_export の E_SESSION_NOT_FOUND と E_VALIDATION の2件が再現されること",
+        "7ツールで再現したコードの重複排除後の集合に E_INTERNAL を足すと 42 件になること"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/errors_rest.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 3
+    },
+    {
+      "id": "T072",
+      "title": "テスト: 失敗モード F1 から F10 の対策が効くことを検査する",
+      "intent": "設計書 2 の対応表の F1 から F10 について、塞ぐ機構が実際に効いていることを1件ずつ検査する。F1 自己採点の甘え、F2 ループ忘却、F3 rubric 消失、F4 基準緩和、F5 スコアだけ上昇、F6 早期 FINAL 宣言、F7 無限ループ、F8 根拠使い回し、F9 一気にジャンプ、F10 成果物差し替えを扱う。",
+      "design_refs": [
+        "2. 何を潰すのか — 失敗モードと対策の1対1対応"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/failure_modes_1_10.test.js",
+          "kind": "add",
+          "note": "F1..F10 を1件1テストで検査"
+        }
+      ],
+      "acceptance": [
+        "F1 に対し evidence 必須と auto 基準の kind 制限が効き E_EVIDENCE_REQUIRED と E_EVIDENCE_KIND が出ること",
+        "F2 に対し全応答の next_action と状態機械の順序強制が効くこと",
+        "F3 に対し loop_state が rubric 全文とアンカーを再供給すること",
+        "F4 に対し緩和が記録され FINAL に到達不能になること",
+        "F5 に対し E_SCORE_INFLATION が出ること",
+        "F6 に対し自己申告が判定に影響せず ITERATING が強制されること",
+        "F7 に対し max_rounds と停滞検知の2系統で STALLED になること",
+        "F8 に対し E_EVIDENCE_STALE が出ること",
+        "F9 に対し E_SCORE_JUMP が出て、command 根拠2件で解除されること",
+        "F10 に対し artifact_commit → score_submit の順序強制と E_DIGEST_MISMATCH が効くこと"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/failure_modes_1_10.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 3
+    },
+    {
+      "id": "T073",
+      "title": "テスト: 失敗モード F11 から F20 の対策が効くことを検査する",
+      "intent": "設計書 2 の対応表の F11 から F20 について、塞ぐ機構が実際に効いていることを1件ずつ検査する。F11 引用捏造、F12 並行上書き、F13 サーバ不在の完了宣言、F14 二重採点、F15 上流の版を知らない、F16 古い合格の放置、F17 下流での辻褄合わせ、F18 設計外作業の混入、F19 テスト削除とアサート弱化、F20 チェーン暴走を扱う。",
+      "design_refs": [
+        "2. 何を潰すのか — 失敗モードと対策の1対1対応"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/failure_modes_11_20.test.js",
+          "kind": "add",
+          "note": "F11..F20 を1件1テストで検査"
+        }
+      ],
+      "acceptance": [
+        "F11 に対し E_EVIDENCE_NOT_FOUND が出ること",
+        "F12 に対し expected_round の楽観ロックと LOCK により E_CONCURRENT が出ること",
+        "F13 に対し SKILL.md の縮退規約が UNVERIFIED-COMPLETE への格下げを強制すること",
+        "F14 に対し submission_id の冪等性で二重適用が起きないこと",
+        "F15 に対し E_UPSTREAM_REQUIRED と E_UPSTREAM_DIGEST_MISMATCH が出ること",
+        "F16 に対し FINAL でも SUPERSEDED に落ちること",
+        "F17 に対し kickback で FROZEN になり下流だけ進む経路が無いこと",
+        "F18 に対し E_PLAN_DESIGN_REF が出ること",
+        "F19 に対し E_TEST_REGRESSION と E_TEST_MUTATED_WITHOUT_DIFF と E_TEST_NOT_GREEN が出ること",
+        "F20 に対し E_CHAIN_BUDGET_EXHAUSTED が出ること"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/failure_modes_11_20.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 3
+    },
+    {
+      "id": "T074",
+      "title": "テスト: 可搬性とスコープ外の混入がないことを検査する",
+      "intent": "スコープ外（CI 設定・配布・レンダリング・ベンダー固有前提）の成果物が混入していないこと、コンポーネントが skills/ と mcp.json の2種のままであることを検査する。可搬パッケージの前提が崩れていないことを機械的に守る。",
+      "design_refs": [
+        "1.3 スコープ外",
+        "1.2 置いた仮定（仕様に無い／曖昧なので、依存しない形にした）",
+        "9.1 パッケージ構成",
+        "11.2 ベンダー固有前提を持ち込まない境界"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/portability.test.js",
+          "kind": "add",
+          "note": "コンポーネント種別・変数・資格情報・スコープ外を検査"
+        }
+      ],
+      "acceptance": [
+        "パッケージ直下のコンポーネントが skills/ と mcp.json の2種だけであること",
+        "mcp.json と mcp.http.json で展開される変数が ${PLUGIN_ROOT} と ${PLUGIN_DATA} の2種のみであること",
+        "パッケージ内に資格情報（token / key / secret / password を名に持つ値）が1件も無いこと",
+        "cwd が PLUGIN_ROOT または PLUGIN_DATA の配下に閉じていること",
+        "CI 設定ファイル・配布用スクリプト・レンダリング関連ファイルがパッケージに含まれないこと",
+        "server/src 配下に vendor 固有の環境変数名が mcp.json 経由で現れないこと"
+      ],
+      "verify": [
+        {
+          "command": "grep -rn 'CLAUDE_PLUGIN' rubric-loop/mcp.json rubric-loop/mcp.http.json",
+          "expect_exit_code": 1,
+          "note": "ベンダー別名が mcp.json に無いこと"
+        },
+        {
+          "command": "node --test rubric-loop/server/test/portability.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T075",
+      "title": "テスト: 既定値表の全項目がコードと一致することを検査する",
+      "intent": "16 の既定値まとめの各行を1件のアサートに落とし、defaults.js の値と突き合わせる。実装時に値を決め直す余地を残さないための最後の関門にする。",
+      "design_refs": [
+        "16. 既定値まとめ（実装時に決め直さない）",
+        "17. 未解決事項として残さないための注記",
+        "7.2 既定値と根拠"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/defaults_table.test.js",
+          "kind": "add",
+          "note": "既定値表の各行を1アサートに対応させる"
+        }
+      ],
+      "acceptance": [
+        "16 の表の各行に対応するアサートが1つ以上存在すること",
+        "モード別 max_rounds / stall_window / stall_epsilon の9値がすべて一致すること",
+        "chain_max_rounds 28 / chain_extra_rounds 6 / chain_max_kickbacks 2 が一致すること",
+        "submission_id の長さ範囲 8 から 128 と、適用ツールが loop_open / artifact_commit / score_submit / rubric_amend / escalate の5本であることが一致すること",
+        "tools/list の ttlMs 86400000 と cacheScope private、および固定ツール順序が一致すること",
+        "fileset の 5000 / 1024 / 2097152 と plan の 200 が一致すること"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/defaults_table.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T076",
+      "title": "テスト: 全モジュール横断の回帰スイートを1コマンドで走らせる",
+      "intent": "server/test 配下の全テストを1コマンドで実行し、途中で停止した場合にどのタスクまで完了しているかが判別できるようにする。部分実装でも常にビルド可能かつテスト緑であることをここで担保する。",
+      "design_refs": [
+        "9.1 パッケージ構成",
+        "1.1 動かせない前提"
+      ],
+      "depends_on": [
+        "T068",
+        "T071",
+        "T072",
+        "T073",
+        "T074",
+        "T075"
+      ],
+      "changes": [
+        {
+          "path": "rubric-loop/server/package.json",
+          "kind": "modify",
+          "note": "scripts.test に node --test を追加"
+        },
+        {
+          "path": "rubric-loop/server/test/smoke.test.js",
+          "kind": "add",
+          "note": "パッケージ骨格と7ツールの疎通のみを見る最小スイート"
+        }
+      ],
+      "acceptance": [
+        "rubric-loop/server で node --test を実行すると全テストが緑で終わること",
+        "smoke.test.js だけを単独実行しても緑で終わること",
+        "未実装のタスクがある段階でも、実装済みタスクのテストは緑のまま実行できること",
+        "テストが PLUGIN_DATA を一時ディレクトリに向け、利用者の実データを汚さないこと"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test",
+          "expect_exit_code": 0,
+          "note": "全数実行"
+        },
+        {
+          "command": "node --test rubric-loop/server/test/smoke.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 2
+    }
+  ]
+}
