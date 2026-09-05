@@ -54,3 +54,33 @@ export function validateFilesetManifest({ files, manifest_command: manifestComma
 
   return { manifest_digest: expectedDigest };
 }
+
+// §19.5.3: fileset の diff はファイル件数ベース。行数はサーバが本文を持たないので null。
+export function computeFilesetDiff(prevFiles, nowFiles) {
+  const prevByPath = new Map(prevFiles.map((f) => [f.path, f]));
+  const nowByPath = new Map(nowFiles.map((f) => [f.path, f]));
+
+  let added = 0;
+  let changed = 0;
+  for (const [filePath, file] of nowByPath) {
+    const prev = prevByPath.get(filePath);
+    if (!prev) added += 1;
+    else if (prev.sha256 !== file.sha256) changed += 1;
+  }
+  let removed = 0;
+  for (const filePath of prevByPath.keys()) {
+    if (!nowByPath.has(filePath)) removed += 1;
+  }
+
+  const total = Math.max(nowByPath.size, 1);
+  const changedRatio = Math.min(1, (added + removed + changed) / total);
+
+  return {
+    added_files: added,
+    removed_files: removed,
+    changed_files: changed,
+    added_lines: null,
+    removed_lines: null,
+    changed_ratio: changedRatio,
+  };
+}

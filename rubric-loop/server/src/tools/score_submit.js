@@ -15,6 +15,7 @@ import {
 } from '../evidence/verify.js';
 import { computeWeightedMean, computeMinScore, nextRoundsWithoutImprovement, decideVerdict } from '../judge/engine.js';
 import { checkScoreInflation, checkScoreJump, checkEvidenceStale } from '../judge/anti_gaming.js';
+import { checkTestNotGreen } from '../implement/test_inventory.js';
 import { recordAcceptedRound, recordRejectedSubmission } from '../judge/round_store.js';
 import { createEscalation } from '../escalation/token.js';
 import { checkSupersede } from '../chain/supersede.js';
@@ -116,6 +117,13 @@ export function scoreSubmit({ input, persistence }) {
       checkCompleteness(input.scores, rubric.criteria);
 
       const artifactBody = readArtifactContent(sDir, currentDigest, session.artifact_kind);
+
+      // R4: fileset の test_inventory が green でないのに auto 基準へ pass_score 以上を付けていないか
+      // （artifact_commit 側の R1-R3/R5 と対になる、採点時点でのみ判定可能な検査）。
+      if (session.artifact_kind === 'fileset' && session.current_artifact.test_inventory) {
+        const autoScores = input.scores.filter((s) => criteriaById.get(s.criterion_id).verification === 'auto');
+        checkTestNotGreen(session.current_artifact.test_inventory, autoScores, rubric.policy.pass_score);
+      }
 
       let upstreamBody = null;
       const needsUpstream = input.scores.some((s) => s.evidence.some((e) => e.kind === 'upstream'));

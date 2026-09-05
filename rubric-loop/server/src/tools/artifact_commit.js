@@ -5,10 +5,14 @@ import { checkStateTransition } from '../fsm/guard.js';
 import { readSession, writeSession, sessionDir, sessionExists } from '../store/session_store.js';
 import {
   saveContentArtifact,
+  saveFilesetArtifact,
   readArtifactContent,
   recordArtifactForRound,
   computeContentDiff,
 } from '../artifact/store.js';
+import { validateFilesetManifest, computeFilesetDiff } from '../artifact/fileset.js';
+import { assertTestInventoryRequired, checkTestInventoryOnCommit } from '../implement/test_inventory.js';
+import { checkAssertMutation, honestLimitWarnings } from '../implement/assert_mutation.js';
 import { checkSupersede } from '../chain/supersede.js';
 import { recordCommitForRound } from '../judge/round_store.js';
 import { CHANGE_NOTE_MIN_LENGTH, ARTIFACT_MAX_BYTES } from '../config/defaults.js';
@@ -21,7 +25,6 @@ function fail(code, message, detail = {}) {
   throw err;
 }
 
-// content 系（markdown/text/plan）のみを扱う。fileset は T031 で実装する。
 export function artifactCommit({ input, persistence }) {
   validate(TOOL_SCHEMAS.artifact_commit.input, input);
 
@@ -33,23 +36,27 @@ export function artifactCommit({ input, persistence }) {
       reason: 'oneOf_content_or_files',
     });
   }
-  if (hasFiles) {
-    fail('E_VALIDATION', 'files-based artifact_commit is not yet supported', {
-      path: '$.files',
-      reason: 'not_implemented',
-    });
-  }
   if (input.change_note.length < CHANGE_NOTE_MIN_LENGTH) {
     fail('E_VALIDATION', `change_note must be at least ${CHANGE_NOTE_MIN_LENGTH} characters`, {
       path: '$.change_note',
       reason: 'too_short',
     });
   }
-  if (Buffer.byteLength(input.content, 'utf8') > ARTIFACT_MAX_BYTES) {
+  if (hasContent && Buffer.byteLength(input.content, 'utf8') > ARTIFACT_MAX_BYTES) {
     fail('E_VALIDATION', `content exceeds ${ARTIFACT_MAX_BYTES} bytes`, {
       path: '$.content',
       reason: 'too_large',
     });
+  }
+
+  let manifestDigest = null;
+  if (hasFiles) {
+    ({ manifest_digest: manifestDigest } = validateFilesetManifest({
+      files: input.files,
+      manifest_command: input.manifest_command,
+      manifest_output_sha256: input.manifest_output_sha256,
+    }));
+    assertTestInventoryRequired('fileset', input.test_inventory);
   }
 
   const dataDir = persistence.dir;
@@ -74,6 +81,17 @@ export function artifactCommit({ input, persistence }) {
       });
     }
 
+    if (hasFiles && session.artifact_kind !== 'fileset') {
+      fail('E_ARTIFACT_KIND_MISMATCH', 'files was provided but session artifact_kind is not "fileset"', {
+        artifact_kind: session.artifact_kind,
+      });
+    }
+    if (hasContent && session.artifact_kind === 'fileset') {
+      fail('E_ARTIFACT_KIND_MISMATCH', 'content was provided but session artifact_kind is "fileset"', {
+        artifact_kind: session.artifact_kind,
+      });
+    }
+
     if (session.round >= 2) {
       const requiredCriterion = session.last_evaluation?.must_fix?.[0]?.criterion_id;
       if (requiredCriterion && !(input.addresses ?? []).includes(requiredCriterion)) {
@@ -86,23 +104,63 @@ export function artifactCommit({ input, persistence }) {
 
     const warnings = [];
     const previousArtifact = session.current_artifact;
-    const { digest, bytes } = saveContentArtifact(sDir, session.artifact_kind, input.content);
     const previousDigest = previousArtifact?.digest ?? null;
-    const unchanged = previousDigest === digest;
 
-    const artifact = { digest, bytes, unchanged, previous_digest: previousDigest };
+    let digest;
+    let bytes;
+    let artifact;
+    let currentArtifactState;
 
-    if (previousDigest && !unchanged) {
-      const previousContent = readArtifactContent(sDir, previousDigest, session.artifact_kind);
-      artifact.diff = computeContentDiff(previousContent, input.content);
-      if (artifact.diff.changed_ratio >= 0.9) warnings.push('near_total_rewrite');
-      if (bytes < previousArtifact.bytes * 0.5) warnings.push('suspicious_shrink');
+    if (hasFiles) {
+      const previousFiles = previousArtifact?.files ?? [];
+      const previousInventory = previousArtifact?.test_inventory ?? null;
+      checkTestInventoryOnCommit(previousInventory, input.test_inventory);
+      checkAssertMutation(previousFiles, input.files, input.test_inventory);
+
+      digest = `sha256:${manifestDigest}`;
+      const manifest = {
+        files: input.files,
+        manifest_command: input.manifest_command,
+        manifest_output_sha256: input.manifest_output_sha256,
+      };
+      ({ bytes } = saveFilesetArtifact(sDir, digest, manifest));
+      const unchanged = previousDigest === digest;
+
+      artifact = { digest, bytes, unchanged, previous_digest: previousDigest };
+      if (previousDigest && !unchanged) {
+        artifact.diff = computeFilesetDiff(previousFiles, input.files);
+        if (artifact.diff.changed_ratio >= 0.9) warnings.push('near_total_rewrite');
+      }
+      if (unchanged) warnings.push('artifact_unchanged');
+      warnings.push(...honestLimitWarnings());
+
+      currentArtifactState = {
+        digest,
+        bytes,
+        committed_at: null,
+        files: input.files,
+        test_inventory: input.test_inventory,
+      };
+    } else {
+      ({ digest, bytes } = saveContentArtifact(sDir, session.artifact_kind, input.content));
+      const unchanged = previousDigest === digest;
+
+      artifact = { digest, bytes, unchanged, previous_digest: previousDigest };
+      if (previousDigest && !unchanged) {
+        const previousContent = readArtifactContent(sDir, previousDigest, session.artifact_kind);
+        artifact.diff = computeContentDiff(previousContent, input.content);
+        if (artifact.diff.changed_ratio >= 0.9) warnings.push('near_total_rewrite');
+        if (bytes < previousArtifact.bytes * 0.5) warnings.push('suspicious_shrink');
+      }
+      if (unchanged) warnings.push('artifact_unchanged');
+
+      currentArtifactState = { digest, bytes, committed_at: null };
     }
-    if (unchanged) warnings.push('artifact_unchanged');
 
     recordArtifactForRound(sDir, session.round, digest);
 
     const committedAt = new Date().toISOString();
+    currentArtifactState.committed_at = committedAt;
     recordCommitForRound(sDir, session.round, {
       round: session.round,
       digest,
@@ -112,10 +170,11 @@ export function artifactCommit({ input, persistence }) {
       addresses: input.addresses ?? [],
       diff: artifact.diff ?? null,
       committed_at: committedAt,
+      ...(hasFiles ? { files: input.files, test_inventory: input.test_inventory } : {}),
     });
 
     session.state = 'SCORING';
-    session.current_artifact = { digest, bytes, committed_at: committedAt };
+    session.current_artifact = currentArtifactState;
     session.updated_at = new Date().toISOString();
     writeSession(dataDir, session);
 

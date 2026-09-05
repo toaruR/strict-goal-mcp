@@ -4,11 +4,12 @@ import { writeAtomic, writeJson, readJson } from '../store/atomic.js';
 import { sha256Hex, normalize } from '../hash/digest.js';
 
 // artifact_kind ごとの拡張子（§8.1 の artifacts/sha256-<hex>.<ext>）。
-// fileset は本文を持たない別経路（T031）なのでここには含めない。
+// fileset は本文を持たず manifest.json（files[] のスナップショット）を本文相当として保存する。
 const EXT_BY_KIND = Object.freeze({
   markdown: '.md',
   text: '.txt',
   plan: '.json',
+  fileset: '.manifest.json',
 });
 
 function artifactsDir(sDir) {
@@ -44,6 +45,18 @@ export function saveContentArtifact(sDir, artifactKind, content) {
 
 export function readArtifactContent(sDir, digest, artifactKind) {
   return fs.readFileSync(artifactPath(sDir, digest, artifactKind), 'utf8');
+}
+
+// fileset は本文ではなく manifest（files[] + 再現コマンド）を内容アドレスで保存する。
+// digest は §19.5.3 のマニフェスト digest（saveContentArtifact の「文字列の sha256」とは別式）。
+export function saveFilesetArtifact(sDir, digest, manifest) {
+  const target = artifactPath(sDir, digest, 'fileset');
+  const serialized = JSON.stringify(manifest, null, 2);
+  fs.mkdirSync(artifactsDir(sDir), { recursive: true });
+  if (!fs.existsSync(target)) {
+    writeAtomic(target, serialized);
+  }
+  return { bytes: manifest.files.reduce((sum, f) => sum + f.bytes, 0) };
 }
 
 // audit_export(§12.2 rounds[].artifact.path) 用。セッションディレクトリ相対の

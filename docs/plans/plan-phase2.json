@@ -1,0 +1,547 @@
+{
+  "plan_version": 1,
+  "summary": "Phase 2: 受け入れテスト AT-1–AT-18。原典 rubric-loop-implementation-plan.json (T050–T067) の分割実行計画。",
+  "assumptions": [
+    "本計画は原典計画の Phase 2: 受け入れテスト AT-1–AT-18 を独立実行するための分割計画である。",
+    "先行する Phase 1 までの全タスクが実装完了・テスト green であることを前提とする。"
+  ],
+  "tasks": [
+    {
+      "id": "T050",
+      "title": "テスト: AT-1: 正常収束",
+      "intent": "設計書 AT-1 の呼び出し列を上から実行し、期待どおり FINAL に到達することを確かめる。判定を出すのがサーバだけであることを正常系で固定する。",
+      "design_refs": [
+        "13. 受け入れテスト",
+        "AT-1: 正常収束"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/at/at01.test.js",
+          "kind": "add",
+          "note": "AT-1: の呼び出し列と期待返り値をそのまま実行する"
+        }
+      ],
+      "acceptance": [
+        "loop_open から score_submit までの呼び出し列が設計書 AT-1 の記載順で実行できること",
+        "全基準 9 以上かつ加重平均 9.0 以上の提出で verdict が FINAL、verdict_reason が all_criteria_passed になること",
+        "FINAL 到達後に artifact_commit を呼ぶと E_STATE_VIOLATION になること",
+        "AT-1 単独で実行でき、他の AT テストの実行順に依存しないこと"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/at/at01.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T051",
+      "title": "テスト: AT-2: ごまかし検出①：成果物不変でスコアだけ上昇",
+      "intent": "失敗モード F5 の受け入れテスト。artifact_digest を変えずにスコアだけ上げた提出が E_SCORE_INFLATION で拒否され、拒否記録が残ることを確かめる。",
+      "design_refs": [
+        "13. 受け入れテスト",
+        "AT-2: ごまかし検出①：成果物不変でスコアだけ上昇"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/at/at02.test.js",
+          "kind": "add",
+          "note": "AT-2: の呼び出し列と期待返り値をそのまま実行する"
+        }
+      ],
+      "acceptance": [
+        "同一 artifact_digest で1基準を +1 した score_submit が E_SCORE_INFLATION になること",
+        "detail に上昇した criterion_id が列挙されること",
+        "拒否された提出が rounds/<round>.rejected/ に error_code 付きで残ること",
+        "拒否によって round が進まないこと"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/at/at02.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T052",
+      "title": "テスト: AT-3: ごまかし検出②：根拠の捏造と使い回し",
+      "intent": "失敗モード F8 と F11 の受け入れテスト。成果物に存在しない引用と、前周と同一の evidence_digest の再利用がそれぞれ拒否されることを確かめる。",
+      "design_refs": [
+        "13. 受け入れテスト",
+        "AT-3: ごまかし検出②：根拠の捏造と使い回し"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/at/at03.test.js",
+          "kind": "add",
+          "note": "AT-3: の呼び出し列と期待返り値をそのまま実行する"
+        }
+      ],
+      "acceptance": [
+        "成果物本文に存在しない excerpt を持つ locator 根拠が E_EVIDENCE_NOT_FOUND になること",
+        "スコアが上昇した基準で前周と同一の evidence_digest を出すと E_EVIDENCE_STALE になること",
+        "両方の拒否が監査 JSON に error_code 付きで残ること"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/at/at03.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T053",
+      "title": "テスト: AT-4: 停滞打ち切り",
+      "intent": "失敗モード F7 の受け入れテスト。改善量が stall_epsilon 未満の周が stall_window 連続したとき STALLED になり、escalate 以外の道が塞がることを確かめる。",
+      "design_refs": [
+        "13. 受け入れテスト",
+        "AT-4: 停滞打ち切り"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/at/at04.test.js",
+          "kind": "add",
+          "note": "AT-4: の呼び出し列と期待返り値をそのまま実行する"
+        }
+      ],
+      "acceptance": [
+        "改善量 0.25 未満の周が design モードで3周連続したとき verdict が STALLED になること",
+        "verdict_reason が no_improvement であること",
+        "STALLED で score_submit を呼ぶと E_STATE_VIOLATION になること",
+        "STALLED で escalate だけが受理されること"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/at/at04.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T054",
+      "title": "テスト: AT-5: max_rounds 到達",
+      "intent": "失敗モード F7 のもう一系統の受け入れテスト。round が max_rounds に達したとき、改善が続いていても STALLED になることを確かめる。",
+      "design_refs": [
+        "13. 受け入れテスト",
+        "AT-5: max_rounds 到達"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/at/at05.test.js",
+          "kind": "add",
+          "note": "AT-5: の呼び出し列と期待返り値をそのまま実行する"
+        }
+      ],
+      "acceptance": [
+        "round が design モードの max_rounds 12 に達したとき verdict が STALLED になること",
+        "verdict_reason が max_rounds_reached であること",
+        "毎周改善している場合でも max_rounds では止まること",
+        "延長が escalate と human_token を経由しないと起きないこと"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/at/at05.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T055",
+      "title": "テスト: AT-6: セッション再開",
+      "intent": "失敗モード F2 と F3 の受け入れテスト。サーバを再起動しハンドル1個だけで再開したとき、rubric 全文と履歴と must_fix が復元されることを確かめる。",
+      "design_refs": [
+        "13. 受け入れテスト",
+        "AT-6: セッション再開"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/at/at06.test.js",
+          "kind": "add",
+          "note": "AT-6: の呼び出し列と期待返り値をそのまま実行する"
+        }
+      ],
+      "acceptance": [
+        "サーバプロセスを落として再起動した後、session_id だけで loop_open(resume) が成功すること",
+        "復元された rubric がアンカー本文まで一致すること",
+        "直前の must_fix が復元されること",
+        "モデル側の記憶に相当する入力を一切与えずに再開が成立すること"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/at/at06.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T056",
+      "title": "テスト: AT-7: rubric の緩和を検出してエスカレーション",
+      "intent": "失敗モード F4 の受け入れテスト。重みを下げる rubric_amend の後は FINAL に到達できず、ESCALATED(relaxation_pending_approval) になることを確かめる。",
+      "design_refs": [
+        "13. 受け入れテスト",
+        "AT-7: rubric の緩和を検出してエスカレーション"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/at/at07.test.js",
+          "kind": "add",
+          "note": "AT-7: の呼び出し列と期待返り値をそのまま実行する"
+        }
+      ],
+      "acceptance": [
+        "重みを下げる rubric_amend が relaxation として rubric_diff に記録されること",
+        "その後に全基準 9 以上を出しても verdict が ESCALATED、verdict_reason が relaxation_pending_approval になること",
+        "resolve/approve_relaxation の後の提出で FINAL_WITH_RELAXATION になること",
+        "FINAL には到達しないこと"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/at/at07.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T057",
+      "title": "テスト: AT-8: モデルの自己申告を無効化する",
+      "intent": "失敗モード F1 と F6 の受け入れテスト。self_verdict_note に FINAL と書いても判定が変わらず、根拠なしのスコアが拒否されることを確かめる。",
+      "design_refs": [
+        "13. 受け入れテスト",
+        "AT-8: モデルの自己申告を無効化する"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/at/at08.test.js",
+          "kind": "add",
+          "note": "AT-8: の呼び出し列と期待返り値をそのまま実行する"
+        }
+      ],
+      "acceptance": [
+        "self_verdict_note に \"FINAL\" を含めても閾値未満なら verdict が ITERATING になること",
+        "self_verdict_note を変えただけで verdict と weighted_mean が一切変わらないこと",
+        "evidence が0件の基準があると E_EVIDENCE_REQUIRED になること",
+        "verification:\"auto\" の基準に command 以外の根拠を出すと E_EVIDENCE_KIND になること"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/at/at08.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T058",
+      "title": "テスト: AT-9: サーバ起動失敗時のスキル単独動作",
+      "intent": "失敗モード F13 の受け入れテスト。MCP サーバが起動しない状況で、スキルが FINAL を名乗らず UNVERIFIED-COMPLETE に格下げして journal を残すことを確かめる。",
+      "design_refs": [
+        "13. 受け入れテスト",
+        "AT-9: サーバ起動失敗時のスキル単独動作"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/at/at09.test.js",
+          "kind": "add",
+          "note": "AT-9: の呼び出し列と期待返り値をそのまま実行する"
+        }
+      ],
+      "acceptance": [
+        "サーバ不在時の縮退手順が SKILL.md に閉じており、ツール呼び出しを前提としないこと",
+        "縮退時の完了表現が UNVERIFIED-COMPLETE であり FINAL を名乗らないこと",
+        "フォールバック journal に周ごとの rubric 版・スコア・根拠が残る書式であること",
+        "復旧後に journal を artifact_commit と score_submit で追認できること"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/at/at09.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T059",
+      "title": "テスト: AT-10: 3モード連鎖の正常系",
+      "intent": "design から plan、plan から implement へピンを張って連鎖が1本通ることを確かめる。各段の上流が FINAL であり digest が一致することが前提条件になる。",
+      "design_refs": [
+        "13. 受け入れテスト",
+        "AT-10: 3モード連鎖の正常系"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/at/at10.test.js",
+          "kind": "add",
+          "note": "AT-10: の呼び出し列と期待返り値をそのまま実行する"
+        }
+      ],
+      "acceptance": [
+        "design セッションが FINAL になった後、その artifact_digest をピンして plan セッションが開けること",
+        "plan セッションが FINAL になった後、その digest をピンして implement セッションが開けること",
+        "3セッションが同一の chain_id を共有すること",
+        "chain.json に3セッションが追記のみで並ぶこと"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/at/at10.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 3
+    },
+    {
+      "id": "T060",
+      "title": "テスト: AT-11: 上流の版を知らずに下流を開こうとする",
+      "intent": "失敗モード F15 の受け入れテスト。upstream を省略した plan セッションの作成と、digest 不一致のピンがそれぞれ拒否されることを確かめる。",
+      "design_refs": [
+        "13. 受け入れテスト",
+        "AT-11: 上流の版を知らずに下流を開こうとする"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/at/at11.test.js",
+          "kind": "add",
+          "note": "AT-11: の呼び出し列と期待返り値をそのまま実行する"
+        }
+      ],
+      "acceptance": [
+        "loop_mode:\"plan\" で upstream を省略すると E_UPSTREAM_REQUIRED になること",
+        "artifact_digest が上流の確定値と異なるとき E_UPSTREAM_DIGEST_MISMATCH になること",
+        "拒否された場合にセッションが1件も作られないこと"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/at/at11.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T061",
+      "title": "テスト: AT-12: 上流変更による下流の失効と部分再検証",
+      "intent": "失敗モード F16 の受け入れテスト。上流が変わると下流が FINAL であっても SUPERSEDED に落ち、rebase で carry_over と invalidated に分かれることを確かめる。",
+      "design_refs": [
+        "13. 受け入れテスト",
+        "AT-12: 上流変更による下流の失効と部分再検証"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/at/at12.test.js",
+          "kind": "add",
+          "note": "AT-12: の呼び出し列と期待返り値をそのまま実行する"
+        }
+      ],
+      "acceptance": [
+        "上流が新しい成果物で FINAL になった後、下流の任意のツール呼び出しで state が SUPERSEDED になること",
+        "下流が FINAL であっても SUPERSEDED に落ちること",
+        "escalate(action:\"rebase\") 後に carry_over と invalidated が rebases/1.json に記録されること",
+        "invalidated に分類された基準だけが再採点必須になること"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/at/at12.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 3
+    },
+    {
+      "id": "T062",
+      "title": "テスト: AT-13: 差し戻し（implement → plan）",
+      "intent": "失敗モード F17 の受け入れテスト。implement から plan へ kickback したとき、下流が FROZEN になり先へ進めないことを確かめる。",
+      "design_refs": [
+        "13. 受け入れテスト",
+        "AT-13: 差し戻し（implement → plan）"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/at/at13.test.js",
+          "kind": "add",
+          "note": "AT-13: の呼び出し列と期待返り値をそのまま実行する"
+        }
+      ],
+      "acceptance": [
+        "escalate(action:\"kickback\") で下流が FROZEN、上流が DRAFTING になること",
+        "FROZEN で artifact_commit を呼ぶと E_FROZEN になること",
+        "kickback が chain.json に記録されること",
+        "下流だけを先に進める呼び出し列が存在しないこと"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/at/at13.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T063",
+      "title": "テスト: AT-14: 実装モードのごまかし検出（テスト削除）",
+      "intent": "失敗モード F19 の受け入れテスト。前周にあったテストの説明なき削除と skip 増加が拒否されることを確かめる。",
+      "design_refs": [
+        "13. 受け入れテスト",
+        "AT-14: 実装モードのごまかし検出（テスト削除）"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/at/at14.test.js",
+          "kind": "add",
+          "note": "AT-14: の呼び出し列と期待返り値をそのまま実行する"
+        }
+      ],
+      "acceptance": [
+        "前周の test_inventory にあったテスト名が説明なく消えた提出が E_TEST_REGRESSION になること",
+        "skip 数が増えた提出が E_TEST_REGRESSION になること",
+        "test_inventory を添付しない implement モードの artifact_commit が E_TEST_INVENTORY_REQUIRED になること",
+        "削除理由を添えた場合は受理され監査に理由が残ること"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/at/at14.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T064",
+      "title": "テスト: AT-15: 実装モードのごまかし検出（結果の使い回しとアサート弱化）",
+      "intent": "失敗モード F19 の後半の受け入れテスト。過去のテスト実行結果の使い回しと、差分を添えないテスト書き換えが拒否されることを確かめる。",
+      "design_refs": [
+        "13. 受け入れテスト",
+        "AT-15: 実装モードのごまかし検出（結果の使い回しとアサート弱化）"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/at/at15.test.js",
+          "kind": "add",
+          "note": "AT-15: の呼び出し列と期待返り値をそのまま実行する"
+        }
+      ],
+      "acceptance": [
+        "command 根拠の target_digest が現在の成果物 digest と異なるとき E_EVIDENCE_TARGET になること",
+        "テストファイルの sha256 が変わったのに差分が添付されていないとき E_TEST_MUTATED_WITHOUT_DIFF になること",
+        "テストが green でない状態で 9 点を出すと E_TEST_NOT_GREEN になること",
+        "差分を添えた弱化は受理されるが監査に差分がそのまま残ること"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/at/at15.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T065",
+      "title": "テスト: AT-16: チェーン予算の超過",
+      "intent": "失敗モード F20 の受け入れテスト。チェーン合計 28 周と kickback 2 回の上限で止まり、上乗せが人間承認1回に限られることを確かめる。",
+      "design_refs": [
+        "13. 受け入れテスト",
+        "AT-16: チェーン予算の超過"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/at/at16.test.js",
+          "kind": "add",
+          "note": "AT-16: の呼び出し列と期待返り値をそのまま実行する"
+        }
+      ],
+      "acceptance": [
+        "チェーン合計 round が 28 に達した後の loop_open と score_submit が E_CHAIN_BUDGET_EXHAUSTED になること",
+        "3回目の kickback が E_CHAIN_BUDGET_EXHAUSTED になること",
+        "人間承認による chain_extra_rounds 6 の上乗せが同一チェーンで2回目は効かないこと"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/at/at16.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T066",
+      "title": "テスト: AT-17: 途中モードからの再開（実装セッションのハンドル1個）",
+      "intent": "implement セッションのハンドル1個だけから、上流2段分のピンとチェーン状況まで復元できることを確かめる。",
+      "design_refs": [
+        "13. 受け入れテスト",
+        "AT-17: 途中モードからの再開（実装セッションのハンドル1個）"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/at/at17.test.js",
+          "kind": "add",
+          "note": "AT-17: の呼び出し列と期待返り値をそのまま実行する"
+        }
+      ],
+      "acceptance": [
+        "implement の session_id 1個だけで loop_open(resume) が成功すること",
+        "応答から plan セッションと design セッションの session_id と artifact_digest が辿れること",
+        "chain.json の集計（合計周回・kickback 回数）が応答に含まれること",
+        "上流本文を再供給しなくても design_refs の照合が継続できること"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/at/at17.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T067",
+      "title": "テスト: AT-18: MCP サーバ起動失敗（3モード）",
+      "intent": "失敗モード F13 の3モード版の受け入れテスト。design / plan / implement のどのモードでもサーバ不在時に同じ縮退が効くことを確かめる。",
+      "design_refs": [
+        "13. 受け入れテスト",
+        "AT-18: MCP サーバ起動失敗（3モード）"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "rubric-loop/server/test/at/at18.test.js",
+          "kind": "add",
+          "note": "AT-18: の呼び出し列と期待返り値をそのまま実行する"
+        }
+      ],
+      "acceptance": [
+        "3モードいずれでもサーバ不在時に FINAL を名乗らないことが SKILL.md で規定されていること",
+        "3モードいずれでも UNVERIFIED-COMPLETE への格下げが規定されていること",
+        "3モードいずれでもフォールバック journal の書式が同一であること",
+        "復旧後の追認手順が3モードで同一であること"
+      ],
+      "verify": [
+        {
+          "command": "node --test rubric-loop/server/test/at/at18.test.js",
+          "expect_exit_code": 0
+        }
+      ],
+      "estimate_rounds": 2
+    }
+  ]
+}
