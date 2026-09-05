@@ -17,3 +17,4 @@ __pycache__/
 .knowledge-kit/source.json
 docs/knowledge-kit-usage.md
 .rubric-loop-data/
+.strict-goal/

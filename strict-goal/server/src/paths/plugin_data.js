@@ -15,35 +15,39 @@ export function resolvePluginData(env, platform = process.platform) {
   const warnings = [];
   const candidates = [];
 
+  const strictGoalData = env.STRICT_GOAL_DATA;
   const rubricLoopData = env.RUBRIC_LOOP_DATA;
   const claudePluginData = env.CLAUDE_PLUGIN_DATA;
 
-  if (rubricLoopData && claudePluginData && rubricLoopData !== claudePluginData) {
+  const primaryData = strictGoalData || rubricLoopData;
+  const primarySource = strictGoalData ? 'STRICT_GOAL_DATA' : 'RUBRIC_LOOP_DATA';
+
+  if (primaryData && claudePluginData && primaryData !== claudePluginData) {
     warnings.push(
-      `data_dir_conflict: RUBRIC_LOOP_DATA=${rubricLoopData} CLAUDE_PLUGIN_DATA=${claudePluginData} using=${rubricLoopData}`
+      `data_dir_conflict: ${primarySource}=${primaryData} CLAUDE_PLUGIN_DATA=${claudePluginData} using=${primaryData}`
     );
-    candidates.push({ root: rubricLoopData, source: 'RUBRIC_LOOP_DATA', tier: 1 });
-  } else if (rubricLoopData) {
-    candidates.push({ root: rubricLoopData, source: 'RUBRIC_LOOP_DATA', tier: 1 });
+    candidates.push({ root: primaryData, source: primarySource, tier: 1 });
+  } else if (primaryData) {
+    candidates.push({ root: primaryData, source: primarySource, tier: 1 });
   } else if (claudePluginData) {
     candidates.push({ root: claudePluginData, source: 'CLAUDE_PLUGIN_DATA', tier: 2 });
   }
 
   if (env.XDG_STATE_HOME) {
-    candidates.push({ root: path.join(env.XDG_STATE_HOME, 'rubric-loop'), source: 'XDG_STATE_HOME', tier: 3 });
+    candidates.push({ root: path.join(env.XDG_STATE_HOME, 'strict-goal'), source: 'XDG_STATE_HOME', tier: 3 });
   }
 
   if (platform === 'win32') {
     if (env.LOCALAPPDATA) {
-      candidates.push({ root: path.join(env.LOCALAPPDATA, 'rubric-loop'), source: 'LOCALAPPDATA', tier: 4 });
+      candidates.push({ root: path.join(env.LOCALAPPDATA, 'strict-goal'), source: 'LOCALAPPDATA', tier: 4 });
     }
   } else if (env.HOME) {
-    candidates.push({ root: path.join(env.HOME, '.local', 'state', 'rubric-loop'), source: 'HOME', tier: 4 });
+    candidates.push({ root: path.join(env.HOME, '.local', 'state', 'strict-goal'), source: 'HOME', tier: 4 });
   }
 
   for (const candidate of candidates) {
     if (tryWritableRoot(candidate.root)) {
-      const dir = path.join(candidate.root, 'rubric-loop');
+      const dir = path.join(candidate.root, 'strict-goal');
       mkdirSync(dir, { recursive: true });
       const w = [...warnings];
       if (candidate.tier >= 3) {

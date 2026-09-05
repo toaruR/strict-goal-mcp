@@ -3,18 +3,22 @@ import { fileURLToPath } from 'node:url';
 
 export function resolvePluginRoot(env, argv1) {
   const warnings = [];
+  const strictGoalRoot = env.STRICT_GOAL_ROOT;
   const rubricLoopRoot = env.RUBRIC_LOOP_ROOT;
   const claudePluginRoot = env.CLAUDE_PLUGIN_ROOT;
 
-  if (rubricLoopRoot && claudePluginRoot && rubricLoopRoot !== claudePluginRoot) {
+  const primaryRoot = strictGoalRoot || rubricLoopRoot;
+  const primarySource = strictGoalRoot ? 'STRICT_GOAL_ROOT' : 'RUBRIC_LOOP_ROOT';
+
+  if (primaryRoot && claudePluginRoot && primaryRoot !== claudePluginRoot) {
     warnings.push(
-      `root_conflict: RUBRIC_LOOP_ROOT=${rubricLoopRoot} CLAUDE_PLUGIN_ROOT=${claudePluginRoot} using=${rubricLoopRoot}`
+      `root_conflict: ${primarySource}=${primaryRoot} CLAUDE_PLUGIN_ROOT=${claudePluginRoot} using=${primaryRoot}`
     );
-    return { root: rubricLoopRoot, source: 'PLUGIN_ROOT', warnings };
+    return { root: primaryRoot, source: 'PLUGIN_ROOT', warnings };
   }
 
-  if (rubricLoopRoot) {
-    return { root: rubricLoopRoot, source: 'PLUGIN_ROOT', warnings };
+  if (primaryRoot) {
+    return { root: primaryRoot, source: 'PLUGIN_ROOT', warnings };
   }
 
   if (claudePluginRoot) {

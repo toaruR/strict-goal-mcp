@@ -14,7 +14,7 @@ function readJson(relPath) {
 test('plugin.json は正しいスキーマと名前を持つ', () => {
   const plugin = readJson('plugin.json');
   assert.equal(plugin.$schema, 'https://agent-plugins.org/schemas/v1.0.0/plugin.json');
-  assert.equal(plugin.name, 'rubric-loop');
+  assert.equal(plugin.name, 'strict-goal');
 });
 
 test('plugin.json に資格情報キーが無い', () => {

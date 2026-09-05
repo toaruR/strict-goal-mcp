@@ -45,10 +45,18 @@ test('persistent モードでは enforceEphemeralPolicy が警告なしで成功
   assert.deepEqual(result.warnings, []);
 });
 
-test('解決したディレクトリ配下に rubric-loop/ が作られ、以後のパスがその下に閉じる', () => {
+test('解決したディレクトリ配下に strict-goal/ が作られ、以後のパスがその下に閉じる', () => {
+  const a = tmpBase();
+  const result = resolvePluginData({ STRICT_GOAL_DATA: a });
+  assert.equal(result.dir, path.join(a, 'strict-goal'));
+  assert.ok(existsSync(result.dir));
+  rmSync(a, { recursive: true, force: true });
+});
+
+test('RUBRIC_LOOP_DATA でも下位互換で strict-goal/ が作られる', () => {
   const a = tmpBase();
   const result = resolvePluginData({ RUBRIC_LOOP_DATA: a });
-  assert.equal(result.dir, path.join(a, 'rubric-loop'));
+  assert.equal(result.dir, path.join(a, 'strict-goal'));
   assert.ok(existsSync(result.dir));
   rmSync(a, { recursive: true, force: true });
 });

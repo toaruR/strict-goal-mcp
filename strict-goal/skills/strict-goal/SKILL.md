@@ -1,6 +1,6 @@
 ---
-name: rubric-loop
-description: Iteratively refine a design, implementation plan, or implementation until it passes server-side rubric evaluation. Use when asked to write a design document, formulate an implementation plan, or implement code according to a plan.
+name: strict-goal
+description: AIの妥協やサボりを防ぎ、客観的なルーブリック検証を満たすまで厳格にゴール完遂を強制する反復改善ループ。設計書作成、実装計画策定、コード実装・テスト時に使用する。
 ---
 
 ## Principles

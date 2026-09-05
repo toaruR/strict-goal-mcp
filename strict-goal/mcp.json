@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/v1.0.0/mcp.json",
   "mcpServers": {
-    "rubric-loop": {
+    "strict-goal": {
       "type": "stdio",
       "command": "node",
       "args": [
@@ -10,9 +10,9 @@
         "${PLUGIN_DATA}"
       ],
       "env": {
-        "RUBRIC_LOOP_ROOT": "${PLUGIN_ROOT}",
-        "RUBRIC_LOOP_DATA": "${PLUGIN_DATA}",
-        "RUBRIC_LOOP_LOG": "warn"
+        "STRICT_GOAL_ROOT": "${PLUGIN_ROOT}",
+        "STRICT_GOAL_DATA": "${PLUGIN_DATA}",
+        "STRICT_GOAL_LOG": "warn"
       },
       "cwd": "${PLUGIN_DATA}"
     }

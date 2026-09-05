@@ -1,5 +1,6 @@
-# rubric-loop
+# Strict Goal MCP (`strict-goal`)
 
+> **サボらせない・妥協を許さないゴール完遂ハーネス**  
 > **Server-enforced iterative refinement loop for AI coding agents based on rubrics, compliant with Agent Plugins 1.0.0 and Model Context Protocol (MCP).**
 
 [日本語版 README (README.ja.md)](./README.ja.md)
@@ -11,10 +12,10 @@
 When AI coding agents iterate using only self-prompts ("think step-by-step", "grade yourself and improve"), they frequently fall victim to known failure modes:
 - **Self-grading bias & grade inflation**: Giving higher scores across rounds even when the artifact didn't meaningfully change.
 - **Rubric amnesia**: Losing criteria, rules, or previous scores when conversation contexts are compressed or truncated.
-- **Premature completion**: Announcing "FINAL / Done" before actually satisfying strict criteria thresholds.
+- **Premature completion / Slacking**: Announcing "FINAL / Done" prematurely before actually satisfying strict criteria thresholds.
 - **Criteria relaxation**: Silently weakening difficult criteria when stuck.
 
-**`rubric-loop`** solves this by moving state tracking, FSM validation, and convergence judgments **out of the LLM context and into a deterministic MCP server**. The agent commits artifacts, scores itself with mandatory line/command-level evidence and weaknesses, and the server independently evaluates threshold logic, detects stalls and gaming, and decides whether the process is `ITERATING` or `FINAL`.
+**`Strict Goal MCP` (`strict-goal`)** solves this by moving state tracking, FSM validation, and convergence judgments **out of the LLM context and into a deterministic MCP server**. The agent commits artifacts, scores itself with mandatory line/command-level evidence and weaknesses, and the server independently evaluates threshold logic, detects stalls and gaming, and decides whether the process is `ITERATING` or `FINAL`.
 
 ---
 

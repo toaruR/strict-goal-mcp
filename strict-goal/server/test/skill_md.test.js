@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const skillsDir = path.resolve(__dirname, '..', '..', 'skills');
-const skillFile = path.resolve(skillsDir, 'rubric-loop', 'SKILL.md');
+const skillFile = path.resolve(skillsDir, 'strict-goal', 'SKILL.md');
 
 test('SKILL.md に7見出しがすべて存在する（日英両対応）', () => {
   const content = readFileSync(skillFile, 'utf8');
@@ -70,7 +70,7 @@ test('スキルが1本だけであること（skills/ 配下のディレクト�
   const entries = readdirSync(skillsDir, { withFileTypes: true });
   const dirs = entries.filter((e) => e.isDirectory());
   assert.equal(dirs.length, 1);
-  assert.equal(dirs[0].name, 'rubric-loop');
+  assert.equal(dirs[0].name, 'strict-goal');
 });
 
 test('SKILL.md に資格情報および絶対パスが1件も無い', () => {
