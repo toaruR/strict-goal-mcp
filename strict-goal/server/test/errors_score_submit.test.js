@@ -25,10 +25,10 @@ const pluginRoot = path.resolve(__dirname, '..', '..');
 const CHANGE_NOTE = 'これは20文字以上ある変更理由の説明文です';
 
 function tmpDataDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-errors-score-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-errors-score-'));
 }
 function durablePersistence() {
-  return { mode: 'durable', dir: tmpDataDir(), source: 'RUBRIC_LOOP_DATA' };
+  return { mode: 'durable', dir: tmpDataDir(), source: 'STRICT_GOAL_DATA' };
 }
 let submissionCounter = 0;
 function submissionId() {
@@ -128,10 +128,29 @@ function createPlan(persistence, upstream) {
     persistence,
   });
 }
-function finalize(persistence, sessionId, content, criterionId) {
+const VALID_PLAN_CONTENT = JSON.stringify({
+  plan_version: 1,
+  summary: 'これは40文字以上になるように書いた計画の要約文章です。ダミーの文字を足して長さを稼ぎます。',
+  tasks: [
+    {
+      id: 'T001',
+      title: 'タスク1',
+      intent: 'このタスクの意図を20文字以上で説明する文章',
+      design_refs: ['# 設計'],
+      depends_on: [],
+      changes: [{ path: 'src/a.js', kind: 'add' }],
+      acceptance: ['受け入れ条件が満たされること'],
+      verify: [{ command: 'npm test', expect_exit_code: 0 }],
+    },
+  ],
+}, null, 2);
+const VALID_PLAN_EXCERPT = 'これは40文字以上になるように書いた計画の要約文章です。ダミーの文字を足して長さを稼ぎます。';
+
+function finalize(persistence, sessionId, content, criterionId, excerptOverride = undefined) {
   const c1 = commit(persistence, sessionId, content, 1);
+  const excerpt = excerptOverride ?? content;
   const r1 = scoreSubmit({
-    input: { session_id: sessionId, submission_id: submissionId(), expected_round: 1, artifact_digest: c1.artifact.digest, scores: [{ criterion_id: criterionId, score: 9, rationale: 'a'.repeat(45), weakness: 'b'.repeat(15), evidence: [{ kind: 'locator', locator: '§1', excerpt: content }] }] },
+    input: { session_id: sessionId, submission_id: submissionId(), expected_round: 1, artifact_digest: c1.artifact.digest, scores: [{ criterion_id: criterionId, score: 9, rationale: 'a'.repeat(45), weakness: 'b'.repeat(15), evidence: [{ kind: 'locator', locator: '§1', excerpt }] }] },
     persistence,
   });
   assert.equal(r1.verdict, 'FINAL');
@@ -266,7 +285,7 @@ expectCode('E_EVIDENCE_TARGET', () => {
   const design = createDesign(persistence);
   const designDigest = finalize(persistence, design.session_id, '# 設計\n実装は完全に動作することを実行ログで確認したという記録がある。', 'impl_works');
   const plan = createPlan(persistence, { session_id: design.session_id, artifact_digest: designDigest });
-  const planDigest = finalize(persistence, plan.session_id, '# 計画\n実装計画がここに詳細に記述されている一つの文章です。', 'plan_works');
+  const planDigest = finalize(persistence, plan.session_id, VALID_PLAN_CONTENT, 'plan_works', VALID_PLAN_EXCERPT);
   const implement = loopOpenCreate({
     input: { mode: 'create', submission_id: submissionId(), task: 'サンプルタスクの説明文で20文字以上になるようにする', loop_mode: 'implement', upstream: { session_id: plan.session_id, artifact_digest: planDigest }, rubric: AUTO_RUBRIC },
     persistence,
@@ -336,7 +355,7 @@ expectCode('E_TEST_NOT_GREEN', () => {
   const design = createDesign(persistence);
   const designDigest = finalize(persistence, design.session_id, '# 設計\n実装は完全に動作することを実行ログで確認したという記録がある。', 'impl_works');
   const plan = createPlan(persistence, { session_id: design.session_id, artifact_digest: designDigest });
-  const planDigest = finalize(persistence, plan.session_id, '# 計画\n実装計画がここに詳細に記述されている一つの文章です。', 'plan_works');
+  const planDigest = finalize(persistence, plan.session_id, VALID_PLAN_CONTENT, 'plan_works', VALID_PLAN_EXCERPT);
   const implement = loopOpenCreate({
     input: { mode: 'create', submission_id: submissionId(), task: 'サンプルタスクの説明文で20文字以上になるようにする', loop_mode: 'implement', upstream: { session_id: plan.session_id, artifact_digest: planDigest }, rubric: AUTO_RUBRIC },
     persistence,
@@ -362,12 +381,12 @@ expectCode('E_TEST_NOT_GREEN', () => {
 expectCode('E_UPSTREAM_NOT_FOUND', () => {
   const persistence = durablePersistence();
   const { plan } = buildDesignPlanChain(persistence);
-  const committed = commit(persistence, plan.session_id, '# 計画本文\nこれは計画セッションの成果物本文であり十分な長さがある文章です。', 1);
+  const committed = commit(persistence, plan.session_id, VALID_PLAN_CONTENT, 1);
   const raw = readSessionRaw(persistence, plan.session_id);
   raw.upstream = { ...raw.upstream, session_id: 'sess_does_not_exist' };
   writeSessionRaw(persistence, plan.session_id, raw);
   scoreSubmit({
-    input: { session_id: plan.session_id, submission_id: submissionId(), expected_round: 1, artifact_digest: committed.artifact.digest, scores: [{ criterion_id: 'plan_works', score: 9, rationale: 'a'.repeat(45), weakness: 'b'.repeat(15), evidence: [{ kind: 'locator', locator: '§1', excerpt: 'これは計画セッションの成果物本文であり十分な長さがある文章です。' }] }] },
+    input: { session_id: plan.session_id, submission_id: submissionId(), expected_round: 1, artifact_digest: committed.artifact.digest, scores: [{ criterion_id: 'plan_works', score: 9, rationale: 'a'.repeat(45), weakness: 'b'.repeat(15), evidence: [{ kind: 'locator', locator: '§1', excerpt: VALID_PLAN_EXCERPT }] }] },
     persistence,
   });
 });
@@ -375,12 +394,12 @@ expectCode('E_UPSTREAM_NOT_FOUND', () => {
 expectCode('E_FROZEN', () => {
   const persistence = durablePersistence();
   const { design, plan } = buildDesignPlanChain(persistence);
-  const committed = commit(persistence, plan.session_id, '# 計画本文\nこれは計画セッションの成果物本文であり十分な長さがある文章です。', 1);
+  const committed = commit(persistence, plan.session_id, VALID_PLAN_CONTENT, 1);
   const raw = readSessionRaw(persistence, design.session_id);
   raw.state = 'DRAFTING';
   writeSessionRaw(persistence, design.session_id, raw);
   scoreSubmit({
-    input: { session_id: plan.session_id, submission_id: submissionId(), expected_round: 1, artifact_digest: committed.artifact.digest, scores: [{ criterion_id: 'plan_works', score: 9, rationale: 'a'.repeat(45), weakness: 'b'.repeat(15), evidence: [{ kind: 'locator', locator: '§1', excerpt: 'これは計画セッションの成果物本文であり十分な長さがある文章です。' }] }] },
+    input: { session_id: plan.session_id, submission_id: submissionId(), expected_round: 1, artifact_digest: committed.artifact.digest, scores: [{ criterion_id: 'plan_works', score: 9, rationale: 'a'.repeat(45), weakness: 'b'.repeat(15), evidence: [{ kind: 'locator', locator: '§1', excerpt: VALID_PLAN_EXCERPT }] }] },
     persistence,
   });
 });
@@ -388,12 +407,12 @@ expectCode('E_FROZEN', () => {
 expectCode('E_SUPERSEDED', () => {
   const persistence = durablePersistence();
   const { design, plan } = buildDesignPlanChain(persistence);
-  const committed = commit(persistence, plan.session_id, '# 計画本文\nこれは計画セッションの成果物本文であり十分な長さがある文章です。', 1);
+  const committed = commit(persistence, plan.session_id, VALID_PLAN_CONTENT, 1);
   const raw = readSessionRaw(persistence, design.session_id);
   raw.current_artifact = { ...raw.current_artifact, digest: `sha256:${'f'.repeat(64)}` };
   writeSessionRaw(persistence, design.session_id, raw);
   scoreSubmit({
-    input: { session_id: plan.session_id, submission_id: submissionId(), expected_round: 1, artifact_digest: committed.artifact.digest, scores: [{ criterion_id: 'plan_works', score: 9, rationale: 'a'.repeat(45), weakness: 'b'.repeat(15), evidence: [{ kind: 'locator', locator: '§1', excerpt: 'これは計画セッションの成果物本文であり十分な長さがある文章です。' }] }] },
+    input: { session_id: plan.session_id, submission_id: submissionId(), expected_round: 1, artifact_digest: committed.artifact.digest, scores: [{ criterion_id: 'plan_works', score: 9, rationale: 'a'.repeat(45), weakness: 'b'.repeat(15), evidence: [{ kind: 'locator', locator: '§1', excerpt: VALID_PLAN_EXCERPT }] }] },
     persistence,
   });
 });

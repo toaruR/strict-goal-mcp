@@ -6,7 +6,7 @@ import os from 'node:os';
 import { validateSubmissionId, withIdempotency, MUTATION_TOOLS_REQUIRING_SUBMISSION_ID } from '../src/idempotency/guard.js';
 
 function tmpSessionDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-idem-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-idem-'));
 }
 
 test('submission_id は7文字だと E_VALIDATION、8文字と128文字は通り、129文字は E_VALIDATION', () => {

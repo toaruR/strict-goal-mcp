@@ -11,11 +11,11 @@ import { escalate } from '../src/tools/escalate.js';
 import { createEscalation, consumeToken } from '../src/escalation/token.js';
 
 function tmpDataDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-escalate-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-escalate-'));
 }
 
 function durablePersistence() {
-  return { mode: 'durable', dir: tmpDataDir(), source: 'RUBRIC_LOOP_DATA' };
+  return { mode: 'durable', dir: tmpDataDir(), source: 'STRICT_GOAL_DATA' };
 }
 
 let submissionCounter = 0;

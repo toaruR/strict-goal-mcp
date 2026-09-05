@@ -7,7 +7,7 @@ import { writeSession, readSession } from '../src/store/session_store.js';
 import { readIndex, resolveByLabel, resolveByChain } from '../src/store/index_store.js';
 
 function tmpDataDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-session-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-session-'));
 }
 
 function sampleSession(overrides = {}) {
@@ -23,10 +23,10 @@ function sampleSession(overrides = {}) {
     rubric_digest: 'sha256:5b1e0f9c',
     label: 'my-label',
     server: {
-      plugin_root: '/home/u/.agent-plugins/rubric-loop',
+      plugin_root: '/home/u/.agent-plugins/strict-goal',
       plugin_root_source: 'PLUGIN_ROOT',
-      data_dir: '/home/u/.agent-plugins-data/rubric-loop',
-      data_dir_source: 'RUBRIC_LOOP_DATA',
+      data_dir: '/home/u/.agent-plugins-data/strict-goal',
+      data_dir_source: 'STRICT_GOAL_DATA',
       persistence: 'durable',
     },
     ...overrides,

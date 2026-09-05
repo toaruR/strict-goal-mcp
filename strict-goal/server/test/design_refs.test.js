@@ -8,7 +8,7 @@ import { saveContentArtifact } from '../src/artifact/store.js';
 import { sessionDir, writeSession } from '../src/store/session_store.js';
 
 function tmpDataDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-design-refs-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-design-refs-'));
 }
 
 function seedUpstream(dataDir, sessionId, content) {

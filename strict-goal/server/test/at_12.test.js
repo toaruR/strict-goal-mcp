@@ -13,11 +13,11 @@ import { escalate } from '../src/tools/escalate.js';
 import { saveContentArtifact } from '../src/artifact/store.js';
 
 function tmpDataDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-at12-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-at12-'));
 }
 
 function durablePersistence() {
-  return { mode: 'durable', dir: tmpDataDir(), source: 'RUBRIC_LOOP_DATA' };
+  return { mode: 'durable', dir: tmpDataDir(), source: 'STRICT_GOAL_DATA' };
 }
 
 let submissionCounter = 0;

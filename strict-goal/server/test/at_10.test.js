@@ -15,11 +15,11 @@ import { auditExport } from '../src/tools/audit_export.js';
 import { readSession } from '../src/store/session_store.js';
 
 function tmpDataDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-at10-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-at10-'));
 }
 
 function durablePersistence() {
-  return { mode: 'durable', dir: tmpDataDir(), source: 'RUBRIC_LOOP_DATA' };
+  return { mode: 'durable', dir: tmpDataDir(), source: 'STRICT_GOAL_DATA' };
 }
 
 let submissionCounter = 0;
@@ -29,7 +29,23 @@ function submissionId() {
 }
 
 const DESIGN_CONTENT = '# 設計\n実装は完全に動作することを実行ログで確認したという記録がここにある。';
-const PLAN_CONTENT = '# 計画\n実装計画がここに詳細に記述されている一つの文章です。';
+const PLAN_CONTENT = JSON.stringify({
+  plan_version: 1,
+  summary: 'これはテスト用の実装計画書であり、40文字以上の長さを十分に確保するための要約文章です。',
+  tasks: [
+    {
+      id: 'T001',
+      title: 'タスクの実装',
+      intent: 'タスクの実装を行うための十分な文字数の意図説明文である。',
+      depends_on: [],
+      design_refs: ['# 設計'],
+      changes: [{ path: 'src/main.js', kind: 'add' }],
+      acceptance: ['初期機能が正常に動作することを確認するための受け入れ条件である'],
+      verify: [{ command: 'npm test', expect_exit_code: 0 }],
+    },
+  ],
+});
+const PLAN_EXCERPT = 'これはテスト用の実装計画書であり、40文字以上の長さを十分に確保するための要約文章です。';
 
 function oneCriterionRubric(criterionId) {
   return {
@@ -86,7 +102,7 @@ function createImplement(persistence, upstream) {
   });
 }
 
-function finalize(persistence, sessionId, content, criterionId) {
+function finalize(persistence, sessionId, content, criterionId, excerptOverride = undefined) {
   const c1 = artifactCommit({
     input: {
       session_id: sessionId,
@@ -97,6 +113,7 @@ function finalize(persistence, sessionId, content, criterionId) {
     },
     persistence,
   });
+  const excerpt = excerptOverride ?? content;
   const r1 = scoreSubmit({
     input: {
       session_id: sessionId,
@@ -109,7 +126,7 @@ function finalize(persistence, sessionId, content, criterionId) {
           score: 9,
           rationale: 'a'.repeat(45),
           weakness: 'b'.repeat(15),
-          evidence: [{ kind: 'locator', locator: '§1', excerpt: content }],
+          evidence: [{ kind: 'locator', locator: '§1', excerpt }],
         },
       ],
     },
@@ -144,7 +161,7 @@ test('AT-10: design→plan→implementでchain_idが共通し、audit_export(sco
   assert.equal(planState.upstream_artifact.current_digest, designDigest);
   assert.equal(planState.upstream_artifact.drifted, false);
 
-  const planDigest = finalize(persistence, plan.session_id, PLAN_CONTENT, 'plan_works');
+  const planDigest = finalize(persistence, plan.session_id, PLAN_CONTENT, 'plan_works', PLAN_EXCERPT);
 
   const implement = createImplement(persistence, { session_id: plan.session_id, artifact_digest: planDigest });
   assert.equal(implement.chain_id, design.chain_id);

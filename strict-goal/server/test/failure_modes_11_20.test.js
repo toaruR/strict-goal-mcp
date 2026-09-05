@@ -25,11 +25,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pluginRoot = path.resolve(__dirname, '..', '..');
 
 function tmpDataDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-fm1120-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-fm1120-'));
 }
 
 function durablePersistence() {
-  return { mode: 'durable', dir: tmpDataDir(), source: 'RUBRIC_LOOP_DATA' };
+  return { mode: 'durable', dir: tmpDataDir(), source: 'STRICT_GOAL_DATA' };
 }
 
 let submissionCounter = 0;
@@ -99,13 +99,28 @@ function finalizeDesign(persistence, sessionId, round = 1) {
   return c1.artifact.digest;
 }
 function finalizePlan(persistence, sessionId) {
-  const content = '# 計画\n実装計画がここに詳細に記述されている一つの文章です。';
+  const content = JSON.stringify({
+    plan_version: 1,
+    summary: 'これは40文字以上になるように書いた計画の要約文章です。ダミーの文字を足して長さを稼ぎます。',
+    tasks: [
+      {
+        id: 'T001',
+        title: 'タスク1',
+        intent: 'このタスクの意図を20文字以上で説明する文章',
+        design_refs: ['# 設計'],
+        depends_on: [],
+        changes: [{ path: 'src/a.js', kind: 'add' }],
+        acceptance: ['受け入れ条件が満たされること'],
+        verify: [{ command: 'npm test', expect_exit_code: 0 }],
+      },
+    ],
+  }, null, 2);
   const c1 = artifactCommit({
     input: { session_id: sessionId, submission_id: submissionId(), expected_round: 1, content, change_note: CHANGE_NOTE },
     persistence,
   });
   const r1 = scoreSubmit({
-    input: { session_id: sessionId, submission_id: submissionId(), expected_round: 1, artifact_digest: c1.artifact.digest, scores: [{ criterion_id: 'plan_works', score: 9, rationale: 'a'.repeat(45), weakness: 'b'.repeat(15), evidence: [{ kind: 'locator', locator: '§1', excerpt: content }] }] },
+    input: { session_id: sessionId, submission_id: submissionId(), expected_round: 1, artifact_digest: c1.artifact.digest, scores: [{ criterion_id: 'plan_works', score: 9, rationale: 'a'.repeat(45), weakness: 'b'.repeat(15), evidence: [{ kind: 'locator', locator: '§1', excerpt: 'これは40文字以上になるように書いた計画の要約文章です。ダミーの文字を足して長さを稼ぎます。' }] }] },
     persistence,
   });
   assert.equal(r1.verdict, 'FINAL');
@@ -194,9 +209,9 @@ test('F12: expected_round が現在の round と食い違うと E_CONCURRENT に
 // --- F13: サーバ不在で無検証の完了宣言（SKILL.md の縮退規約） ---
 
 test('F13: SKILL.md がツール不在時に UNVERIFIED-COMPLETE への格下げとモード別の縮退要件を規約化している', () => {
-  const skillPath = path.resolve(__dirname, '..', '..', 'skills', 'rubric-loop', 'SKILL.md');
+  const skillPath = path.resolve(__dirname, '..', '..', 'skills', 'strict-goal', 'SKILL.md');
   const skill = readFileSync(skillPath, 'utf8');
-  assert.match(skill, /UNVERIFIED-COMPLETE: rubric-loop server unavailable/);
+  assert.match(skill, /UNVERIFIED-COMPLETE: (strict-goal|rubric-loop) server unavailable/);
   assert.match(skill, /FINAL を名乗らない|forbidden from declaring FINAL/);
   for (const mode of ['design', 'plan', 'implement']) {
     assert.ok(skill.includes(`- ${mode} `) || skill.includes(`- ${mode} —`), `${mode} の縮退要件が明記されている`);

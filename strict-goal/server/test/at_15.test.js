@@ -15,11 +15,11 @@ import { scoreSubmit } from '../src/tools/score_submit.js';
 import { computeManifestDigest } from '../src/artifact/fileset.js';
 
 function tmpDataDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-at15-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-at15-'));
 }
 
 function durablePersistence() {
-  return { mode: 'durable', dir: tmpDataDir(), source: 'RUBRIC_LOOP_DATA' };
+  return { mode: 'durable', dir: tmpDataDir(), source: 'STRICT_GOAL_DATA' };
 }
 
 let submissionCounter = 0;
@@ -83,7 +83,25 @@ function createImplement(persistence, upstream) {
   });
 }
 
-function finalizeDesign(persistence, sessionId, content, criterionId) {
+const PLAN_CONTENT = JSON.stringify({
+  plan_version: 1,
+  summary: 'これはテスト用の実装計画書であり、40文字以上の長さを十分に確保するための要約文章です。',
+  tasks: [
+    {
+      id: 'T001',
+      title: 'タスクの実装',
+      intent: 'タスクの実装を行うための十分な文字数の意図説明文である。',
+      depends_on: [],
+      design_refs: ['# 設計'],
+      changes: [{ path: 'src/main.js', kind: 'add' }],
+      acceptance: ['初期機能が正常に動作することを確認するための受け入れ条件である'],
+      verify: [{ command: 'npm test', expect_exit_code: 0 }],
+    },
+  ],
+});
+const PLAN_EXCERPT = 'これはテスト用の実装計画書であり、40文字以上の長さを十分に確保するための要約文章です。';
+
+function finalizeDesign(persistence, sessionId, content, criterionId, excerptOverride = undefined) {
   const c1 = artifactCommit({
     input: {
       session_id: sessionId,
@@ -94,6 +112,7 @@ function finalizeDesign(persistence, sessionId, content, criterionId) {
     },
     persistence,
   });
+  const excerpt = excerptOverride ?? content;
   const r1 = scoreSubmit({
     input: {
       session_id: sessionId,
@@ -106,7 +125,7 @@ function finalizeDesign(persistence, sessionId, content, criterionId) {
           score: 9,
           rationale: 'a'.repeat(45),
           weakness: 'b'.repeat(15),
-          evidence: [{ kind: 'locator', locator: '§1', excerpt: content }],
+          evidence: [{ kind: 'locator', locator: '§1', excerpt }],
         },
       ],
     },
@@ -180,7 +199,7 @@ test('AT-15: target_digest不一致/欠落はE_EVIDENCE_TARGET、テスト改変
   const design = createDesign(persistence);
   const designDigest = finalizeDesign(persistence, design.session_id, '# 設計\n実装は完全に動作することを実行ログで確認したという記録がある。', 'impl_works');
   const plan = createPlan(persistence, { session_id: design.session_id, artifact_digest: designDigest });
-  const planDigest = finalizeDesign(persistence, plan.session_id, '# 計画\n実装計画がここに詳細に記述されている一つの文章です。', 'plan_works');
+  const planDigest = finalizeDesign(persistence, plan.session_id, PLAN_CONTENT, 'plan_works', PLAN_EXCERPT);
   const implement = createImplement(persistence, { session_id: plan.session_id, artifact_digest: planDigest });
 
   const files1 = [file('src/a.js', 'a', 'source'), file('test/a.test.js', 'b', 'test')];

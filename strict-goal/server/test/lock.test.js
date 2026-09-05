@@ -7,7 +7,7 @@ import { resolveBootId } from '../src/store/boot_id.js';
 import { acquireLock, releaseLock } from '../src/store/lock.js';
 
 function tmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-lock-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'strict-goal-lock-'));
 }
 
 test('boot_id: Linux で /proc 経路が読めれば boot_id_source が os になる', () => {

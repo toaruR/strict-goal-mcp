@@ -12,11 +12,11 @@ import { loopState } from '../src/tools/loop_state.js';
 import { readSession } from '../src/store/session_store.js';
 
 function tmpDataDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-audit-chain-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-audit-chain-'));
 }
 
 function durablePersistence() {
-  return { mode: 'durable', dir: tmpDataDir(), source: 'RUBRIC_LOOP_DATA' };
+  return { mode: 'durable', dir: tmpDataDir(), source: 'STRICT_GOAL_DATA' };
 }
 
 let submissionCounter = 0;
@@ -26,7 +26,23 @@ function submissionId() {
 }
 
 const DESIGN_CONTENT = '# 設計\n実装は完全に動作することを実行ログで確認したという記録がここにある。';
-const PLAN_CONTENT = '# 計画\n実装計画がここに詳細に記述されている一つの文章です。';
+const PLAN_CONTENT = JSON.stringify({
+  plan_version: 1,
+  summary: 'これは40文字以上になるように書いた計画の要約文章です。ダミーの文字を足して長さを稼ぎます。',
+  tasks: [
+    {
+      id: 'T001',
+      title: 'タスク1',
+      intent: 'このタスクの意図を20文字以上で説明する文章',
+      design_refs: ['# 設計'],
+      depends_on: [],
+      changes: [{ path: 'src/a.js', kind: 'add' }],
+      acceptance: ['受け入れ条件が満たされること'],
+      verify: [{ command: 'npm test', expect_exit_code: 0 }],
+    },
+  ],
+}, null, 2);
+const PLAN_EXCERPT = 'これは40文字以上になるように書いた計画の要約文章です。ダミーの文字を足して長さを稼ぎます。';
 
 function oneCriterionRubric(criterionId) {
   return {
@@ -114,7 +130,7 @@ function buildChain(persistence) {
   finalize(persistence, plan.session_id, PLAN_CONTENT, 'plan_works', {
     kind: 'locator',
     locator: '§1',
-    excerpt: PLAN_CONTENT,
+    excerpt: PLAN_EXCERPT,
   });
   return { design, plan };
 }
@@ -129,7 +145,7 @@ test('scope:"chain" は design→plan の2セッション分を audit_version:2 
 
   const result = auditExport({ input: { session_id: plan.session_id, scope: 'chain' }, persistence });
   assert.equal(result.ok, true);
-  assert.equal(result.export.schema, 'https://agent-plugins.org/x/rubric-loop/v1/audit-chain.json');
+  assert.equal(result.export.schema, 'urn:strict-goal:schema:audit-chain:v1');
   assert.match(result.export.sha256, /^[0-9a-f]{64}$/);
 
   const audit = readExportedAudit(result);
@@ -251,12 +267,17 @@ test('kickback と rebase の履歴が時刻付きで chain 監査に反映さ�
   });
   assert.equal(rebased.state, 'DRAFTING');
 
+  const planV2 = JSON.parse(PLAN_CONTENT);
+  planV2.summary = 'これは40文字以上になるように書いた改訂版の計画要約文章です。ダミーの文字を足して長さを稼ぎます。';
+  const planV2Content = JSON.stringify(planV2, null, 2);
+  const planV2Excerpt = planV2.summary;
+
   const c3 = artifactCommit({
     input: {
       session_id: plan.session_id,
       submission_id: submissionId(),
       expected_round: rebased.round,
-      content: `${PLAN_CONTENT}\n改訂版。`,
+      content: planV2Content,
       change_note: 'これは20文字以上ある変更理由の説明文です',
     },
     persistence,
@@ -273,7 +294,13 @@ test('kickback と rebase の履歴が時刻付きで chain 監査に反映さ�
           score: 9,
           rationale: 'a'.repeat(45),
           weakness: 'b'.repeat(15),
-          evidence: [{ kind: 'locator', locator: '§1', excerpt: PLAN_CONTENT }],
+          evidence: [
+            {
+              kind: 'locator',
+              locator: '§1',
+              excerpt: planV2Excerpt,
+            },
+          ],
         },
       ],
     },

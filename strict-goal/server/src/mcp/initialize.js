@@ -8,7 +8,7 @@ export function handleInitialize(params = {}) {
       },
     },
     serverInfo: {
-      name: 'rubric-loop',
+      name: 'strict-goal',
       version: '1.0.0',
     },
   };

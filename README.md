@@ -23,7 +23,7 @@ When AI coding agents iterate using only self-prompts ("think step-by-step", "gr
 
 ### 1. Three Connected Loop Modes
 
-`rubric-loop` supports end-to-end software development via three chained session modes:
+`strict-goal` supports end-to-end software development via three chained session modes:
 
 ```
 [ Requirements ]
@@ -74,7 +74,7 @@ Every round records artifact snapshots, diffs, self-scores, rationale, evidence 
 
 ## MCP Tools Reference
 
-`rubric-loop` exposes 7 orthogonal tools:
+`strict-goal` exposes 7 orthogonal tools:
 
 | Tool | Purpose | Key Inputs |
 |---|---|---|
@@ -90,12 +90,12 @@ Every round records artifact snapshots, diffs, self-scores, rationale, evidence 
 
 ## Agent Plugins 1.0.0 Compliance
 
-`rubric-loop` is fully compliant with the [Agent Plugins 1.0.0 specification](https://agent-plugins.org/specification):
+`strict-goal` is fully compliant with the [Agent Plugins 1.0.0 specification](https://agent-plugins.org/specification):
 
 - **Package Structure**:
   - `plugin.json`: Plugin metadata and schema version.
   - `mcp.json`: Tool provider configuration.
-  - `skills/`: Agent instructions under `skills/rubric-loop/SKILL.md`.
+  - `skills/`: Agent instructions under `skills/strict-goal/SKILL.md`.
 - **Portable Host Variables**: Standardized resolution of `${PLUGIN_ROOT}` and `${PLUGIN_DATA}` (with fallback support for `${CLAUDE_PLUGIN_ROOT}` and standard XDG data directories).
 - **Zero External Runtime Dependencies**: Implemented in clean Node.js (>= 20) with built-in modules (`node:fs`, `node:crypto`, `node:http`, etc.).
 
@@ -117,15 +117,15 @@ Add to your host's MCP configuration (e.g. `.mcp.json` or settings):
 ```json
 {
   "mcpServers": {
-    "rubric-loop": {
+    "strict-goal": {
       "command": "node",
       "args": [
-        "/path/to/rubric-loop/server/main.js",
+        "/path/to/strict-goal/server/main.js",
         "--data-dir",
         "/path/to/persistence/data"
       ],
       "env": {
-        "RUBRIC_LOOP_LOG": "info"
+        "STRICT_GOAL_LOG": "info"
       }
     }
   }
@@ -137,10 +137,57 @@ Add to your host's MCP configuration (e.g. `.mcp.json` or settings):
 Start the HTTP daemon (configurable host and port):
 
 ```bash
-node rubric-loop/server/main.js --http --port 8971 --data-dir /path/to/data
+node strict-goal/server/main.js --http --port 8971 --data-dir /path/to/data
 ```
 
 Point your client to `http://127.0.0.1:8971/mcp`.
+
+---
+
+## Human-Friendly Interfaces (`/goal` & Natural Language)
+
+`strict-goal` provides not only low-level MCP tools but also built-in skill definitions and slash command adapters so coding agents can run the iterative loop autonomously.
+
+### 1. Slash Commands
+In Claude Code, Antigravity, Codex CLI, etc., trigger the full pipeline with a single command:
+
+```bash
+/goal Add rate limiting to authentication API with complete unit test coverage
+```
+or
+```bash
+/strict-goal Add rate limiting to authentication API with complete unit test coverage
+```
+
+### 2. Natural Language Instructions
+Prompts containing keywords trigger the strict verification skill:
+- "*Use strict-goal to implement ...*"
+- "*In strict mode, fix bug in ...*"
+- "*Thoroughly refactor ... without slacking*"
+
+### 3. Automated Progress Dashboards
+After each evaluation round, the agent automatically outputs a structured Japanese/English summary to keep the user informed:
+```markdown
+🔄 [design] Round 1 Evaluation:
+- Verdict: ITERATING (needs improvement)
+- Must-fix criteria:
+  - error_handling: Missing error code definitions for edge cases
+- Action: Adding error handling section to specification before committing...
+```
+
+---
+
+## CLI Helper Tool (`strict-goal/server/helper.js`)
+
+A zero-dependency Node.js script automating sha256 calculations for `fileset` commits and `test_inventory` result parsing:
+
+```bash
+# Calculate sha256 and manifest digest for a set of files:
+node strict-goal/server/helper.js fileset <path1> <path2> ...
+
+# Execute test suite and format exit code, digest, and counts into test_inventory JSON:
+node strict-goal/server/helper.js test-run "<command>"
+```
 
 ---
 
@@ -171,7 +218,7 @@ Point your client to `http://127.0.0.1:8971/mcp`.
 Run the comprehensive test suite (120+ unit and integration tests covering FSM, anti-gaming, atomic storage, and chain budget):
 
 ```bash
-cd rubric-loop/server
+cd strict-goal/server
 npm test
 ```
 
@@ -180,7 +227,7 @@ npm test
 Verify exported audit files independently:
 
 ```bash
-node rubric-loop/server/verify_audit.js ./path/to/audit.json
+node strict-goal/server/verify_audit.js ./path/to/audit.json
 ```
 
 ---
@@ -189,12 +236,12 @@ node rubric-loop/server/verify_audit.js ./path/to/audit.json
 
 ```
 rubric-loop-mcp/
-├── rubric-loop/              # Core Agent Plugin package
+├── strict-goal/              # Core Agent Plugin package
 │   ├── plugin.json           # Agent Plugins 1.0.0 manifest
 │   ├── mcp.json              # stdio MCP configuration
 │   ├── mcp.http.json         # streamable-http MCP configuration
 │   ├── presets/              # Default rubrics (design.json, plan.json, implement.json)
-│   ├── skills/               # Agent skill definition (skills/rubric-loop/SKILL.md)
+│   ├── skills/               # Agent skill definition (skills/strict-goal/SKILL.md)
 │   └── server/               # Node.js MCP server implementation
 │       ├── main.js           # Server entry point
 │       ├── schemas/          # JSON schemas for tools, plan, and fileset

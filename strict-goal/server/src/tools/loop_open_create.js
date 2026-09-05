@@ -61,7 +61,7 @@ export function loopOpenCreate({ input, pluginRoot, pluginRootSource, persistenc
 
   let dataDir = persistence.dir;
   if (!dataDir) {
-    dataDir = mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-ephemeral-'));
+    dataDir = mkdtempSync(path.join(os.tmpdir(), 'strict-goal-ephemeral-'));
   }
 
   return withIdempotency(dataDir, input.submission_id, () => {

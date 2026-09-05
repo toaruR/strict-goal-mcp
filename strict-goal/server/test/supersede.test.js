@@ -12,11 +12,11 @@ import { escalate } from '../src/tools/escalate.js';
 import { readSession } from '../src/store/session_store.js';
 
 function tmpDataDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-supersede-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-supersede-'));
 }
 
 function durablePersistence() {
-  return { mode: 'durable', dir: tmpDataDir(), source: 'RUBRIC_LOOP_DATA' };
+  return { mode: 'durable', dir: tmpDataDir(), source: 'STRICT_GOAL_DATA' };
 }
 
 let submissionCounter = 0;

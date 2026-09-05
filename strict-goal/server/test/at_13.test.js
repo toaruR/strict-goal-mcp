@@ -16,11 +16,11 @@ import { escalate } from '../src/tools/escalate.js';
 import { auditExport } from '../src/tools/audit_export.js';
 
 function tmpDataDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-at13-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-at13-'));
 }
 
 function durablePersistence() {
-  return { mode: 'durable', dir: tmpDataDir(), source: 'RUBRIC_LOOP_DATA' };
+  return { mode: 'durable', dir: tmpDataDir(), source: 'STRICT_GOAL_DATA' };
 }
 
 let submissionCounter = 0;

@@ -10,11 +10,11 @@ import { rubricAmend } from '../src/tools/rubric_amend.js';
 import { auditExport } from '../src/tools/audit_export.js';
 
 function tmpDataDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-audit-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-audit-'));
 }
 
 function durablePersistence() {
-  return { mode: 'durable', dir: tmpDataDir(), source: 'RUBRIC_LOOP_DATA' };
+  return { mode: 'durable', dir: tmpDataDir(), source: 'STRICT_GOAL_DATA' };
 }
 
 let submissionCounter = 0;
@@ -142,7 +142,7 @@ test('既定引数の audit_export が動き、監査 JSON version 1 に全周�
   const result = auditExport({ input: { session_id: created.session_id }, persistence });
 
   assert.equal(result.ok, true);
-  assert.equal(result.export.schema, 'https://agent-plugins.org/x/rubric-loop/v1/audit.json');
+  assert.equal(result.export.schema, 'urn:strict-goal:schema:audit:v1');
   assert.match(result.export.sha256, /^[0-9a-f]{64}$/);
   assert.match(path.basename(result.export.path), /^audit-\d{8}T\d{6}Z\.json$/);
   assert.ok(existsSync(result.export.path));

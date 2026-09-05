@@ -17,17 +17,17 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(here, '..', '..');
 
 function tmpDataDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-smoke-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-smoke-'));
 }
 function durablePersistence() {
   // 利用者の実データを汚さないよう常に一時ディレクトリを PLUGIN_DATA として使う。
-  return { mode: 'durable', dir: tmpDataDir(), source: 'RUBRIC_LOOP_DATA' };
+  return { mode: 'durable', dir: tmpDataDir(), source: 'STRICT_GOAL_DATA' };
 }
 
 test('パッケージ骨格: plugin.json/mcp.json/skills/server/main.js が存在する', () => {
   assert.ok(existsSync(path.join(packageRoot, 'plugin.json')));
   assert.ok(existsSync(path.join(packageRoot, 'mcp.json')));
-  assert.ok(existsSync(path.join(packageRoot, 'skills', 'rubric-loop', 'SKILL.md')));
+  assert.ok(existsSync(path.join(packageRoot, 'skills', 'strict-goal', 'SKILL.md')));
   assert.ok(existsSync(path.join(packageRoot, 'server', 'main.js')));
 });
 

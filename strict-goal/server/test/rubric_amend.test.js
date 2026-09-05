@@ -8,11 +8,11 @@ import { artifactCommit } from '../src/tools/artifact_commit.js';
 import { rubricAmend } from '../src/tools/rubric_amend.js';
 
 function tmpDataDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-amend-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-amend-'));
 }
 
 function durablePersistence() {
-  return { mode: 'durable', dir: tmpDataDir(), source: 'RUBRIC_LOOP_DATA' };
+  return { mode: 'durable', dir: tmpDataDir(), source: 'STRICT_GOAL_DATA' };
 }
 
 let submissionCounter = 0;

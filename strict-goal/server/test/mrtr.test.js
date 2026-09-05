@@ -9,11 +9,11 @@ import { scoreSubmit } from '../src/tools/score_submit.js';
 import { escalate } from '../src/tools/escalate.js';
 
 function tmpDataDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-mrtr-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-mrtr-'));
 }
 
 function durablePersistence() {
-  return { mode: 'durable', dir: tmpDataDir(), source: 'RUBRIC_LOOP_DATA' };
+  return { mode: 'durable', dir: tmpDataDir(), source: 'STRICT_GOAL_DATA' };
 }
 
 let submissionCounter = 0;

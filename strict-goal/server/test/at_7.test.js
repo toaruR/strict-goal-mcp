@@ -14,11 +14,11 @@ import { escalate } from '../src/tools/escalate.js';
 import { auditExport } from '../src/tools/audit_export.js';
 
 function tmpDataDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-at7-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-at7-'));
 }
 
 function durablePersistence() {
-  return { mode: 'durable', dir: tmpDataDir(), source: 'RUBRIC_LOOP_DATA' };
+  return { mode: 'durable', dir: tmpDataDir(), source: 'STRICT_GOAL_DATA' };
 }
 
 let submissionCounter = 0;
@@ -50,7 +50,7 @@ function createSession(persistence) {
     input: {
       mode: 'create',
       submission_id: submissionId(),
-      label: 'rubric-loop-at7',
+      label: 'strict-goal-at7',
       task: 'サンプルタスクの説明文で20文字以上になるようにする',
       loop_mode: 'design',
       rubric: { criteria: [CRITERION_SELF_HOSTING, CRITERION_CLARITY] },

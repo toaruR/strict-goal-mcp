@@ -38,11 +38,11 @@ const VALID_PLAN_CONTENT = JSON.stringify({
 });
 
 function tmpDataDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-errors-commit-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-errors-commit-'));
 }
 
 function durablePersistence() {
-  return { mode: 'durable', dir: tmpDataDir(), source: 'RUBRIC_LOOP_DATA' };
+  return { mode: 'durable', dir: tmpDataDir(), source: 'STRICT_GOAL_DATA' };
 }
 
 let submissionCounter = 0;

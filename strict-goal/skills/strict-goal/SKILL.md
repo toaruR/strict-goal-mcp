@@ -12,6 +12,11 @@ FINAL is a verdict only the server can issue; the model is forbidden from declar
 
 ## Choosing a Mode
 
+When given a goal by a user (via natural language or `/goal <task>` / `/strict-goal <task>`):
+- For new features, complex refactors, or unclear requirements: run the full chain `design` → `plan` → `implement`.
+- For planning an existing design: run `plan` (requires finalized `design` upstream).
+- For writing code/tests against an approved plan: run `implement` (requires finalized `plan` upstream).
+
 | Task | loop_mode | Upstream |
 |---|---|---|
 | Write a design document from requirements | design | none |
@@ -23,7 +28,8 @@ Never guess it (the server rejects a wrong guess with E_UPSTREAM_DIGEST_MISMATCH
 
 ## Procedure
 
-1. Call loop_open. For a new session, pass mode:"create" + loop_mode + task + rubric_preset;
+1. Parse the user's objective and formulate a 20+ character task description.
+   Call loop_open. For a new session, pass mode:"create" + loop_mode + task + rubric_preset;
    to resume, pass mode:"resume" + session_id. Always pass a fresh unique string as submission_id.
 2. Follow the returned next_action. Repeat this loop.
 3. artifact_commit — submit the full artifact every time (not a diff).
@@ -32,14 +38,15 @@ Never guess it (the server rejects a wrong guess with E_UPSTREAM_DIGEST_MISMATCH
    - In loop_mode:"implement", pass files + manifest_command + manifest_output_sha256 +
      test_inventory instead of content. If you modified a test file, put its diff in
      test_inventory.diffs.
+   - Tip: run `node strict-goal/server/helper.js fileset <paths...>` to compute files sha256 and manifest digest in one step.
 4. score_submit — score every criterion with a rationale (40+ characters), a weakness, and evidence.
    Grading yourself generously gains nothing. The server compares against the previous round and
    evidence; an unsubstantiated increase is rejected with E_SCORE_INFLATION.
    - Show correspondence to upstream requirements with kind:"upstream" evidence.
    - In implement, command evidence must always include target_digest (the digest returned by
      the most recent artifact_commit).
-5. If the server returns FINAL, you're done. If ITERATING, resolve must_fix and go back to
-   step 3. The server alone determines FINAL.
+   - Tip: run `node strict-goal/server/helper.js test-run "<test command>"` to run tests and output test_inventory and command evidence JSON.
+5. If the server returns FINAL, that phase is complete. If chained, advance to the next mode linking the upstream digest. If the server returns ITERATING, resolve must_fix and go back to step 3. The server alone determines FINAL; never claim FINAL yourself.
 
 ## When Upstream Changes
 
@@ -63,9 +70,9 @@ from memory.
 If the MCP server isn't running or is unreachable due to a failure, do not claim FINAL.
 Always prepend the following string to the artifact:
 
-UNVERIFIED-COMPLETE: rubric-loop server unavailable
+UNVERIFIED-COMPLETE: strict-goal server unavailable
 
-Save the fallback journal to `./rubric-loop-fallback.json` (or `.rubric-loop/fallback-journal.md`)
+Save the fallback journal to `./strict-goal-fallback.json` (or `.strict-goal/fallback-journal.md`)
 in the workspace.
 
 Degraded-mode requirements per mode:

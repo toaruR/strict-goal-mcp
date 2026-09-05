@@ -73,7 +73,7 @@ export function loopOpenResume({ input, persistence }) {
 
   let dataDir = persistence.dir;
   if (!dataDir) {
-    dataDir = mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-ephemeral-'));
+    dataDir = mkdtempSync(path.join(os.tmpdir(), 'strict-goal-ephemeral-'));
   }
 
   const sessionId = resolveSessionId(dataDir, { sessionId: input.session_id, label: input.label });

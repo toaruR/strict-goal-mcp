@@ -11,11 +11,11 @@ import { artifactCommit } from '../src/tools/artifact_commit.js';
 import { scoreSubmit } from '../src/tools/score_submit.js';
 
 function tmpDataDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-at6-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-at6-'));
 }
 
 function durablePersistence() {
-  return { mode: 'durable', dir: tmpDataDir(), source: 'RUBRIC_LOOP_DATA' };
+  return { mode: 'durable', dir: tmpDataDir(), source: 'STRICT_GOAL_DATA' };
 }
 
 let submissionCounter = 0;
@@ -37,7 +37,7 @@ function createSession(persistence) {
     input: {
       mode: 'create',
       submission_id: submissionId(),
-      label: 'rubric-loop-design',
+      label: 'strict-goal-design',
       task: 'サンプルタスクの説明文で20文字以上になるようにする',
       loop_mode: 'design',
       rubric: { criteria: [CRITERION], policy: { stall_window: 10, max_rounds: 20 } },
@@ -116,7 +116,7 @@ test('AT-6: resumeで状態復元、rubric再指定はE_RUBRIC_ON_RESUME、古�
 
   // ハンドルを失っていても label で引ける
   const resumedByLabel = loopOpenResume({
-    input: { mode: 'resume', submission_id: submissionId(), label: 'rubric-loop-design' },
+    input: { mode: 'resume', submission_id: submissionId(), label: 'strict-goal-design' },
     persistence,
   });
   assert.equal(resumedByLabel.session_id, created.session_id);

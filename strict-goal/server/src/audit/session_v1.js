@@ -111,7 +111,7 @@ export function buildSessionAudit(dataDir, sessionId, { includeArtifacts, includ
   const rejectedSubmissions = includeRejected ? buildRejectedSubmissions(sDir) : [];
 
   return {
-    schema: 'https://agent-plugins.org/x/rubric-loop/v1/audit.json',
+    schema: 'urn:strict-goal:schema:audit:v1',
     audit_version: AUDIT_VERSION_SESSION,
     exported_at: new Date().toISOString(),
     session: {

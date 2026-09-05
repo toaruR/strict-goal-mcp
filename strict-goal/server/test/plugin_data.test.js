@@ -6,13 +6,13 @@ import path from 'node:path';
 import { resolvePluginData, enforceEphemeralPolicy } from '../src/paths/plugin_data.js';
 
 function tmpBase() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-test-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-test-'));
 }
 
-test('RUBRIC_LOOP_DATA と CLAUDE_PLUGIN_DATA が異値のとき 1 を採用し data_dir_conflict 警告が出る', () => {
+test('STRICT_GOAL_DATA と CLAUDE_PLUGIN_DATA が異値のとき 1 を採用し data_dir_conflict 警告が出る', () => {
   const a = tmpBase();
   const b = tmpBase();
-  const result = resolvePluginData({ RUBRIC_LOOP_DATA: a, CLAUDE_PLUGIN_DATA: b });
+  const result = resolvePluginData({ STRICT_GOAL_DATA: a, CLAUDE_PLUGIN_DATA: b });
   assert.equal(result.root, a);
   assert.equal(result.mode, 'persistent');
   assert.ok(result.warnings.some((w) => w.startsWith('data_dir_conflict:')));
@@ -53,9 +53,9 @@ test('解決したディレクトリ配下に strict-goal/ が作られ、以後
   rmSync(a, { recursive: true, force: true });
 });
 
-test('RUBRIC_LOOP_DATA でも下位互換で strict-goal/ が作られる', () => {
+test('STRICT_GOAL_DATA でも下位互換で strict-goal/ が作られる', () => {
   const a = tmpBase();
-  const result = resolvePluginData({ RUBRIC_LOOP_DATA: a });
+  const result = resolvePluginData({ STRICT_GOAL_DATA: a });
   assert.equal(result.dir, path.join(a, 'strict-goal'));
   assert.ok(existsSync(result.dir));
   rmSync(a, { recursive: true, force: true });

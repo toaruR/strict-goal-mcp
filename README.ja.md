@@ -94,7 +94,7 @@ LLMエージェントがプロンプト内の自己反省（「段階的に考�
 - **パッケージ構成**:
   - `plugin.json`: プラグインメタデータとスキーマバージョン定義。
   - `mcp.json`: MCPツールプロバイダー定義。
-  - `skills/`: `skills/rubric-loop/SKILL.md` によるエージェント向け実行規範。
+  - `skills/`: `skills/strict-goal/SKILL.md` によるエージェント向け実行規範。
 - **可搬ホスト変数**: `${PLUGIN_ROOT}` と `${PLUGIN_DATA}` の標準解決（`${CLAUDE_PLUGIN_ROOT}` などのベンダー環境変数や標準XDGデータパスへの自動フォールバックに対応）。
 - **ゼロ外部ランタイム依存**: Node.js 標準モジュール（`node:fs`, `node:crypto`, `node:http` 等）のみで実装され、`npm install` なしで起動可能。
 
@@ -116,15 +116,15 @@ LLMエージェントがプロンプト内の自己反省（「段階的に考�
 ```json
 {
   "mcpServers": {
-    "rubric-loop": {
+    "strict-goal": {
       "command": "node",
       "args": [
-        "/path/to/rubric-loop/server/main.js",
+        "/path/to/strict-goal/server/main.js",
         "--data-dir",
         "/path/to/persistence/data"
       ],
       "env": {
-        "RUBRIC_LOOP_LOG": "info"
+        "STRICT_GOAL_LOG": "info"
       }
     }
   }
@@ -136,10 +136,57 @@ LLMエージェントがプロンプト内の自己反省（「段階的に考�
 サーバーを HTTP デーモンとして起動します:
 
 ```bash
-node rubric-loop/server/main.js --http --port 8971 --data-dir /path/to/data
+node strict-goal/server/main.js --http --port 8971 --data-dir /path/to/data
 ```
 
 クライアントから `http://127.0.0.1:8971/mcp` を参照するように設定します。
+
+---
+
+## 人間フレンドリーな指示インターフェース (`/goal` / 人語指示)
+
+`strict-goal` は低レベルな MCP ツール群だけでなく、エージェントが自律的にループを回せるスキル・コマンド連携を備えています。
+
+### 1. スラッシュコマンドによる指示
+Claude Code、Antigravity、Codex CLI 等で以下のコマンドを実行すると、`strict-goal` ハーネスが自動起動し、`design` → `plan` → `implement` の連鎖ループが始まります。
+
+```bash
+/goal ユーザー認証APIにレートリミット機能を追加し、単体テストを完備する
+```
+または
+```bash
+/strict-goal ユーザー認証APIにレートリミット機能を追加し、単体テストを完備する
+```
+
+### 2. 自然言語（人語）による指示
+通常チャットでも以下のようなキーワードを含めると、スキルがトリガーされてサーバー主導の厳格ループが開始されます:
+- 「**strict-goalで** 〇〇を実装して」
+- 「**厳格モードで** 〇〇のバグを修正して」
+- 「**サボらずに** 〇〇のリファクタリングを完遂して」
+
+### 3. 進捗レポートの自動出力
+エージェントは各周回の評価完了後、ユーザーに対して自動的に進捗サマリーを報告します:
+```markdown
+🔄 [design] 第 1 周 評価結果:
+- 判定: ITERATING (要改善)
+- 主な要修正項目:
+  - error_handling: 異常系のエラーコード定義が不足
+- アクション: 設計書にエラーハンドリング節を追加して再コミットします...
+```
+
+---
+
+## 補助CLIツール (`strict-goal/server/helper.js`)
+
+`implement` モードにおける `artifact_commit`（fileset の sha256 算出）や `score_submit`（テスト実行結果・カウント収集）を自動化するゼロ依存 Node.js ヘルパーを提供しています。
+
+```bash
+# 指定ファイル群の sha256 と manifest digest を JSON 出力
+node strict-goal/server/helper.js fileset <path1> <path2> ...
+
+# テストコマンドを実行し、終了コード・出力ダイジェスト・テスト件数を test_inventory 形式で出力
+node strict-goal/server/helper.js test-run "<command>"
+```
 
 ---
 
@@ -172,7 +219,7 @@ node rubric-loop/server/main.js --http --port 8971 --data-dir /path/to/data
 状態機械、アンチゲーミング、原子的I/O、チェーン予算などを含む120以上の包括的テストスイートを実行します:
 
 ```bash
-cd rubric-loop/server
+cd strict-goal/server
 npm test
 ```
 
@@ -181,7 +228,7 @@ npm test
 エクスポートされた監査JSONが改ざんされていないかオフラインで検証します:
 
 ```bash
-node rubric-loop/server/verify_audit.js ./path/to/audit.json
+node strict-goal/server/verify_audit.js ./path/to/audit.json
 ```
 
 ---
@@ -190,12 +237,12 @@ node rubric-loop/server/verify_audit.js ./path/to/audit.json
 
 ```
 rubric-loop-mcp/
-├── rubric-loop/              # コア Agent Plugin パッケージ
+├── strict-goal/              # コア Agent Plugin パッケージ
 │   ├── plugin.json           # Agent Plugins 1.0.0 マニフェスト
 │   ├── mcp.json              # stdio MCP 設定
 │   ├── mcp.http.json         # streamable-http MCP 設定
 │   ├── presets/              # デフォルト評価基準プリセット (design, plan, implement)
-│   ├── skills/               # エージェント用スキル定義 (skills/rubric-loop/SKILL.md)
+│   ├── skills/               # エージェント用スキル定義 (skills/strict-goal/SKILL.md)
 │   └── server/               # Node.js MCP サーバー実装
 │       ├── main.js           # サーバー起動エントリポイント
 │       ├── schemas/          # ツール・plan・fileset 用 JSON Schema

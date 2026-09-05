@@ -17,10 +17,10 @@ import { escalate } from '../src/tools/escalate.js';
 import { decideStallVerdict } from '../src/judge/stall.js';
 
 function tmpDataDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-fm110-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-fm110-'));
 }
 function durablePersistence() {
-  return { mode: 'durable', dir: tmpDataDir(), source: 'RUBRIC_LOOP_DATA' };
+  return { mode: 'durable', dir: tmpDataDir(), source: 'STRICT_GOAL_DATA' };
 }
 
 let submissionCounter = 0;

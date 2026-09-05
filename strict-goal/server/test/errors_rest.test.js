@@ -17,10 +17,10 @@ import { auditExport } from '../src/tools/audit_export.js';
 import { TOOL_ERRORS } from '../src/errors/codes.js';
 
 function tmpDataDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-errors-rest-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-errors-rest-'));
 }
 function durablePersistence() {
-  return { mode: 'durable', dir: tmpDataDir(), source: 'RUBRIC_LOOP_DATA' };
+  return { mode: 'durable', dir: tmpDataDir(), source: 'STRICT_GOAL_DATA' };
 }
 
 let submissionCounter = 0;
@@ -117,14 +117,32 @@ function finalizeDesignK(persistence, sessionId, round) {
   assert.equal(r1.verdict, 'FINAL');
   return c1.artifact.digest;
 }
+const VALID_PLAN_CONTENT_K = JSON.stringify({
+  plan_version: 1,
+  summary: 'これは40文字以上になるように書いた計画の要約文章です。ダミーの文字を足して長さを稼ぎます。',
+  tasks: [
+    {
+      id: 'T001',
+      title: 'タスク1',
+      intent: 'このタスクの意図を20文字以上で説明する文章',
+      design_refs: ['# 設計'],
+      depends_on: [],
+      changes: [{ path: 'src/a.js', kind: 'add' }],
+      acceptance: ['受け入れ条件が満たされること'],
+      verify: [{ command: 'npm test', expect_exit_code: 0 }],
+    },
+  ],
+}, null, 2);
+const VALID_PLAN_EXCERPT_K = 'これは40文字以上になるように書いた計画の要約文章です。ダミーの文字を足して長さを稼ぎます。';
+
 function finalizePlanK(persistence, sessionId) {
-  const content = '# 計画\n実装計画がここに詳細に記述されている一つの文章です。';
+  const content = VALID_PLAN_CONTENT_K;
   const c1 = artifactCommit({
     input: { session_id: sessionId, submission_id: submissionId(), expected_round: 1, content, change_note: CHANGE_NOTE },
     persistence,
   });
   const r1 = scoreSubmit({
-    input: { session_id: sessionId, submission_id: submissionId(), expected_round: 1, artifact_digest: c1.artifact.digest, scores: [{ criterion_id: 'plan_works', score: 9, rationale: 'a'.repeat(45), weakness: 'b'.repeat(15), evidence: [{ kind: 'locator', locator: '§1', excerpt: content }] }] },
+    input: { session_id: sessionId, submission_id: submissionId(), expected_round: 1, artifact_digest: c1.artifact.digest, scores: [{ criterion_id: 'plan_works', score: 9, rationale: 'a'.repeat(45), weakness: 'b'.repeat(15), evidence: [{ kind: 'locator', locator: '§1', excerpt: VALID_PLAN_EXCERPT_K }] }] },
     persistence,
   });
   assert.equal(r1.verdict, 'FINAL');

@@ -15,11 +15,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const verifyScript = path.resolve(__dirname, '..', 'verify_audit.js');
 
 function tmpDataDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-audit-v-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-audit-v-'));
 }
 
 function durablePersistence() {
-  return { mode: 'durable', dir: tmpDataDir(), source: 'RUBRIC_LOOP_DATA' };
+  return { mode: 'durable', dir: tmpDataDir(), source: 'STRICT_GOAL_DATA' };
 }
 
 let submissionCounter = 0;

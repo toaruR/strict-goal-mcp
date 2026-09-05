@@ -32,7 +32,7 @@ function policy(overrides = {}) {
 }
 
 function tmpSessionDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-rubric-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-rubric-'));
 }
 
 test('criteria が41件のとき E_VALIDATION になり、40件は通る', () => {

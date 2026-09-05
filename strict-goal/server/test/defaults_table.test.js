@@ -79,7 +79,8 @@ test('ロックの stale 判定は60秒', () => {
 
 test('transport 既定は stdio（mcp.json）', () => {
   const mcp = JSON.parse(readFileSync(path.join(packageRoot, 'mcp.json'), 'utf8'));
-  assert.equal(mcp.mcpServers['rubric-loop'].type, 'stdio');
+  const server = mcp.mcpServers['strict-goal'] ?? mcp.mcpServers['rubric-loop'];
+  assert.equal(server.type, 'stdio');
 });
 
 test('MCP リビジョンは2026-07-28を第一対象、2025-11-25も受理する', () => {

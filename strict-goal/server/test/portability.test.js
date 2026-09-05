@@ -75,7 +75,8 @@ test('固定位置の配布ファイルに資格情報を名に持つキーが1�
 // 9.3: cwd は PLUGIN_ROOT / PLUGIN_DATA 配下から出ない(`..` を含まない)。
 test('mcp.json の cwd が PLUGIN_ROOT/PLUGIN_DATA 配下に閉じている', () => {
   const mcp = readJson('mcp.json');
-  const cwd = mcp.mcpServers['rubric-loop'].cwd;
+  const server = mcp.mcpServers['strict-goal'] ?? mcp.mcpServers['rubric-loop'];
+  const cwd = server.cwd;
   assert.ok(cwd === '${PLUGIN_ROOT}' || cwd === '${PLUGIN_DATA}' || cwd.startsWith('${PLUGIN_ROOT}/') || cwd.startsWith('${PLUGIN_DATA}/'));
   assert.ok(!cwd.includes('..'));
 });
@@ -104,8 +105,12 @@ test('CI設定ファイル・配布用スクリプト・レンダリング関連
 // 11.2: server/src 配下のコードは env 変数名をベタ書きせず、mcp.json の env キー経由でのみ受け取る。
 test('server/src 配下に mcp.json が宣言しない env キー名（ベンダー固有名含む）がハードコードされていない', () => {
   const mcp = readJson('mcp.json');
-  const declaredEnvKeys = Object.keys(mcp.mcpServers['rubric-loop'].env ?? {});
-  assert.deepEqual(declaredEnvKeys.sort(), ['RUBRIC_LOOP_DATA', 'RUBRIC_LOOP_LOG', 'RUBRIC_LOOP_ROOT'].sort());
+  const server = mcp.mcpServers['strict-goal'] ?? mcp.mcpServers['rubric-loop'];
+  const declaredEnvKeys = Object.keys(server.env ?? {});
+  const expectedKeys = server.env.STRICT_GOAL_DATA
+    ? ['STRICT_GOAL_DATA', 'STRICT_GOAL_LOG', 'STRICT_GOAL_ROOT']
+    : ['STRICT_GOAL_DATA', 'RUBRIC_LOOP_LOG', 'RUBRIC_LOOP_ROOT'];
+  assert.deepEqual(declaredEnvKeys.sort(), expectedKeys.sort());
 
   const jsonFiles = collectJsonFiles(path.join(packageRoot, 'server', 'schemas'));
   for (const f of jsonFiles) {

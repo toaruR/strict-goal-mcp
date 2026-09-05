@@ -6,7 +6,7 @@ import path from 'node:path';
 import { writeAtomic, readJson, writeJson } from '../src/store/atomic.js';
 
 function tmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-atomic-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'strict-goal-atomic-'));
 }
 
 test('writeAtomic 完了後、書いた全バイトが読み出せる', () => {

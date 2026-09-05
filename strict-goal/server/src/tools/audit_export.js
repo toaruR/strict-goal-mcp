@@ -10,7 +10,7 @@ import { buildChainAudit } from '../audit/chain_v2.js';
 import { buildEnvelope } from '../mcp/envelope.js';
 import { AUDIT_DEFAULTS } from '../config/defaults.js';
 
-const CHAIN_AUDIT_SCHEMA = 'https://agent-plugins.org/x/rubric-loop/v1/audit-chain.json';
+const CHAIN_AUDIT_SCHEMA = 'urn:strict-goal:schema:audit-chain:v1';
 
 function fail(code, message, detail = {}) {
   const err = new Error(message);

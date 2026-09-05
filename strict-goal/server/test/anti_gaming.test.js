@@ -11,11 +11,11 @@ import { scoreSubmit } from '../src/tools/score_submit.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function tmpDataDir() {
-  return mkdtempSync(path.join(os.tmpdir(), 'rubric-loop-anti-gaming-'));
+  return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-anti-gaming-'));
 }
 
 function durablePersistence(dir) {
-  return { mode: 'durable', dir: dir ?? tmpDataDir(), source: 'RUBRIC_LOOP_DATA' };
+  return { mode: 'durable', dir: dir ?? tmpDataDir(), source: 'STRICT_GOAL_DATA' };
 }
 
 let submissionCounter = 0;
