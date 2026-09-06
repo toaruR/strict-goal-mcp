@@ -113,6 +113,7 @@ export const TOOL_ERRORS = Object.freeze({
     'E_UPSTREAM_NOT_FOUND',
     'E_FROZEN',
     'E_SUPERSEDED',
+    'E_CHAIN_BUDGET_EXHAUSTED',
   ],
   rubric_amend: [
     'E_STATE_VIOLATION',

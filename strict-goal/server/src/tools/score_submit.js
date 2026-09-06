@@ -20,6 +20,8 @@ import { checkTestNotGreen } from '../implement/test_inventory.js';
 import { recordAcceptedRound, recordRejectedSubmission } from '../judge/round_store.js';
 import { createEscalation } from '../escalation/token.js';
 import { checkSupersede } from '../chain/supersede.js';
+import { chainExists, readChain } from '../chain/store.js';
+import { computeChainRounds, effectiveRoundLimit } from '../chain/budget.js';
 import { buildEnvelope } from '../mcp/envelope.js';
 import { WEAKNESS_REQUIRED_BELOW_SCORE, WEAKNESS_MIN_LENGTH, WEAKNESS_NONE_VALUE, MUST_FIX_MAX } from '../config/defaults.js';
 
@@ -197,10 +199,54 @@ export function scoreSubmit({ input, persistence }) {
         roundsWithoutImprovement,
       });
 
-      const isFinal = verdict === 'FINAL' || verdict === 'FINAL_WITH_RELAXATION';
-      const mustFix = isFinal ? [] : buildMustFix(perCriterion, criteriaById, rubric.policy.pass_score);
+      let chainBudgetExhausted = false;
+      let chainBudgetDetail = null;
+      let chainObj = null;
+      let chainRoundsCount = 0;
+      let chainLimit = 0;
+      if (session.chain_id && chainExists(dataDir, session.chain_id)) {
+        chainObj = readChain(dataDir, session.chain_id);
+        const { chainRounds, perSession } = computeChainRounds(dataDir, chainObj);
+        chainRoundsCount = chainRounds;
+        chainLimit = effectiveRoundLimit(chainObj);
+        if (chainRounds >= chainLimit) {
+          chainBudgetExhausted = true;
+          chainBudgetDetail = { chain_rounds: chainRounds, limit: chainLimit, per_session: perSession };
+        }
+      }
 
       const scoredRound = session.round;
+      let effectiveVerdict = verdict;
+      let effectiveVerdictReason = verdictReason;
+      let escalationData = null;
+      const warnings = [];
+
+      if (verdict === 'FINAL' || verdict === 'FINAL_WITH_RELAXATION') {
+        if (chainBudgetExhausted) {
+          effectiveVerdict = 'PASS';
+          session.state = 'FINAL';
+          warnings.push('chain_budget_exceeded');
+        } else {
+          session.state = verdict;
+        }
+      } else {
+        if (chainBudgetExhausted) {
+          if (chainObj && (chainObj.granted_extra_rounds > 0 || chainRoundsCount > chainLimit)) {
+            fail('E_CHAIN_BUDGET_EXHAUSTED', 'chain round budget exhausted', chainBudgetDetail);
+          }
+          effectiveVerdict = 'REVISE';
+          effectiveVerdictReason = 'chain_budget_exhausted';
+          session.state = 'ESCALATED';
+          escalationData = { reason: 'chain_budget_exhausted', detail: chainBudgetDetail };
+        } else {
+          session.state = verdict === 'ITERATING' ? 'DRAFTING' : verdict;
+          if (verdict === 'ITERATING') session.round += 1;
+        }
+      }
+
+      const isFinal = session.state === 'FINAL' || session.state === 'FINAL_WITH_RELAXATION';
+      const mustFix = isFinal ? [] : buildMustFix(perCriterion, criteriaById, rubric.policy.pass_score);
+
       const record = {
         round: scoredRound,
         rubric_version: session.rubric_version,
@@ -209,8 +255,8 @@ export function scoreSubmit({ input, persistence }) {
         artifact_digest: input.artifact_digest,
         weighted_mean: weightedMeanValue,
         min_score: minScoreValue,
-        verdict,
-        verdict_reason: verdictReason,
+        verdict: effectiveVerdict,
+        verdict_reason: effectiveVerdictReason,
         submission: { self_verdict_note: input.self_verdict_note ?? null, scores: perCriterion },
       };
       recordAcceptedRound(sDir, scoredRound, record);
@@ -221,23 +267,29 @@ export function scoreSubmit({ input, persistence }) {
         artifact_digest: input.artifact_digest,
         weighted_mean: weightedMeanValue,
         min_score: minScoreValue,
-        verdict,
-        verdict_reason: verdictReason,
+        verdict: effectiveVerdict,
+        verdict_reason: effectiveVerdictReason,
         scores: perCriterion,
         must_fix: mustFix,
       };
-      session.state = verdict === 'ITERATING' ? 'DRAFTING' : verdict;
-      if (verdict === 'ITERATING') session.round += 1;
       session.updated_at = new Date().toISOString();
       persistSession(dataDir, session);
 
-      // 緩和承認待ちの自動 ESCALATED（§7.1 手順12）は STALLED と違い escalate(request_human) を
-      // 経由しないので、ここでトークンを発行しておく(escalate.js の resolve が読む)。
-      if (verdict === 'ESCALATED') {
-        createEscalation(sDir, {
-          reason: verdictReason,
+      let escalationInfo;
+      // 緩和承認待ちや予算超過等の自動 ESCALATED（§7.1 手順12）
+      if (session.state === 'ESCALATED') {
+        const { record: escRecord, tokenPath } = createEscalation(sDir, escalationData ?? {
+          reason: effectiveVerdictReason,
           summaryForHuman: { rounds: scoredRound, weighted_mean_trend: [weightedMeanValue], blocking_criteria: mustFix.map((m) => m.criterion_id) },
         });
+        escalationInfo = {
+          escalation_id: escRecord.escalation_id,
+          created_at: escRecord.created_at,
+          token_path: tokenPath,
+          reason: escRecord.reason,
+          ...(escalationData?.detail ? { detail: escalationData.detail } : {}),
+          ...(escRecord.summary_for_human ? { summary_for_human: escRecord.summary_for_human } : {}),
+        };
       }
 
       return buildEnvelope({
@@ -247,9 +299,10 @@ export function scoreSubmit({ input, persistence }) {
         round: session.round,
         rubricVersion: session.rubric_version,
         persistence: persistence.mode,
-        warnings: [],
-        verdict,
-        verdictReason,
+        warnings,
+        verdict: effectiveVerdict,
+        verdictReason: effectiveVerdictReason,
+        escalation: escalationInfo,
         evaluation: {
           scored_round: scoredRound,
           artifact_digest: input.artifact_digest,

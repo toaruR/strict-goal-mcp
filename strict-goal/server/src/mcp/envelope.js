@@ -4,6 +4,15 @@ function defaultNextAction(state) {
   if (state && TERMINAL_STATES.has(state)) {
     return { tool: 'audit_export', input_skeleton: {} };
   }
+  if (state === 'SCORING') {
+    return { tool: 'score_submit', input_skeleton: {} };
+  }
+  if (state === 'DRAFTING') {
+    return { tool: 'artifact_commit', input_skeleton: {} };
+  }
+  if (state === 'STALLED' || state === 'ESCALATED') {
+    return { tool: 'escalate', input_skeleton: {} };
+  }
   return { tool: 'loop_state', input_skeleton: { session_id: null } };
 }
 

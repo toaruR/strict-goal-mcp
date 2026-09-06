@@ -44,8 +44,7 @@ function currentEscalationId(sDir) {
   return `esc_${String(Math.max(...nums)).padStart(2, '0')}`;
 }
 
-// 人間が読むトークンをファイルにのみ書く。応答本文には値を一切載せない（§6.4.6）。
-export function createEscalation(sDir, { reason, summaryForHuman, channel = 'token_file' }) {
+export function createEscalation(sDir, { reason, summaryForHuman, channel = 'token_file', detail }) {
   const dir = escalationsDir(sDir);
   fs.mkdirSync(dir, { recursive: true });
   const escalationId = nextEscalationId(sDir);
@@ -59,6 +58,7 @@ export function createEscalation(sDir, { reason, summaryForHuman, channel = 'tok
     reason,
     channel,
     ...(summaryForHuman ? { summary_for_human: summaryForHuman } : {}),
+    ...(detail !== undefined ? { detail } : {}),
     consumed: false,
     consumed_at: null,
     token_read_at: null,

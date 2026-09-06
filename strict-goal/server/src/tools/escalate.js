@@ -6,6 +6,8 @@ import { readSession, sessionDir, sessionExists } from '../store/session_store.j
 import { persistSession } from '../store/persist.js';
 import { createEscalation, createMrtrEscalation, resolveMrtrEscalation, consumeToken, recordSystemEvent } from '../escalation/token.js';
 import { checkSupersede } from '../chain/supersede.js';
+import { chainExists, readChain } from '../chain/store.js';
+import { grantExtraRounds, effectiveRoundLimit, computeChainRounds } from '../chain/budget.js';
 import { performRebase } from '../chain/rebase.js';
 import { performKickback } from '../chain/kickback.js';
 import { clientSupportsMrtr, buildElicitationRequest, extractInputResponse } from '../mcp/mrtr.js';
@@ -56,11 +58,23 @@ function assertActionInputs(input) {
   }
 }
 
-function applyResolution(session, resolution, escalationId) {
+function applyResolution(session, resolution, escalationId, dataDir) {
+  let chainInfo;
   if (resolution === 'continue') {
     session.state = 'DRAFTING';
+    session.round += 1;
     session.counters.rounds_without_improvement = 0;
     session.counters.extra_rounds_granted = (session.counters.extra_rounds_granted ?? 0) + EXTRA_ROUNDS;
+    if (dataDir && session.chain_id && chainExists(dataDir, session.chain_id)) {
+      const currentChain = readChain(dataDir, session.chain_id);
+      const { chainRounds } = computeChainRounds(dataDir, currentChain);
+      const effectiveLimit = effectiveRoundLimit(currentChain);
+      if (chainRounds >= effectiveLimit || session.last_evaluation?.verdict_reason === 'chain_budget_exhausted') {
+        grantExtraRounds(dataDir, session.chain_id);
+        const updated = readChain(dataDir, session.chain_id);
+        chainInfo = { limit: effectiveRoundLimit(updated), granted_extra_rounds: updated.granted_extra_rounds };
+      }
+    }
   } else if (resolution === 'accept_as_is') {
     session.state = 'FINAL_WITH_RELAXATION';
     session.audit_flags = [
@@ -73,6 +87,7 @@ function applyResolution(session, resolution, escalationId) {
   } else if (resolution === 'abort') {
     session.state = 'ABORTED';
   }
+  return chainInfo;
 }
 
 // §6.4.6 / §7.3。T040 の対象は request_human / resolve(continue|accept_as_is|relax_rubric|abort) /
@@ -94,6 +109,7 @@ export function escalate({ input, persistence, meta }) {
     checkStateTransition(session.state, 'escalate', { action: input.action });
 
     let escalationInfo;
+    let chainInfo;
     let mrtrUnavailable = false;
 
     if (input.action === 'request_human') {
@@ -101,7 +117,7 @@ export function escalate({ input, persistence, meta }) {
       if (mrtrAnswer && session.state === 'ESCALATED') {
         // MRTR 往復の2回目: クライアントが inputResponses を付けて同じ要求を再試行してきた。
         const resolved = resolveMrtrEscalation(sDir, mrtrAnswer.escalationId, { resolution: mrtrAnswer.resolution });
-        applyResolution(session, mrtrAnswer.resolution, resolved.escalation_id);
+        chainInfo = applyResolution(session, mrtrAnswer.resolution, resolved.escalation_id, dataDir);
         escalationInfo = toEscalationInfo(resolved, '');
       } else {
         if (session.state === 'ESCALATED') {
@@ -132,7 +148,7 @@ export function escalate({ input, persistence, meta }) {
         fail('E_RESOLUTION_NOT_APPLICABLE', 'resolve is only valid in ESCALATED', { state: session.state });
       }
       const consumed = consumeToken(sDir, input.human_token, { resolution: input.resolution });
-      applyResolution(session, input.resolution, consumed.escalation_id);
+      chainInfo = applyResolution(session, input.resolution, consumed.escalation_id, dataDir);
       escalationInfo = toEscalationInfo(consumed, '');
     } else if (input.action === 'abort') {
       const reason = session.last_evaluation?.verdict_reason ?? 'manual_abort';
@@ -184,6 +200,7 @@ export function escalate({ input, persistence, meta }) {
       warnings: mrtrUnavailable ? ['mrtr_unavailable'] : [],
       escalation: escalationInfo,
       reopened: session.reopened,
+      chain: chainInfo,
     });
   });
 }

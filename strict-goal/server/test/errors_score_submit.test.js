@@ -417,8 +417,27 @@ expectCode('E_SUPERSEDED', () => {
   });
 });
 
-test('score_submit: 再現したコード集合がちょうど17件で E_INTERNAL 以外の未知コードが出ない', () => {
-  assert.equal(seen.size, 17);
+expectCode('E_CHAIN_BUDGET_EXHAUSTED', () => {
+  const persistence = durablePersistence();
+  const { plan } = buildDesignPlanChain(persistence);
+  const committed = commit(persistence, plan.session_id, VALID_PLAN_CONTENT, 1);
+  const raw = readSessionRaw(persistence, plan.session_id);
+  raw.round = 30;
+  writeSessionRaw(persistence, plan.session_id, raw);
+  scoreSubmit({
+    input: {
+      session_id: plan.session_id,
+      submission_id: submissionId(),
+      expected_round: 30,
+      artifact_digest: committed.artifact.digest,
+      scores: [{ criterion_id: 'plan_works', score: 5, rationale: 'a'.repeat(45), weakness: 'b'.repeat(15), evidence: [{ kind: 'locator', locator: '§1', excerpt: VALID_PLAN_EXCERPT }] }],
+    },
+    persistence,
+  });
+});
+
+test('score_submit: 再現したコード集合がちょうど18件で E_INTERNAL 以外の未知コードが出ない', () => {
+  assert.equal(seen.size, 18);
   assert.deepEqual([...seen].sort(), [...TOOL_ERRORS.score_submit].sort());
   assert.ok(!seen.has('E_INTERNAL'));
 });

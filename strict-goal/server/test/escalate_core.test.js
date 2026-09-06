@@ -191,9 +191,10 @@ test('誤った human_token の resolve は E_TOKEN_INVALID になり state は 
   assert.equal(sessionAfter.counters.rounds_without_improvement, 0);
   assert.equal(sessionAfter.counters.extra_rounds_granted, 3);
 
-  // max_rounds は2だったが +3 されたので、round=2 で再度ITERATINGになり即STALLEDには戻らない。
-  const c2 = commit(persistence, created.session_id, 2);
-  const r2 = scoreOnce(persistence, created.session_id, 2, c2.artifact.digest, [{ criterionId: 'impl_works', score: 5 }]);
+  // max_rounds は2だったが +3 されたので、次の周で再度ITERATINGになり即STALLEDには戻らない。
+  const nextR = sessionAfter.round;
+  const c2 = commit(persistence, created.session_id, nextR);
+  const r2 = scoreOnce(persistence, created.session_id, nextR, c2.artifact.digest, [{ criterionId: 'impl_works', score: 5 }]);
   assert.equal(r2.verdict, 'ITERATING');
 });
 
