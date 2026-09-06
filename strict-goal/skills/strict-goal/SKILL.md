@@ -18,7 +18,7 @@ Users can invoke either the full chain or a single targeted phase using English 
 |---|---|---|
 | `strict-goal design <instruction>`<br>`strict-goal 設計 <指示>` | `design` only | Creates specification document. Runs rubric iteration loop until server returns FINAL, then stops (does not advance to plan/implement). |
 | `strict-goal plan <design_doc_path> [instruction]`<br>`strict-goal 計画 <設計書パス> [指示]` | `plan` only | Reads the given design document, generates task DAG & acceptance criteria (JSON), and iterates until server returns FINAL, then stops (does not advance to implement). If no upstream design session exists, immediately creates and finalizes a minimal design session referencing the document to satisfy server chain integrity. |
-| `strict-goal implement <plan_doc_path> [instruction]`<br>`strict-goal 実装 <計画書パス> [指示]` | `implement` only | Reads the given implementation plan, implements code & tests, runs test verification, and iterates until server returns FINAL, then stops. If no upstream plan session exists, registers the plan to satisfy upstream digest requirements. |
+| `strict-goal implement <plan_doc_path> [instruction]`<br>`strict-goal 実装 <計画書パス> [指示]` | `implement` only | Reads the given plan. Before touching code, calls `loop_open` first (auto-resolving upstream plan from `.strict-goal/index.json`'s latest session where server returned FINAL) to enter DRAFTING, then implements code & tests, runs verification, and iterates until server returns FINAL. |
 | `strict-goal <goal>`<br>`/strict-goal <goal>`<br>`/goal <goal>` | `design` → `plan` → `implement` | Default: Executes the entire sequential pipeline until the final implement phase's server returns FINAL. |
 
 ### Pipeline Overview
@@ -30,14 +30,18 @@ Users can invoke either the full chain or a single targeted phase using English 
 | Write code and tests from a finalized plan | implement | plan session handle & artifact digest | Fileset + Test Inventory |
 
 If you don't know the upstream digest, call `loop_state` on the upstream session to get it.
+For `implement`, if upstream session ID is omitted, auto-resolve it from the latest session in `.strict-goal/index.json` where server returns FINAL.
 Never guess it (the server rejects a wrong guess with `E_UPSTREAM_DIGEST_MISMATCH`).
 
 ## Procedure
 
-1. Parse the user's objective and formulate a 20+ character task description.
-   Call loop_open. For a new session, pass mode:"create" + loop_mode + task + rubric_preset;
-   to resume, pass mode:"resume" + session_id. Always pass a fresh unique string as submission_id.
-2. Follow the returned next_action. Repeat this loop.
+1. **Call loop_open FIRST before writing code**:
+   Do NOT start editing files or implementing code before opening a session.
+   Parse the objective and formulate a 20+ character task description.
+   - In `loop_mode:"implement"`, you MUST supply `upstream` (`{ session_id, artifact_digest }`). If omitted in prompt, auto-resolve it: read `.strict-goal/index.json` to find the latest session where `loop_mode` was plan and server returns FINAL (or inspect via `loop_state`), then retrieve its `session_id` and `current_artifact.digest`.
+   - Call `loop_open` immediately. For a new session, pass mode:"create" + loop_mode + task + rubric_preset (and upstream for plan/implement); to resume, pass mode:"resume" + session_id. Always pass a fresh unique string as submission_id.
+   - Calling `loop_open` puts the session in DRAFTING state and immediately updates the live dashboard (`<data_dir>/dashboard/index.html` and `<session_id>.html`).
+2. Follow the returned next_action. Proceed to write code, edit files, and run tests only after the session is created and in DRAFTING. Repeat this loop.
 3. artifact_commit — submit the full artifact every time (not a diff).
    Pass the round the server returned back as expected_round.
    addresses must always include the criterion id at the head of the previous must_fix.
