@@ -134,7 +134,7 @@ export function renderSessionHtml(model) {
     : '';
 
   return `<!DOCTYPE html>
-<html lang="ja"><head><meta charset="utf-8"><title>${escapeHtml(model.session_id)} dashboard</title><style>${PAGE_STYLE}</style></head>
+<html lang="ja"><head><meta charset="utf-8"><meta http-equiv="refresh" content="5"><title>${escapeHtml(model.session_id)} dashboard</title><style>${PAGE_STYLE}</style></head>
 <body>
 <p><a href="./index.html">&larr; 全セッション一覧</a></p>
 <h1>${escapeHtml(model.session_id)}</h1>
@@ -195,7 +195,7 @@ ${rows}
   }).join('\n');
 
   return `<!DOCTYPE html>
-<html lang="ja"><head><meta charset="utf-8"><title>rubric-loop dashboard</title><style>${PAGE_STYLE}</style></head>
+<html lang="ja"><head><meta charset="utf-8"><meta http-equiv="refresh" content="5"><title>rubric-loop dashboard</title><style>${PAGE_STYLE}</style></head>
 <body>
 <h1>全セッション一覧</h1>
 ${sections || '<p>(セッションなし)</p>'}
