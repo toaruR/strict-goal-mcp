@@ -35,14 +35,19 @@ Never guess it (the server rejects a wrong guess with `E_UPSTREAM_DIGEST_MISMATC
 
 ## Subagent Delegation for Implementation (実装のサブエージェント委譲)
 
-In chained runs (`design` → `plan` → `implement`) or complex projects, **delegating the `implement` phase to a subagent (`coder` / `self`) is strongly recommended** to protect the main orchestrator's context from token exhaustion and test output noise:
+In chained runs (`design` → `plan` → `implement`) or complex projects, **delegating the `implement` phase to a subagent (`implementer` / `coder` / `self`) is strongly recommended** to protect the main orchestrator's context from token exhaustion and test output noise:
 
 - **Antigravity**:
-  Call `invoke_subagent` with `TypeName: "self"` (or custom coder), passing:
-  `Role: "Implementation Worker"`, `Workspace: "inherit"`, and a prompt such as:
-  `"strict-goal implement <plan_doc_path> を実行してください。上流 plan の digest をピン留めし、コード・テスト実装、helper.js での fileset 生成、サーバが判定した結果が FINAL になるまで自律周回し、確定ダイジェストと完了報告を返してください。"`
+  Call `invoke_subagent` with `TypeName: "self"` (or custom implementer), passing:
+  `Role: "Implementation Supervisor"`, `Workspace: "inherit"`, and a prompt such as:
+  `"strict-goal implement <plan_doc_path> を実行してください。上流 plan の digest をピン留めし、plan の各タスクを順次孫エージェントに実装させ、helper.js での fileset 生成、サーバが判定した結果が FINAL になるまで自律周回し、確定ダイジェストと完了報告を返してください。"`
 - **Claude Code**:
   Launch the `coder` subagent (`Agent(subagent_type="coder", prompt=...)`) or delegate the task.
+- **Hierarchical Task Delegation (子監督 → 孫タスク実装)**:
+  The `implementer` subagent acts as an in-loop supervisor:
+  1. Opens the session via `loop_open` and parses `tasks[]` from upstream `plan`.
+  2. Sequentially spawns a grandchild subagent (`task-worker` / `self`) for each individual task (or `must_fix` item), restricting each worker's scope strictly to that task's implementation and unit tests.
+  3. After each task completes, the supervisor verifies overall integrity, executes `helper.js` for test verification & fileset generation, and commits/scores the round.
 - The subagent runs the full implement loop autonomously until the server returns FINAL, then reports back with the finalized digest and test summary.
 
 ## Procedure
