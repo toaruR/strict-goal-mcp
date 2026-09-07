@@ -241,6 +241,20 @@ npm test
 node strict-goal/server/verify_audit.js ./path/to/audit.json
 ```
 
+### バージョンの確認
+
+strict-goal のバージョン（`1.0.0`）は以下のコマンドで確認できます:
+
+```bash
+# サーバー CLI
+node strict-goal/server/main.js --version
+# または短縮フラグ
+node strict-goal/server/main.js -v
+
+# ヘルパーユーティリティ
+node strict-goal/server/helper.js version
+```
+
 ---
 
 ## ディレクトリ構成

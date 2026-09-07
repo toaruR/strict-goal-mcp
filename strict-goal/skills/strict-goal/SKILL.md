@@ -33,6 +33,24 @@ If you don't know the upstream digest, call `loop_state` on the upstream session
 For `implement`, if upstream session ID is omitted, auto-resolve it from the latest session in `.strict-goal/index.json` where server returns FINAL.
 Never guess it (the server rejects a wrong guess with `E_UPSTREAM_DIGEST_MISMATCH`).
 
+## Subagent Delegation for Implementation (実装のサブエージェント委譲)
+
+In chained runs (`design` → `plan` → `implement`) or complex projects, **delegating the `implement` phase to a subagent (`sg-implementer` / `sg-coder` / `self`) is strongly recommended** to protect the main orchestrator's context from token exhaustion and test output noise:
+
+- **Antigravity**:
+  Call `invoke_subagent` with `TypeName: "self"` (or custom supervisor), passing:
+  `Role: "Implementation Supervisor"`, `Workspace: "inherit"`, and a prompt such as:
+  `"Execute strict-goal implement <plan_doc_path>. Pin upstream plan digest, sequentially delegate plan tasks to grandchild workers, generate fileset/evidence via helper.js, run autonomous loop until the server returns FINAL, and report back with the finalized digest."`
+- **Claude Code**:
+  - Direct execution: Launch `sg-coder` subagent via `Agent(subagent_type="sg-coder", prompt=...)`.
+  - Hierarchical execution (recommended): Launch `sg-implementer` supervisor via `Agent(subagent_type="sg-implementer", prompt=...)`. The supervisor sequentially dispatches each task to `sg-worker` (`Agent(subagent_type="sg-worker", prompt=...)`).
+- **Hierarchical Task Delegation (子監督 → 孫タスク実装)**:
+  The `sg-implementer` subagent acts as an in-loop supervisor:
+  1. Opens the session via `loop_open` and parses `tasks[]` from upstream `plan`.
+  2. Sequentially spawns a grandchild subagent (`sg-worker` / `self`) for each individual task (or `must_fix` item), restricting each worker's scope strictly to that task's implementation and unit tests.
+  3. After each task completes, the supervisor verifies overall integrity, executes `helper.js` for test verification & fileset generation, and commits/scores the round.
+- The subagent runs the full implement loop autonomously until the server returns FINAL, then reports back with the finalized digest and test summary.
+
 ## Procedure
 
 1. **Call loop_open FIRST before writing code**:
@@ -73,6 +91,12 @@ need re-scoring — fix only those. Don't redo everything.
 Don't paper over it downstream. Propose
 escalate{action:"kickback", target_criteria:[…], note:"description of the flaw"} and request
 human approval. Your session is frozen and resumes once upstream is fixed.
+
+## Checking Version
+
+To check the installed version of strict-goal:
+- Server CLI: `node strict-goal/server/main.js --version` (or `-v`)
+- Helper CLI: `node strict-goal/server/helper.js version` (or `--version`)
 
 ## When Context Is Lost
 

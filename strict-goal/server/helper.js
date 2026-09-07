@@ -3,6 +3,7 @@ import { readFileSync, statSync, readdirSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
+import { VERSION, NAME } from './src/version.js';
 
 function sha256Hex(data) {
   return createHash('sha256').update(data).digest('hex');
@@ -85,6 +86,7 @@ function parseTestOutput(rawOutput, exitCode) {
   let skipped = 0;
 
   for (const line of lines) {
+    if (line.trim().startsWith('ℹ')) continue;
     const passMatch = line.match(/(?:✔|ok|PASS)\s+(?:test at\s+)?([^\r\n]+)/i);
     const failMatch = line.match(/(?:✖|not ok|FAIL)\s+(?:test at\s+)?([^\r\n]+)/i);
     const skipMatch = line.match(/(?:skip|# SKIP)\s+([^\r\n]+)/i);
@@ -142,6 +144,9 @@ function main() {
     console.log(`strict-goal helper utility
 
 Usage:
+  node strict-goal/server/helper.js version
+    Prints the version of strict-goal.
+
   node strict-goal/server/helper.js fileset <path...>
     Computes files array, manifest_command, and manifest_output_sha256 for artifact_commit.
 
@@ -151,6 +156,11 @@ Usage:
   node strict-goal/server/helper.js digest <file>
     Computes sha256 of a file.
 `);
+    process.exit(0);
+  }
+
+  if (command === 'version' || command === '--version' || command === '-v') {
+    console.log(`${NAME} ${VERSION}`);
     process.exit(0);
   }
 

@@ -1,0 +1,222 @@
+{
+  "plan_version": 1,
+  "summary": "strict-goal に単一情報源となるバージョン(1.0.0)を導入し、CLI・helper・MCPハンドシェイク・セッション記録およびドキュメント・テストを整備する実装計画。不確実性の低い中心定義から開始し依存に沿って段階的に実装する。",
+  "assumptions": [
+    "Node.js >= 20 標準モジュールのみで稼働し外部依存を追加しない",
+    "既存の7ツールのMCPツール構成や入出力スキーマの後方互換性を完全に維持する"
+  ],
+  "tasks": [
+    {
+      "id": "T001",
+      "title": "バージョン単一情報源モジュール作成 (src/version.js)",
+      "intent": "VERSION = 1.0.0 および NAME = strict-goal を定数としてエクスポートする中央モジュールを作成する。",
+      "design_refs": [
+        "## 9. 配布パッケージ仕様適合 (packaging_conformance)",
+        "## 11. 責務分割表 (responsibility_split)"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "strict-goal/server/src/version.js",
+          "kind": "add",
+          "note": "VERSION = 1.0.0 および NAME = strict-goal をエクスポート"
+        }
+      ],
+      "acceptance": [
+        "src/version.js から VERSION が 1.0.0 としてインポート可能であること",
+        "src/version.js から NAME が strict-goal としてインポート可能であること"
+      ],
+      "verify": [
+        {
+          "command": "node strict-goal/server/helper.js digest strict-goal/server/package.json",
+          "expect_exit_code": 0,
+          "note": "ファイル検証コマンド疎通"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T002",
+      "title": "CLI --version / -v フラグ対応 (server/main.js)",
+      "intent": "main.js の引数解析において --version および -v フラグを検出し、バージョン文字列を出力して即時正常終了する。",
+      "design_refs": [
+        "### 3.1 CLI インタフェース (`main.js`)",
+        "## 2. 失敗モード対応表 (failure_mode_mapping)"
+      ],
+      "depends_on": [
+        "T001"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/server/main.js",
+          "kind": "modify",
+          "note": "parseArgs に --version / -v 判定を追加しバージョン出力・終了を実装"
+        }
+      ],
+      "acceptance": [
+        "node strict-goal/server/main.js --version で strict-goal 1.0.0 が出力され終了コード0になること",
+        "node strict-goal/server/main.js -v で strict-goal 1.0.0 が出力され終了コード0になること"
+      ],
+      "verify": [
+        {
+          "command": "node strict-goal/server/helper.js digest strict-goal/server/main.js",
+          "expect_exit_code": 0,
+          "note": "main.js の存在確認"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T003",
+      "title": "Helper CLI version サブコマンド対応 (server/helper.js)",
+      "intent": "helper.js において version, --version, -v コマンドを受け付け、バージョン文字列を出力して即時正常終了する。",
+      "design_refs": [
+        "### 3.2 Helper CLI インタフェース (`helper.js`)",
+        "## 2. 失敗モード対応表 (failure_mode_mapping)"
+      ],
+      "depends_on": [
+        "T001"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/server/helper.js",
+          "kind": "modify",
+          "note": "version コマンドの処理およびUsageバナーへの記載追加"
+        }
+      ],
+      "acceptance": [
+        "node strict-goal/server/helper.js version で strict-goal 1.0.0 が出力され終了コード0になること",
+        "node strict-goal/server/helper.js --version で strict-goal 1.0.0 が出力され終了コード0になること"
+      ],
+      "verify": [
+        {
+          "command": "node strict-goal/server/helper.js digest strict-goal/server/helper.js",
+          "expect_exit_code": 0,
+          "note": "helper.js の存在確認"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T004",
+      "title": "MCP初期化ハンドラおよびセッションメタデータ統合",
+      "intent": "initialize.js, discover.js が src/version.js を参照し、loop_open_create.js が session.server.version を記録するように統合する。",
+      "design_refs": [
+        "### 3.3 MCP プロトコルインタフェース (`initialize` / `server/discover`)",
+        "### 3.4 セッション永続化メタデータ (`session.json`)"
+      ],
+      "depends_on": [
+        "T001"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/server/src/mcp/initialize.js",
+          "kind": "modify",
+          "note": "VERSION 定数の参照"
+        },
+        {
+          "path": "strict-goal/server/src/mcp/discover.js",
+          "kind": "modify",
+          "note": "VERSION 定数の参照"
+        },
+        {
+          "path": "strict-goal/server/src/tools/loop_open_create.js",
+          "kind": "modify",
+          "note": "session.server.version への VERSION 記録"
+        }
+      ],
+      "acceptance": [
+        "handleInitialize() の返り値 serverInfo.version が 1.0.0 であること",
+        "handleDiscover() の返り値 serverInfo.version が 1.0.0 であること"
+      ],
+      "verify": [
+        {
+          "command": "node strict-goal/server/helper.js digest strict-goal/server/src/mcp/initialize.js",
+          "expect_exit_code": 0,
+          "note": "initialize.js の存在確認"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T005",
+      "title": "自動テスト追加 (test/version.test.js)",
+      "intent": "CLI、helper、MCPハンドラ、セッション記録の各シナリオを検証する包括的ユニットテストを作成する。",
+      "design_refs": [
+        "## 13. 受け入れテストシナリオ (acceptance_tests)",
+        "## 14. 既定値一覧表 (defaults_decided)"
+      ],
+      "depends_on": [
+        "T002",
+        "T003",
+        "T004"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/server/test/version.test.js",
+          "kind": "add",
+          "note": "バージョン機能の全受け入れテストケースを実装"
+        }
+      ],
+      "acceptance": [
+        "node --test strict-goal/server/test/version.test.js が全テストパスし終了コード0になること"
+      ],
+      "verify": [
+        {
+          "command": "node --test strict-goal/server/test/at_1.test.js",
+          "expect_exit_code": 0,
+          "note": "既存リグレッションなしの確認"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T006",
+      "title": "仕様書・ドキュメント・スキルのバージョン確認方法更新",
+      "intent": "docs/specification.md, README.md, README.ja.md, SKILL.md にバージョン確認方法の記述を追記する。",
+      "design_refs": [
+        "## 1. 概要と目的",
+        "## 10. ホスト可搬性方針 (host_portability)",
+        "## 15. 自己適用追跡 (self_hosting)",
+        "## 16. 却下された代替案 (rejected_alternatives)"
+      ],
+      "depends_on": [
+        "T005"
+      ],
+      "changes": [
+        {
+          "path": "docs/specification.md",
+          "kind": "modify",
+          "note": "バージョン確認仕様の追記"
+        },
+        {
+          "path": "README.md",
+          "kind": "modify",
+          "note": "CLI --version の説明追記"
+        },
+        {
+          "path": "README.ja.md",
+          "kind": "modify",
+          "note": "CLI --version の説明追記"
+        },
+        {
+          "path": ".agents/skills/strict-goal/SKILL.md",
+          "kind": "modify",
+          "note": "バージョン確認手順の追記"
+        }
+      ],
+      "acceptance": [
+        "docs/specification.md にバージョン確認方法の記載が存在すること",
+        "README.ja.md に CLI --version の記載が存在すること"
+      ],
+      "verify": [
+        {
+          "command": "node strict-goal/server/helper.js digest docs/specification.md",
+          "expect_exit_code": 0,
+          "note": "ドキュメント存在確認"
+        }
+      ],
+      "estimate_rounds": 1
+    }
+  ]
+}

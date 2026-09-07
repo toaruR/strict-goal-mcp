@@ -1,3 +1,5 @@
+import { VERSION, NAME } from '../version.js';
+
 export function handleInitialize(params = {}) {
   const requestedVersion = params?.protocolVersion ?? '2024-11-05';
   return {
@@ -8,8 +10,8 @@ export function handleInitialize(params = {}) {
       },
     },
     serverInfo: {
-      name: 'strict-goal',
-      version: '1.0.0',
+      name: NAME,
+      version: VERSION,
     },
   };
 }

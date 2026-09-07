@@ -241,6 +241,20 @@ Verify exported audit files independently:
 node strict-goal/server/verify_audit.js ./path/to/audit.json
 ```
 
+### Version Inspection
+
+Check the installed version of strict-goal (`1.0.0`):
+
+```bash
+# Server CLI
+node strict-goal/server/main.js --version
+# Or short flag
+node strict-goal/server/main.js -v
+
+# Helper utility
+node strict-goal/server/helper.js version
+```
+
 ---
 
 ## Directory Structure
