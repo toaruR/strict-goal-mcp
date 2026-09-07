@@ -33,6 +33,18 @@ If you don't know the upstream digest, call `loop_state` on the upstream session
 For `implement`, if upstream session ID is omitted, auto-resolve it from the latest session in `.strict-goal/index.json` where server returns FINAL.
 Never guess it (the server rejects a wrong guess with `E_UPSTREAM_DIGEST_MISMATCH`).
 
+## Subagent Delegation for Implementation (実装のサブエージェント委譲)
+
+In chained runs (`design` → `plan` → `implement`) or complex projects, **delegating the `implement` phase to a subagent (`coder` / `self`) is strongly recommended** to protect the main orchestrator's context from token exhaustion and test output noise:
+
+- **Antigravity**:
+  Call `invoke_subagent` with `TypeName: "self"` (or custom coder), passing:
+  `Role: "Implementation Worker"`, `Workspace: "inherit"`, and a prompt such as:
+  `"strict-goal implement <plan_doc_path> を実行してください。上流 plan の digest をピン留めし、コード・テスト実装、helper.js での fileset 生成、サーバが判定した結果が FINAL になるまで自律周回し、確定ダイジェストと完了報告を返してください。"`
+- **Claude Code**:
+  Launch the `coder` subagent (`Agent(subagent_type="coder", prompt=...)`) or delegate the task.
+- The subagent runs the full implement loop autonomously until the server returns FINAL, then reports back with the finalized digest and test summary.
+
 ## Procedure
 
 1. **Call loop_open FIRST before writing code**:
