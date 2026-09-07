@@ -1,4 +1,4 @@
-<!-- spec-doc:last-reviewed-commit=788095ed988a1a1fbec13222d2972e84e7d4d1e5 (strict-goal-mcp) reviewed-at=2026-09-05 -->
+<!-- spec-doc:last-reviewed-commit=cdfc14a5b42d3ace6b92718ea3bc97a923b1c8b6 (strict-goal-mcp) reviewed-at=2026-09-07 -->
 
 # 仕様書
 
@@ -13,7 +13,7 @@
   - `stdio`（標準入出力 JSON-RPC 2.0、クライアント統合用）
   - `streamable-http`（HTTP デーモンモード、`http://127.0.0.1:<port>/mcp`）
 - **ランタイム要件**:
-  - Node.js >= 20.0.0
+  - Node.js >= 20.0.0（CI自動検証: Node.js 24.x）
   - 外部依存ゼロ（`node:fs`, `node:crypto`, `node:http` 等の標準組込モジュールのみで稼働）
 
 ---
@@ -47,13 +47,25 @@
 | `plan` | `plan` (JSON) | タスクDAG、`summary` (>=40文字)、`tasks[]`、`design_refs` を含む厳格な JSON | `FINAL` 確定した `design` セッションの `upstream_digest` |
 | `implement` | `fileset` (multi-file) | 各ファイルパスと sha256 からなるマニフェスト、`test_inventory` (テスト実行結果・カウント) | `FINAL` 確定した `plan` セッションの `upstream_digest` |
 
-### 上流連鎖保護 (Lineage Protection)
+### 2.1 上流連鎖保護 (Lineage Protection) とチェーン予算管理
 1. **失効 (`SUPERSEDED`)**:
    - 上流セッションの確定成果物が変更（改変）された場合、下流セッションは直ちに `SUPERSEDED` 状態へ遷移し、追加のコミットや採点は拒絶（`E_SUPERSEDED`）される。
 2. **リベース (`rebase`)**:
    - `escalate(action: "rebase")` により、改定された上流との差分を自動検査し、影響を受けた評価基準のみを特定して再採点対象とし、状態を `DRAFTING` へ復帰させる。
 3. **差し戻し (`kickback`)**:
    - 実装中に上流仕様の欠陥を発見した場合、`escalate(action: "kickback")` を提起する。下流セッションは `FROZEN` 状態（`E_FROZEN`）で凍結され、上流セッションの再改定と人間の承認トークンを要求する。
+4. **チェーンラウンド予算管理 (`chain round budget`)**:
+   - チェーン全体の累積ラウンド数（`computeChainRounds`）を `score_submit` 時に自動検査。
+   - 予算超過時:
+     - 採点合格（`verdict === "FINAL"` / `"FINAL_WITH_RELAXATION"`）の場合: `FINAL` を維持し、`warnings: ["chain_budget_exceeded"]` を付与。
+     - 採点不合格（`verdict !== "FINAL"`）の場合: `verdict: "REVISE"`, `state: "ESCALATED"` へ自動遷移し、エスカレーション情報（`detail: { reason: "chain_budget_exhausted", ... }`）と人間介入用トークンを発行。
+     - 追加ラウンド消費後も超過が継続した場合は `E_CHAIN_BUDGET_EXHAUSTED` エラーを返出。
+   - `escalate(action: "resolve", resolution: "continue")` により、セッションおよびチェーン全体に追加ラウンド枠（既定 +6周）が付与（`grantExtraRounds`）され、状態が `DRAFTING` へ復帰。
+
+### 2.2 fileset の証跡照合仕様
+- **マニフェスト照合**: サーバはワークスペースの実ファイルを直接走査しない（設計原則 A3: クライアント完全隔離）ため、`readArtifactContent` が返す成果物本文はマニフェスト JSON テキスト（`sha256-<digest>.manifest.json`）となる。
+- **locator 根拠の制約**: `locator` 根拠の `excerpt` は個別ファイル本文ではなく、マニフェスト JSON テキスト内の実在文字列（`"path": "..."` 等）と照合される。
+- **実行・テスト根拠**: 個別ファイルのコード実装やテスト結果の正当性は、`kind: "command"` 根拠（終了コード 0、標準出力ハッシュ、`target_digest`）によって証明する。
 
 ---
 
@@ -68,7 +80,7 @@
 - `EVALUATED`: サーバー判定完了後、次周（`ITERATING`）への移行、または合格（`FINAL`）。
 - `FINAL` / `FINAL_WITH_RELAXATION`: 合格基準（加重平均 >= 9.0、全基準最低点 >= 9）を満たし完了確定。
 - `STALLED`: 連続停滞（スコア改善なしが規定周回継続）または `max_rounds` 到達による打ち切り。
-- `ESCALATED`: 人間への支援要請、上流リベース、キックバック待ち。
+- `ESCALATED`: 人間への支援要請、緩和承認待ち、チェーン予算枯渇（`chain_budget_exhausted`）、上流リベース、キックバック待ち。
 - `SUPERSEDED` / `FROZEN`: 上流の成果物不整合による無効化・凍結。
 
 ### 3.2 アンチゲーミング・ガードレール仕様
@@ -94,15 +106,21 @@
 | `loop_open` | セッションの新規開設（`mode: "create"`）または既存セッションの再開（`mode: "resume"`） | `mode`, `loop_mode`, `task`, `rubric_preset`, `upstream`, `label`, `allow_ephemeral` | `session_id`, `state`, `round`, `next_action`, `rubric` |
 | `loop_state` | 現在の状態、周回番号、アクティブな基準、履歴の取得 | `session_id`, `include` (`["rubric", "history", "upstream"]`) | `state`, `round`, `next_action`, `last_evaluation`, `rubric` |
 | `artifact_commit` | 成果物（Markdown文字列またはfilesetマニフェスト）のコミット | `session_id`, `expected_round`, `change_note`, `content` または `files`, `addresses`, `test_inventory` | `state`, `artifact_digest`, `diff`, `next_action: "score_submit"` |
-| `score_submit` | ルーブリック全基準に対する採点・理由・弱点・エビデンスの提出 | `session_id`, `scores` (`[{ criterion_id, score, rationale, weakness, evidence }]`) | `verdict` (`ITERATING` / `FINAL`), `weighted_mean`, `min_score`, `must_fix`, `next_action` |
+| `score_submit` | ルーブリック全基準に対する採点・理由・弱点・エビデンスの提出 | `session_id`, `scores` (`[{ criterion_id, score, rationale, weakness, evidence }]`) | `verdict` (`ITERATING` / `FINAL` / `REVISE`), `weighted_mean`, `min_score`, `must_fix`, `next_action`, `escalation`, `warnings` |
 | `rubric_amend` | 基準や閾値の変更（40文字以上の理由と緩和ログ記録） | `session_id`, `reason`, `amendments` (`add`, `modify`, `remove`) | `state`, `rubric_version`, `rubric_diff`, `is_final_reachable` |
-| `escalate` | 人間への支援要請、上流リベース、キックバック、セッション再開 | `session_id`, `action` (`request_human` / `rebase` / `kickback` / `resolve` / `abort`), `human_token` | `state`, `escalation_id`, `resolution` |
+| `escalate` | 人間への支援要請、上流リベース、キックバック、セッション再開 | `session_id`, `action` (`request_human` / `rebase` / `kickback` / `resolve` / `abort`), `human_token` | `state`, `escalation_id`, `resolution`, `chain` |
 | `audit_export` | 改ざん検知可能な監査 JSON（セッション単位またはチェーン全体）の出力 | `session_id`, `scope` (`session` / `chain`), `include_artifacts`, `include_rejected`, `include_diffs` | `export` (`path`, `sha256`, `schema`) |
 
 - **監査スキーマ識別子 (URN)**:
   - 単体セッション監査: `urn:strict-goal:schema:audit:v1`
   - 連鎖監査: `urn:strict-goal:schema:audit-chain:v1`
   - 同梱の `strict-goal/server/verify_audit.js` により、オフラインで監査ログの完全性・再計算検証が可能。
+
+### 4.1 静的 HTML ダッシュボード自動生成 (`persistSession`)
+セッション状態を変更する全7操作（`loop_open_create`, `artifact_commit`, `score_submit`, `rubric_amend`, `escalate`, `kickback`, `supersede`）の実行時、`src/store/persist.js` 経由でダッシュボードが自動再生成される。
+- `<data_dir>/dashboard/<session_id>.html`: セッション詳細ダッシュボード（状態、周回、ルーブリック採点状況、must_fix、評価推移）。
+- `<data_dir>/dashboard/index.html`: 全セッション一覧ダッシュボード（チェーンID、モード、最終判定、タイムスタンプ）。
+- 各ダッシュボード HTML には `<meta http-equiv="refresh" content="5">` が付与され、外部ブラウザでのリアルタイム（5秒周期）自動更新に対応。
 
 ---
 
@@ -111,13 +129,20 @@
 エージェントが自律的かつ人語でループを回すためのインターフェース層を提供する。
 
 ### 5.1 コマンド・人語連携スキル
-- **スラッシュコマンド**:
+- **スラッシュコマンド・フェーズショートカット**:
   - `/goal <指示>`: 目標を受け付け、`design` → `plan` → `implement` の連鎖パイプラインを起動。
   - `/strict-goal <指示>`: 厳格モードで指定ゴールを実行。
+  - `strict-goal [design|plan|implement] <target>`: フェーズを明示指定した直接起動。
 - **自然言語トリガー**:
   - 「`strict-goalで` 〇〇を実装して」「`厳格モードで` 〇〇して」「`サボらずに` 〇〇して」などの人語指示を検知し自動起動。
-- **進捗ダッシュボード**:
-  - 各周回の評価完了後、判定（`ITERATING` / `FINAL`）、要修正項目（`must_fix`）、次アクションの日本語サマリーを自動表示。
+- **実装前 `loop_open` 必須原則**:
+  - `implement` フェーズでは、コード変更に着手する前に必ず `loop_open`（DRAFTING）を実行し、ダッシュボードへのセッション可視化と状態管理を先行させる。上流 plan の `session_id` は `.strict-goal/index.json` の直近 FINAL セッションから自動解決する。
+- **階層型サブエージェント委譲 (Hierarchical Task Delegation Protocol)**:
+  - 親エージェントのコンテキスト肥大化とテスト実行ノイズを防ぐため、3層構造の自律委譲プロトコルを標準化。
+  - **親（メインエージェント）**: `design` → `plan` の策定・採点完遂、全体統括。
+  - **子 (`implementer`)**: 実装監督エージェント（`enable_subagent_tools: true`）。実装着手前に `loop_open` を呼び出し、上流 `plan` の `tasks[]` を解析して孫へ順次委譲。テスト検証・マニフェスト fileset 生成・周回提出を統括。
+  - **孫 (`task-worker`)**: 単一タスク（または `must_fix` 1件）の実装と単体テスト通過のみを担当する極小コンテキスト作業エージェント。ハーネス操作や git コミットは行わず、完了報告後に破棄。
+  - **エージェント定義**: `.agents/agents/implementer.md`, `.agents/agents/task-worker.md`, `.agents/agents/coder.md`
 
 ### 5.2 補助CLIツール (`strict-goal/server/helper.js`)
 - `node strict-goal/server/helper.js fileset <path...>`:

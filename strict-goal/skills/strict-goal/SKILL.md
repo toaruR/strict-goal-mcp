@@ -40,7 +40,7 @@ In chained runs (`design` → `plan` → `implement`) or complex projects, **del
 - **Antigravity**:
   Call `invoke_subagent` with `TypeName: "self"` (or custom implementer), passing:
   `Role: "Implementation Supervisor"`, `Workspace: "inherit"`, and a prompt such as:
-  `"strict-goal implement <plan_doc_path> を実行してください。上流 plan の digest をピン留めし、plan の各タスクを順次孫エージェントに実装させ、helper.js での fileset 生成、サーバが判定した結果が FINAL になるまで自律周回し、確定ダイジェストと完了報告を返してください。"`
+  `"Execute strict-goal implement <plan_doc_path>. Pin upstream plan digest, sequentially delegate plan tasks to grandchild workers, generate fileset/evidence via helper.js, run autonomous loop until the server returns FINAL, and report back with the finalized digest."`
 - **Claude Code**:
   Launch the `coder` subagent (`Agent(subagent_type="coder", prompt=...)`) or delegate the task.
 - **Hierarchical Task Delegation (子監督 → 孫タスク実装)**:
