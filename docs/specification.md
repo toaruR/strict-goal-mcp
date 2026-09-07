@@ -140,9 +140,10 @@
 - **階層型サブエージェント委譲 (Hierarchical Task Delegation Protocol)**:
   - 親エージェントのコンテキスト肥大化とテスト実行ノイズを防ぐため、3層構造の自律委譲プロトコルを標準化。
   - **親（メインエージェント）**: `design` → `plan` の策定・採点完遂、全体統括。
-  - **子 (`implementer`)**: 実装監督エージェント（`enable_subagent_tools: true`）。実装着手前に `loop_open` を呼び出し、上流 `plan` の `tasks[]` を解析して孫へ順次委譲。テスト検証・マニフェスト fileset 生成・周回提出を統括。
-  - **孫 (`task-worker`)**: 単一タスク（または `must_fix` 1件）の実装と単体テスト通過のみを担当する極小コンテキスト作業エージェント。ハーネス操作や git コミットは行わず、完了報告後に破棄。
-  - **エージェント定義**: `.agents/agents/implementer.md`, `.agents/agents/task-worker.md`, `.agents/agents/coder.md`
+  - **子 (`sg-implementer`)**: 実装監督エージェント（`enable_subagent_tools: true`）。実装着手前に `loop_open` を呼び出し、上流 `plan` の `tasks[]` を解析して孫へ順次委譲。テスト検証・マニフェスト fileset 生成・周回提出を統括。
+  - **孫 (`sg-worker`)**: 単一タスク（または `must_fix` 1件）の実装と単体テスト通過のみを担当する極小コンテキスト作業エージェント。ハーネス操作や git コミットは行わず、完了報告後に破棄。
+  - **単体自律実装 (`sg-coder`)**: 階層化せず単一サブエージェントで直接 `strict-goal implement` を自律周回する実装エージェント。
+  - **エージェント定義**: `.agents/agents/` および `.claude/agents/` 配下の `sg-implementer.md`, `sg-worker.md`, `sg-coder.md`
 
 ### 5.2 補助CLIツール (`strict-goal/server/helper.js`)
 - `node strict-goal/server/helper.js fileset <path...>`:

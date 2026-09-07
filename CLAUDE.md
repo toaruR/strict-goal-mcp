@@ -15,6 +15,12 @@ planモードで作成したマークダウンファイルは、<プロジェク
 - コードベースの機能調査やコード探索を行う際は、最初に MCP ツール `search` (BM25 Code Search) を優先して使用してください。
 - **Claude Code での呼び出し手順**: Claude Code では MCP ツールが Deferred Tool となるため、初回呼び出し前に必ず `ToolSearch` (`select:mcp__bm25-code-search__search`) でスキーマをロードしてから `mcp__bm25-code-search__search` を実行してください。
 - `search` で結果が得られない場合、または特定のシンボル名の完全一致を直接検索する場合にのみ `grep_search` や `glob` を使用してください。
+
+## Agents / Subagents
+- Strict-goal subagents under `.claude/agents/` are launched and delegated via `Agent(subagent_type="<name>", prompt=...)`:
+  - `sg-implementer`: In-loop implementation supervisor (session lifecycle, task breakdown, delegation to `sg-worker`).
+  - `sg-worker`: Single-task worker (TDD implementation without strict-goal harness tools).
+  - `sg-coder`: Autonomous implementer (completes smaller goals standalone through loop).
 <!-- knowledge-kit:end section=general-instructions -->
 
 <!-- knowledge-kit:begin section=recording-rules version=1.11.1 -->

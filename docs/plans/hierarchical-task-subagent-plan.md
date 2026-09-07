@@ -12,10 +12,11 @@
 ```mermaid
 flowchart TD
     Main["親: メインエージェント<br>(design / plan 策定・全体統括)"]
-    Child["子: implementer エージェント<br>(strict-goal implementループ監督・タスク進行)"]
-    Grandchild1["孫: task-worker (Task 1 実装)"]
-    Grandchild2["孫: task-worker (Task 2 実装)"]
-    GrandchildN["孫: task-worker (must_fix 解消)"]
+    Main["親: メインエージェント<br>(design / plan 策定・全体統括)"]
+    Child["子: sg-implementer エージェント<br>(strict-goal implementループ監督・タスク進行)"]
+    Grandchild1["孫: sg-worker (Task 1 実装)"]
+    Grandchild2["孫: sg-worker (Task 2 実装)"]
+    GrandchildN["孫: sg-worker (must_fix 解消)"]
 
     Main -->|"invoke_subagent<br>(enable_subagent_tools: true)"| Child
     Child -->|"1. タスク1委譲"| Grandchild1
@@ -36,18 +37,18 @@ flowchart TD
 
 | 階層 | エージェント | ツール権限 | 主な責務 |
 |---|---|---|---|
-| **親** | メイン | 全権限 | ・ユーザー対話<br>・`design` → `plan` の策定・採点完遂<br>・子エージェント（`implementer`）の起動と最終成果確認 |
-| **子** | `implementer`<br>(実装監督) | subagents, bash, read, write, strict-goal MCP | ・`loop_open`（DRAFTING）の開設<br>・上流 `plan` のタスク一覧を読み、1タスクずつ孫へ委譲<br>・統合テスト確認・`helper.js` で fileset 生成<br>・`artifact_commit` / `score_submit` の周回（FINALまで） |
-| **孫** | `task-worker`<br>(実装作業員) | read, write, edit, grep, glob, bash | ・指定された1タスク（または `must_fix` 1件）の実装と単体テスト<br>・極小コンテキストで集中作業し、完了後に破棄 |
+| **親** | メイン | 全権限 | ・ユーザー対話<br>・`design` → `plan` の策定・採点完遂<br>・子エージェント（`sg-implementer`）の起動と最終成果確認 |
+| **子** | `sg-implementer`<br>(実装監督) | subagents, bash, read, write, strict-goal MCP | ・`loop_open`（DRAFTING）の開設<br>・上流 `plan` のタスク一覧を読み、1タスクずつ孫へ委譲<br>・統合テスト確認・`helper.js` で fileset 生成<br>・`artifact_commit` / `score_submit` の周回（FINALまで） |
+| **孫** | `sg-worker`<br>(実装作業員) | read, write, edit, grep, glob, bash | ・指定された1タスク（または `must_fix` 1件）の実装と単体テスト<br>・極小コンテキストで集中作業し、完了後に破棄 |
 
 ---
 
 ## 提案する変更内容
 
 ### 1. エージェント定義の新設・更新
-- **[NEW] `.agents/agents/task-worker.md`**:
+- **[NEW] `.agents/agents/sg-worker.md`** & **`.claude/agents/sg-worker.md`**:
   単一タスクのコード編集・テスト通過に特化した孫エージェント定義。
-- **[NEW] `.agents/agents/implementer.md`**:
+- **[NEW] `.agents/agents/sg-implementer.md`** & **`.claude/agents/sg-implementer.md`**:
   孫エージェントを統括し `strict-goal implement` を完遂する子エージェント定義（`enable_subagent_tools: true`）。
 
 ### 2. スキル手順の更新
