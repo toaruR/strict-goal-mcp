@@ -7,11 +7,14 @@ import { handleToolsList } from './src/mcp/tools_list.js';
 import { handleToolsCall } from './src/mcp/tools_call.js';
 import { handleInitialize } from './src/mcp/initialize.js';
 import { startStdioServer } from './src/mcp/transport_stdio.js';
+import { VERSION, NAME } from './src/version.js';
 
-function parseArgs(argv) {
-  const args = { dataDir: undefined };
+export function parseArgs(argv) {
+  const args = { dataDir: undefined, showVersion: false };
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--data-dir') {
+    if (argv[i] === '--version' || argv[i] === '-v') {
+      args.showVersion = true;
+    } else if (argv[i] === '--data-dir') {
       args.dataDir = argv[i + 1];
       i += 1;
     }
@@ -41,6 +44,10 @@ export function buildRouter({ env = process.env, argv1 = process.argv[1], dataDi
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
+  if (args.showVersion) {
+    console.log(`${NAME} ${VERSION}`);
+    process.exit(0);
+  }
   const { router } = buildRouter({ dataDir: args.dataDir });
   startStdioServer({ onRequest: (request) => router.dispatch(request) });
 }

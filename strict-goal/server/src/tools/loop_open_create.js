@@ -18,6 +18,7 @@ import { createChain, appendMember } from '../chain/store.js';
 import { validatePin } from '../chain/pin.js';
 import { assertRoundBudget } from '../chain/budget.js';
 import { assertArtifactKind } from '../artifact/kind.js';
+import { VERSION } from '../version.js';
 
 function fail(code, message, detail = {}) {
   const err = new Error(message);
@@ -133,6 +134,7 @@ export function loopOpenCreate({ input, pluginRoot, pluginRootSource, persistenc
       counters: freshCounters(),
       last_evaluation: null,
       server: {
+        version: VERSION,
         plugin_root: pluginRoot,
         plugin_root_source: pluginRootSource,
         data_dir: dataDir,

@@ -92,6 +92,12 @@ Don't paper over it downstream. Propose
 escalate{action:"kickback", target_criteria:[…], note:"description of the flaw"} and request
 human approval. Your session is frozen and resumes once upstream is fixed.
 
+## Checking Version
+
+To check the installed version of strict-goal:
+- Server CLI: `node strict-goal/server/main.js --version` (or `-v`)
+- Helper CLI: `node strict-goal/server/helper.js version` (or `--version`)
+
 ## When Context Is Lost
 
 Call loop_state with just the session_id. Everything you need comes back. Don't try to recall

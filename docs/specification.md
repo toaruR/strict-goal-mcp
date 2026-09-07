@@ -146,10 +146,24 @@
   - **エージェント定義**: `.agents/agents/` および `.claude/agents/` 配下の `sg-implementer.md`, `sg-worker.md`, `sg-coder.md`
 
 ### 5.2 補助CLIツール (`strict-goal/server/helper.js`)
+- `node strict-goal/server/helper.js version`:
+  - strict-goal のバージョン文字列（`strict-goal 1.0.0`）を標準出力に表示（`--version`, `-v` も可）。
 - `node strict-goal/server/helper.js fileset <path...>`:
   - 指定ファイル群の SHA-256 およびマニフェストダイジェストを JSON 出力（`artifact_commit` 用）。
 - `node strict-goal/server/helper.js test-run "<command>"`:
   - テストコマンドを実行し、終了コード、出力ダイジェスト、テスト件数（pass/fail/skip/total）を抽出し `test_inventory` 形式の JSON として出力（`score_submit` 用）。
+
+### 5.3 バージョン管理と確認方法
+- **単一情報源 (Single Source of Truth)**:
+  - `strict-goal/server/src/version.js` (`VERSION = '1.0.0'`, `NAME = 'strict-goal'`)
+- **CLI からの確認**:
+  - `node strict-goal/server/main.js --version` (または `-v`): `strict-goal 1.0.0` を出力し終了コード 0。
+  - `node strict-goal/server/helper.js version` (または `--version`, `-v`): `strict-goal 1.0.0` を出力し終了コード 0。
+- **MCP プロトコルからの確認**:
+  - `initialize` ハンドラ: `serverInfo.name: "strict-goal"`, `serverInfo.version: "1.0.0"`
+  - `server/discover` ハンドラ: `serverInfo.name: "strict-goal"`, `serverInfo.version: "1.0.0"`
+- **セッション永続化メタデータ**:
+  - `loop_open` で生成される `session.json` の `server.version` に実行時バージョンが記録される。
 
 ---
 

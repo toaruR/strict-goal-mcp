@@ -83,4 +83,5 @@ planモードで作成したマークダウンファイルは、<プロジェク
 - **セッション変更時は `writeSession` ではなく `persistSession` を呼ぶこと**: 状態変更時に `<data_dir>/dashboard/<session_id>.html` と `index.html` を同期生成する。循環参照防止のため `src/store/persist.js` を経由する。
 - **`strict-goal implement` 着手前に必ず `loop_open` を呼ぶこと**: セッション起票（DRAFTING）前にコード編集を始めるとダッシュボードに反映されない。上流 plan は `.strict-goal/index.json` から自動解決可能。
 - **fileset の `locator` 照合対象は個別ファイルではなくマニフェスト JSON である**: `excerpt` に個別ファイル本文を指定すると `E_EVIDENCE_NOT_FOUND` になる。マニフェスト文字列を指定するか、テスト検証には `kind: 'command'` を使うこと。
+- **Antigravity でワークスペース切り替え時に MCP サーバープロセスが残留する罠**: 別プロジェクト（例: `gedoku-proxy`）を開いた後に本プロジェクトを開いても、Language Server が起動した既存の MCP 子プロセス（`strict-goal` 等）が常駐・再利用され、`--data-dir` が前プロジェクトのパスのままになる。ワークスペース跨ぎで MCP を使う際は前プロセスの残留に注意し、必要に応じてプロセス終了またはウィンドウ再読み込みを行うこと。
 <!-- knowledge-kit:end section=gotchas -->
