@@ -52,7 +52,11 @@ Never guess it (the server rejects a wrong guess with `E_UPSTREAM_DIGEST_MISMATC
 4. score_submit — score every criterion with a rationale (40+ characters), a weakness, and evidence.
    Grading yourself generously gains nothing. The server compares against the previous round and
    evidence; an unsubstantiated increase is rejected with E_SCORE_INFLATION.
-   - Show correspondence to upstream requirements with kind:"upstream" evidence.
+   - **Crucial for implement (`fileset`)**: The server does NOT read workspace files on disk. Its artifact body is the raw manifest JSON (`sha256-<digest>.manifest.json`).
+     - Never use `kind:"locator"` with excerpts from source/test/doc file contents; it will fail with `E_EVIDENCE_NOT_FOUND`.
+     - For `plan_task_completion` & upstream plan references, use `kind:"upstream"` (excerpt matching the pinned upstream plan JSON). `verification:"auto"` criteria strictly require at least one `kind:"command"` evidence (`E_EVIDENCE_KIND`).
+     - For code quality, test coverage, diffs, and docs, prefer `kind:"command"` (e.g. `test`, `clippy`, `diff` command outputs with exit code and `target_digest`).
+     - If using `kind:"locator"` on a fileset, excerpt MUST match the exact pretty-printed manifest JSON line (e.g., `  "path": "src/dict.rs"` with quotes and indent intact).
    - In implement, command evidence must always include target_digest (the digest returned by
      the most recent artifact_commit).
    - Tip: run `node strict-goal/server/helper.js test-run "<test command>"` to run tests and output test_inventory and command evidence JSON.
