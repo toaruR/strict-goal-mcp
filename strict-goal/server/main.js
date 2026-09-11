@@ -22,11 +22,11 @@ export function parseArgs(argv) {
   return args;
 }
 
-export function buildRouter({ env = process.env, argv1 = process.argv[1], dataDir } = {}) {
+export function buildRouter({ env = process.env, argv1 = process.argv[1], dataDir, cwd = process.cwd() } = {}) {
   const pluginRootResult = resolvePluginRoot(env, argv1);
   const pluginData = dataDir
     ? { dir: dataDir, mode: 'persistent', source: 'cli', warnings: [] }
-    : resolvePluginData(env);
+    : resolvePluginData(env, process.platform, cwd);
 
   const pluginRoot = pluginRootResult.root;
   const pluginRootSource = pluginRootResult.source;
