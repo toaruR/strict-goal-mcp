@@ -19,7 +19,12 @@ import { checkPlan } from '../artifact/plan_checks.js';
 import { checkDesignRefs } from '../artifact/design_refs.js';
 import { checkSupersede } from '../chain/supersede.js';
 import { recordCommitForRound } from '../judge/round_store.js';
-import { CHANGE_NOTE_MIN_LENGTH, ARTIFACT_MAX_BYTES } from '../config/defaults.js';
+import {
+  CHANGE_NOTE_MIN_LENGTH,
+  ARTIFACT_MAX_BYTES,
+  DESTRUCTIVE_OVERWRITE_MIN_BYTES,
+  DESTRUCTIVE_OVERWRITE_PREVIOUS_MULTIPLE,
+} from '../config/defaults.js';
 import { buildEnvelope } from '../mcp/envelope.js';
 
 function fail(code, message, detail = {}) {
@@ -162,6 +167,13 @@ export function artifactCommit({ input, persistence }) {
         artifact.diff = computeContentDiff(previousContent, input.content);
         if (artifact.diff.changed_ratio >= 0.9) warnings.push('near_total_rewrite');
         if (bytes < previousArtifact.bytes * 0.5) warnings.push('suspicious_shrink');
+        if (
+          artifact.diff.changed_ratio >= 0.9 &&
+          bytes < DESTRUCTIVE_OVERWRITE_MIN_BYTES &&
+          previousArtifact.bytes >= DESTRUCTIVE_OVERWRITE_MIN_BYTES * DESTRUCTIVE_OVERWRITE_PREVIOUS_MULTIPLE
+        ) {
+          warnings.push('destructive_overwrite');
+        }
       }
       if (unchanged) warnings.push('artifact_unchanged');
 

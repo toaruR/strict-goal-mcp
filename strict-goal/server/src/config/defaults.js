@@ -18,6 +18,10 @@ export const WEAKNESS_NONE_VALUE = 'none';
 export const MUST_FIX_MAX = 3;
 
 export const ARTIFACT_MAX_BYTES = 1000000;
+// destructive_overwrite 判定（§6.4.3）: near_total_rewrite かつ suspicious_shrink かつ
+// 結果が絶対的に極小のとき「プレースホルダ等での破壊的上書き」を疑う複合警告。
+export const DESTRUCTIVE_OVERWRITE_MIN_BYTES = 200;
+export const DESTRUCTIVE_OVERWRITE_PREVIOUS_MULTIPLE = 10;
 export const CRITERIA_MAX = 40;
 export const PLAN_MAX_TASKS = 200;
 

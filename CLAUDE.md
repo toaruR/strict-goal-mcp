@@ -85,4 +85,5 @@ planモードで作成したマークダウンファイルは、<プロジェク
 - **fileset の `locator` 照合対象は個別ファイルではなくマニフェスト JSON である**: `excerpt` に個別ファイル本文を指定すると `E_EVIDENCE_NOT_FOUND` になる。マニフェスト文字列を指定するか、テスト検証には `kind: 'command'` を使うこと。
 - **Antigravity でワークスペース切り替え時に MCP サーバープロセスが残留する罠**: 別プロジェクト（例: `gedoku-proxy`）を開いた後に本プロジェクトを開いても、Language Server が起動した既存の MCP 子プロセス（`strict-goal` 等）が常駐・再利用され、`--data-dir` が前プロジェクトのパスのままになる。ワークスペース跨ぎで MCP を使う際は前プロセスの残留に注意し、必要に応じてプロセス終了またはウィンドウ再読み込みを行うこと。
 - **`loop_state` の `readHistory` が `1.commit.json` を拾って `ENOENT` で落ちる罠**: `roundsDir` を `readdirSync` して `parseInt` すると、`artifact_commit` で作られる `<round>.commit.json` も数値変換されて `<round>.json`（`score_submit` で作られるファイル）を読もうとし `ENOENT` になる。ファイル名が `/^\d+\.json$/` に完全一致するかフィルタする必要がある。
+- **`artifact_commit` の `near_total_rewrite`/`suspicious_shrink`/`unchanged` は設計上「拒否せず警告のみ」（§6.4.3 明記）**: プレースホルダ誤送信のような事故は単独指標では「正当な全面リライト」と区別できない（行の多重集合差分は言い換えでも重なり0になる）。両方同時発生＋絶対バイト数が極小（前周の10倍以上あった内容が200バイト未満に潰れる）という複合条件でのみ `destructive_overwrite` 警告を追加した（`config/defaults.js` の `DESTRUCTIVE_OVERWRITE_*`）。既存の「拒否しない」方針は変えていない（`warnings` は free-form 配列なのでスキーマ互換）。
 <!-- knowledge-kit:end section=gotchas -->

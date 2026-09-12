@@ -228,3 +228,64 @@ test('expected_round が現在の round と一致しないとき E_CONCURRENT �
     { code: 'E_CONCURRENT' },
   );
 });
+
+test('前周が十分大きく全く重ならない極小 content に差し替えると destructive_overwrite が付く', () => {
+  const persistence = durablePersistence();
+  const created = createSession(persistence);
+  const bigContent = Array.from({ length: 300 }, (_, i) => `本文の行${i}です。詳細な説明がここに入ります。`).join('\n');
+
+  artifactCommit({
+    input: { session_id: created.session_id, submission_id: submissionId(), expected_round: 1, content: bigContent, change_note: CHANGE_NOTE },
+    persistence,
+  });
+
+  let session = readSession(persistence.dir, created.session_id);
+  session.state = 'DRAFTING';
+  session.round = 2;
+  writeSession(persistence.dir, session);
+
+  const result = artifactCommit({
+    input: {
+      session_id: created.session_id,
+      submission_id: submissionId(),
+      expected_round: 2,
+      content: 'placeholder',
+      change_note: CHANGE_NOTE,
+      addresses: [],
+    },
+    persistence,
+  });
+
+  assert.ok(result.warnings.includes('near_total_rewrite'));
+  assert.ok(result.warnings.includes('suspicious_shrink'));
+  assert.ok(result.warnings.includes('destructive_overwrite'));
+});
+
+test('前周が小さいときは同様の縮小でも destructive_overwrite は付かない', () => {
+  const persistence = durablePersistence();
+  const created = createSession(persistence);
+
+  artifactCommit({
+    input: { session_id: created.session_id, submission_id: submissionId(), expected_round: 1, content: '# 短い本文\n最初の版です。', change_note: CHANGE_NOTE },
+    persistence,
+  });
+
+  let session = readSession(persistence.dir, created.session_id);
+  session.state = 'DRAFTING';
+  session.round = 2;
+  writeSession(persistence.dir, session);
+
+  const result = artifactCommit({
+    input: {
+      session_id: created.session_id,
+      submission_id: submissionId(),
+      expected_round: 2,
+      content: 'x',
+      change_note: CHANGE_NOTE,
+      addresses: [],
+    },
+    persistence,
+  });
+
+  assert.ok(!result.warnings.includes('destructive_overwrite'));
+});
