@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { VERSION, NAME } from './src/version.js';
+import { executeAndSanitize } from './src/implement/sanitize_test.js';
 
 function sha256Hex(data) {
   return createHash('sha256').update(data).digest('hex');
@@ -153,6 +154,9 @@ Usage:
   node strict-goal/server/helper.js test-run <test command...>
     Runs test command and returns test_inventory & command_evidence ready for commit & score_submit.
 
+  node strict-goal/server/helper.js sanitize-test <test command...>
+    Runs test command, saves raw log to sessions/<id>/logs/, and returns sanitized output with capped error length.
+
   node strict-goal/server/helper.js digest <file>
     Computes sha256 of a file.
 `);
@@ -211,6 +215,18 @@ Usage:
       },
     };
     console.log(JSON.stringify(payload, null, 2));
+  } else if (command === 'sanitize-test') {
+    const testCmd = args.slice(1).join(' ');
+    if (!testCmd) {
+      console.error('Error: specify test command to run');
+      process.exit(1);
+    }
+    const result = runCommand(testCmd);
+    const sanitized = executeAndSanitize(result);
+    console.log(JSON.stringify(sanitized, null, 2));
+    if (result.exitCode !== 0) {
+      process.exit(result.exitCode || 1);
+    }
   } else if (command === 'digest') {
     const targetFile = args[1];
     if (!targetFile) {

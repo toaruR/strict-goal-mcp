@@ -37,7 +37,7 @@ function parseFrontmatter(filePath) {
 }
 
 test('サブエージェント定義ファイルが存在し、正しいフロントマターを持つ (.agents & .claude)', () => {
-  const agents = ['coder', 'sg-coder', 'sg-implementer', 'sg-worker'];
+  const agents = ['coder', 'sg-coder', 'sg-implementer', 'sg-worker', 'sg-scout', 'sg-verifier'];
   for (const dir of agentsDirs) {
     for (const name of agents) {
       const file = path.resolve(dir, `${name}.md`);

@@ -14,6 +14,7 @@ function sessionPath(dataDir, sessionId) {
 export function writeSession(dataDir, session) {
   const dir = sessionDir(dataDir, session.session_id);
   fs.mkdirSync(dir, { recursive: true });
+  fs.mkdirSync(path.join(dir, 'logs'), { recursive: true });
   writeJson(sessionPath(dataDir, session.session_id), session);
   updateIndexForSession(dataDir, {
     sessionId: session.session_id,

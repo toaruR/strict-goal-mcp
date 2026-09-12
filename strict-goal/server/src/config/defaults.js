@@ -65,3 +65,7 @@ export const MODE_POLICY_DEFAULTS = Object.freeze({
   plan: Object.freeze({ max_rounds: 8, stall_window: 2, stall_epsilon: 0.25 }),
   implement: Object.freeze({ max_rounds: 16, stall_window: 4, stall_epsilon: 0.2 }),
 });
+
+export const MAX_LOG_HISTORY_ROUNDS = 5;
+export const SANITIZE_MAX_ERROR_CHARS = 500;
+

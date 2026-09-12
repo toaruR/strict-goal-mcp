@@ -19,6 +19,7 @@ import { checkPlan } from '../artifact/plan_checks.js';
 import { checkDesignRefs } from '../artifact/design_refs.js';
 import { checkSupersede } from '../chain/supersede.js';
 import { recordCommitForRound } from '../judge/round_store.js';
+import { recordVisitedFile } from '../store/trial_history.js';
 import {
   CHANGE_NOTE_MIN_LENGTH,
   ARTIFACT_MAX_BYTES,
@@ -195,6 +196,12 @@ export function artifactCommit({ input, persistence }) {
       committed_at: committedAt,
       ...(hasFiles ? { files: input.files, test_inventory: input.test_inventory } : {}),
     });
+
+    if (hasFiles && Array.isArray(input.files)) {
+      for (const f of input.files) {
+        if (f.path) recordVisitedFile(dataDir, session.session_id, f.path);
+      }
+    }
 
     session.state = 'SCORING';
     session.current_artifact = currentArtifactState;

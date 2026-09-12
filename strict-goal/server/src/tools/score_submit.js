@@ -24,6 +24,7 @@ import { chainExists, readChain } from '../chain/store.js';
 import { computeChainRounds, effectiveRoundLimit } from '../chain/budget.js';
 import { buildEnvelope } from '../mcp/envelope.js';
 import { WEAKNESS_REQUIRED_BELOW_SCORE, WEAKNESS_MIN_LENGTH, WEAKNESS_NONE_VALUE, MUST_FIX_MAX } from '../config/defaults.js';
+import { recordFailedHypothesis } from '../store/trial_history.js';
 
 function fail(code, message, detail = {}) {
   const err = new Error(message);
@@ -246,6 +247,13 @@ export function scoreSubmit({ input, persistence }) {
 
       const isFinal = session.state === 'FINAL' || session.state === 'FINAL_WITH_RELAXATION';
       const mustFix = isFinal ? [] : buildMustFix(perCriterion, criteriaById, rubric.policy.pass_score);
+
+      if (!isFinal && mustFix && mustFix.length > 0) {
+        for (const mf of mustFix) {
+          const id = typeof mf === 'string' ? mf : mf.criterion_id;
+          recordFailedHypothesis(dataDir, session.session_id, `Failed criterion: ${id} at round ${scoredRound}`);
+        }
+      }
 
       const record = {
         round: scoredRound,

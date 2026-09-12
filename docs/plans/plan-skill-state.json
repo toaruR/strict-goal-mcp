@@ -1,0 +1,355 @@
+{
+  "plan_version": 1,
+  "summary": "strict-goal MCP サーバーに arXiv:2608.26263 (SKILL.state) に基づくステートレス実行アーキテクチャを導入する実装計画。不確実性の低い中心パッケージ・バージョン定義(T001)およびログ永続化基盤(T002)から開始し、検証困難な外部コマンド出力のサニタイズ(T003)とプロジェクション(T004)を依存の許す限り最前に前倒ししてインターフェースを確定する。その後、FSM・Anti-gaming(T005)、監査ログ再構成(T006)、使い捨てワーカー定義・スキル連携(T007)を整え、総合受け入れテスト(T008)で全6シナリオを網羅する。各タスク完了時点で既存の全471テストが green を維持し、安全に中断・ロールバック可能な構成とする。",
+  "assumptions": [
+    "設計書 §0 (用語定義), §1 (前提条件), §14 (セルフホスティング検証), §15 (却下代替案) は概念定義および検証・意思決定の記録でありコード実装不要であることを明示。その他の全節(§2〜§13)はT001〜T008で完全に網羅される。",
+    "Node.js >= 20 標準モジュールのみで稼働し、新たな外部 npm 依存関係を追加しない。",
+    "既存の 7 ツール構成・MCP インターフェースおよび FSM 状態遷移の後方互換性を完全に維持する。",
+    "各タスク完了時点で既存テスト（471件）および新規テストが green を維持し、途中停止時も安全にロールバック可能である。"
+  ],
+  "tasks": [
+    {
+      "id": "T001",
+      "title": "パッケージマニフェストおよびバージョン 1.1.0 定義更新",
+      "intent": "plugin.json, package.json, src/version.js を版 1.1.0 に更新し、Agent Plugins 1.0.0 適合マニフェストを確立する。",
+      "design_refs": [
+        "## §9. 配布パッケージ仕様と適合性（plugin.json / mcp.json 実物）",
+        "### 9.1 `plugin.json` 実物",
+        "### 9.2 `mcp.json` 実物",
+        "### 9.3 パッケージ適合性の機械的検証手順"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "strict-goal/plugin.json",
+          "kind": "modify",
+          "note": "version 1.1.0, skills, mcpパスをAgent Plugins仕様に適合"
+        },
+        {
+          "path": "strict-goal/server/package.json",
+          "kind": "modify",
+          "note": "version 1.1.0 更新"
+        },
+        {
+          "path": "strict-goal/server/src/version.js",
+          "kind": "modify",
+          "note": "VERSION = 1.1.0 更新"
+        }
+      ],
+      "acceptance": [
+        "strict-goal/plugin.json の version が 1.1.0 であり、mcp.json への相対参照が正しく解決されること",
+        "strict-goal/server/src/version.js の VERSION が 1.1.0 としてエクスポートされること",
+        "node -e 形式のパッケージ適合性検証スクリプトが終了コード 0 で完了すること"
+      ],
+      "verify": [
+        {
+          "command": "node -e \"const p = require('./strict-goal/plugin.json'); const m = require('./strict-goal/mcp.json'); if (p.version !== '1.1.0' || !m.mcpServers['strict-goal']) process.exit(1);\"",
+          "expect_exit_code": 0,
+          "note": "プラグインマニフェスト適合性検証"
+        },
+        {
+          "command": "node strict-goal/server/helper.js version",
+          "expect_exit_code": 0,
+          "note": "helper.js version コマンドで 1.1.0 出力確認"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T002",
+      "title": "セッション外部ログ永続化ディレクトリおよび既定値管理機構の実装",
+      "intent": "セッションごとの生出力ログ保存ディレクトリ (.strict-goal/sessions/<session_id>/logs/) と直近5世代保持ローテーション既定値を整備する。",
+      "design_refs": [
+        "## §5. 状態の外部化と 0ターン完全復帰手順",
+        "### 5.1 状態の外部所在一覧表",
+        "## §11. 監査可能性（Auditability）とログ永続化レイアウト",
+        "## §13. 決定済み既定値一覧表（先送りゼロ）"
+      ],
+      "depends_on": [
+        "T001"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/server/src/config/defaults.js",
+          "kind": "modify",
+          "note": "MAX_LOG_HISTORY_ROUNDS (5), SANITIZE_MAX_ERROR_CHARS (500) 既定値追加"
+        },
+        {
+          "path": "strict-goal/server/src/store/log_store.js",
+          "kind": "add",
+          "note": "セッション生ログ保存・ローテーション・読み出し関数群"
+        },
+        {
+          "path": "strict-goal/server/src/store/session_store.js",
+          "kind": "modify",
+          "note": "sessionDir 配下の logs ディレクトリ作成保証と session.json 整合性維持"
+        }
+      ],
+      "acceptance": [
+        "セッション作成時に sessionDir 配下に logs ディレクトリが自動生成されること",
+        "ログファイル保存時にラウンドごとのログ命名 (test_r<round>.log) で安全に追記・保管されること",
+        "5世代を超える過去ログの自動ローテーションが正しく機能すること"
+      ],
+      "verify": [
+        {
+          "command": "node --test strict-goal/server/test/session_store.test.js",
+          "expect_exit_code": 0,
+          "note": "セッションストア基盤の回帰検証"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T003",
+      "title": "helper.js sanitize-test サブコマンドの実装",
+      "intent": "テスト実行の完全生出力を logs に退避しつつ、失敗アサーション行のみを抽出して 500 文字以内にサニタイズする helper サブコマンドを実装する。",
+      "design_refs": [
+        "## §6. ツール表面・インターフェース仕様（実物 JSON Schema とエラー条件）",
+        "### 6.2 `helper.js sanitize-test` 補助コマンド仕様",
+        "### AT-SS-03: `helper.js sanitize-test` によるスタックトレース要約検証"
+      ],
+      "depends_on": [
+        "T002"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/server/src/implement/sanitize_test.js",
+          "kind": "add",
+          "note": "スタックトレース共通部除去およびアサーション行抽出ロジック"
+        },
+        {
+          "path": "strict-goal/server/helper.js",
+          "kind": "modify",
+          "note": "sanitize-test サブコマンドのディスパッチ追加"
+        }
+      ],
+      "acceptance": [
+        "node strict-goal/server/helper.js sanitize-test が存在し、ヘルプ・引数解析が動作すること",
+        "成功時は exit_code: 0 と summary が JSON 出力され、失敗時は失敗テスト名・アサーション行・log_path が JSON 出力されること",
+        "抽出されたエラーメッセージが SANITIZE_MAX_ERROR_CHARS (500文字) 以内に制限され数千行のトレースを遮断すること"
+      ],
+      "verify": [
+        {
+          "command": "node strict-goal/server/helper.js sanitize-test \"node --version\"",
+          "expect_exit_code": 0,
+          "note": "正常終了コマンドに対する sanitize-test 疎通検証"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T004",
+      "title": "loop_state の projection: skill_state 拡張および tools スキーマ更新",
+      "intent": "loop_state の入力に projection (standard / skill_state) を追加し、(P, Sigma_t, O_t) 有界コンテキストを返却するプロジェクタを実装する。",
+      "design_refs": [
+        "## §6. ツール表面・インターフェース仕様（実物 JSON Schema とエラー条件）",
+        "### 6.1 `loop_state` 拡張インターフェース",
+        "### 6.3 エラーコード一覧と発生条件表",
+        "### 5.2 0ターン完全復帰プロトコル",
+        "### AT-SS-02: `loop_state(projection: \"skill_state\")` の有界三つ組検証"
+      ],
+      "depends_on": [
+        "T002"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/server/schemas/tools.json",
+          "kind": "modify",
+          "note": "loop_state input に projection enum 追加および output に skill_state 定義追加"
+        },
+        {
+          "path": "strict-goal/server/src/skill_state/projector.js",
+          "kind": "add",
+          "note": "immutable_spec, canonical_state, recent_observation の三つ組生成"
+        },
+        {
+          "path": "strict-goal/server/src/tools/loop_state.js",
+          "kind": "modify",
+          "note": "projection 判定とプロジェクション結果の組み込み、成果物本文抑制"
+        }
+      ],
+      "acceptance": [
+        "projection 未指定時は既存の standard 出力と完全一致し後方互換性が保たれること",
+        "projection: skill_state 指定時に immutable_spec, canonical_state, recent_observation が返却されること",
+        "skill_state 返却時、include に artifact が含まれていても本文返却が抑制され文字数が 4,000 文字以内に有界化されること"
+      ],
+      "verify": [
+        {
+          "command": "node --test strict-goal/server/test/at_1.test.js",
+          "expect_exit_code": 0,
+          "note": "既存 loop_state 利用テストの回帰検証"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T005",
+      "title": "構造化試行履歴 (trial_history) の管理と FSM / Anti-Gaming 整合性検証",
+      "intent": "visited_files や failed_hypotheses の試行履歴永続化、FSM 状態遷移マトリクス、および 1周3点超上昇時の command 根拠検査を実装する。",
+      "design_refs": [
+        "## §4. 状態機械（FSM）とツール呼び出し可否マトリクス",
+        "### 4.2 状態×ツール完全マトリクス表",
+        "## §7. 判定アルゴリズム・収束・打ち切り・判定所有権",
+        "### 7.1 判定アルゴリズムと厳格な所有権",
+        "### 7.2 収束・判定条件（数値基準）",
+        "## §8. ごまかし防止機構（Anti-Gaming）の適用と限界",
+        "### AT-SS-05: 状態遷移マトリクス違反の厳格拒否"
+      ],
+      "depends_on": [
+        "T004"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/server/src/store/trial_history.js",
+          "kind": "add",
+          "note": "trial_history.json の永続化・ハッシュ記録・読み込み"
+        },
+        {
+          "path": "strict-goal/server/src/fsm/guard.js",
+          "kind": "modify",
+          "note": "状態×ツールマトリクス表に準拠した厳格な状態チェック"
+        },
+        {
+          "path": "strict-goal/server/src/judge/score_submit.js",
+          "kind": "modify",
+          "note": "加重平均 9.0 以上および全基準 9 点以上の厳格 FINAL 判定、E_SCORE_JUMP 検査"
+        }
+      ],
+      "acceptance": [
+        "試行したファイルパスや失敗仮説が trial_history.json に軽量ハッシュ/要約として保存されること",
+        "DRAFTING 状態で score_submit を呼ぶと E_STATE_VIOLATION で拒否され状態が維持されること",
+        "全基準 9 点以上かつ加重平均 9.0 以上の場合のみ FINAL となり、自称 self_verdict_note が判定式に影響しないこと"
+      ],
+      "verify": [
+        {
+          "command": "node --test strict-goal/server/test/at_2.test.js",
+          "expect_exit_code": 0,
+          "note": "FSM 状態遷移およびスコア検証の疎通確認"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T006",
+      "title": "audit_export の外部ログパスおよび試行履歴再構成対応",
+      "intent": "audit_export において各周の生ログ外部パス (logs_archive) および拒否履歴・試行履歴を JSON Schema 準拠で完全出力する。",
+      "design_refs": [
+        "## §11. 監査可能性（Auditability）とログ永続化レイアウト",
+        "### 11.1 監査エクスポート仕様 (`audit_export`)",
+        "### AT-SS-06: 監査エクスポートにおける全試行・ログパスの完全再構成"
+      ],
+      "depends_on": [
+        "T002",
+        "T005"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/server/src/tools/audit_export.js",
+          "kind": "modify",
+          "note": "各ラウンドの logs_archive 相対パスおよび拒否提出記録の埋め込み"
+        },
+        {
+          "path": "strict-goal/server/test/verify_audit.js",
+          "kind": "modify",
+          "note": "拡張された audit_export JSON Schema 構造の検証対応"
+        }
+      ],
+      "acceptance": [
+        "audit_export 出力に logs_archive および rejected_attempts が各ラウンドごとに正しく出力されること",
+        "成果物本文を含まない場合でも第三者が各周の実行とログ所在を完全に再構成できること",
+        "node strict-goal/server/test/verify_audit.js が終了コード 0 で通過すること"
+      ],
+      "verify": [
+        {
+          "command": "node --test strict-goal/server/test/verify_audit.test.js",
+          "expect_exit_code": 0,
+          "note": "監査エクスポート検証スクリプトのテスト実行"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T007",
+      "title": "使い捨てワーカー定義 (sg-scout, sg-verifier) およびスキル手順文書化",
+      "intent": "sg-scout, sg-verifier サブエージェント定義を作成し、SKILL.md に 0 ターン完全復帰手順と使い捨てワーカー協調仕様を追記する。",
+      "design_refs": [
+        "## §3. アーキテクチャ設計（SKILL.state パラダイム適合）",
+        "### 3.1 3種の使い捨てワーカー（Ephemeral Workers）の協調",
+        "## §10. 責務分割表とホスト環境可搬性",
+        "### 10.1 責務分割表",
+        "### 10.2 ホスト環境可搬性（Host Portability）",
+        "### AT-SS-04: Ephemeral Worker によるスコア提出と親コンテキスト汚染防止"
+      ],
+      "depends_on": [
+        "T003",
+        "T004"
+      ],
+      "changes": [
+        {
+          "path": ".agents/agents/sg-scout.md",
+          "kind": "add",
+          "note": "探索・調査専用 Ephemeral Worker 定義"
+        },
+        {
+          "path": ".agents/agents/sg-verifier.md",
+          "kind": "add",
+          "note": "検証・採点・コミット専用 Ephemeral Worker 定義"
+        },
+        {
+          "path": "strict-goal/skills/strict-goal/SKILL.md",
+          "kind": "modify",
+          "note": "0ターン復帰プロトコルおよび使い捨てワーカー協調手順の追記"
+        }
+      ],
+      "acceptance": [
+        ".agents/agents/ に sg-scout.md および sg-verifier.md が存在し適切なフロントマターを持つこと",
+        "SKILL.md に loop_state(projection: skill_state) による 0 ターン復帰手順が明記されていること",
+        "サーバー・スキル・親エージェント・子ワーカーの責務表が反映されていること"
+      ],
+      "verify": [
+        {
+          "command": "node --test strict-goal/server/test/subagents.test.js",
+          "expect_exit_code": 0,
+          "note": "サブエージェント定義・スキル整合性テストの実行"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T008",
+      "title": "SKILL.state 総合受け入れテスト (AT-SS-01 〜 AT-SS-06) の実装と統合",
+      "intent": "設計書 §12 に定義された AT-SS-01〜06 の全受け入れテストシナリオを自動テスト (test/at_ss.test.js) として実装し、全網羅を確認する。",
+      "design_refs": [
+        "## §2. 潰す失敗モード 12件と対策の1対1対応表",
+        "## §12. 受け入れテストシナリオ 6本（呼び出し列・期待値）",
+        "### AT-SS-01: Canonical State による 0ターン完全復帰テスト"
+      ],
+      "depends_on": [
+        "T003",
+        "T005",
+        "T006",
+        "T007"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/server/test/at_ss.test.js",
+          "kind": "add",
+          "note": "AT-SS-01〜06 の呼び出し列・期待値完全検証テストスイート"
+        }
+      ],
+      "acceptance": [
+        "AT-SS-01 (0ターン復帰), AT-SS-02 (有界三つ組), AT-SS-03 (テストサニタイズ), AT-SS-04 (ワーカーコミット), AT-SS-05 (状態違反拒否), AT-SS-06 (監査再構成) がすべて実装されていること",
+        "node --test strict-goal/server/test/at_ss.test.js が exit_code 0 で全テスト通過すること",
+        "失敗モード FM-01〜12 の対応機構が受け入れテストで完全に裏付けられること"
+      ],
+      "verify": [
+        {
+          "command": "node --test strict-goal/server/test/at_ss.test.js",
+          "expect_exit_code": 0,
+          "note": "SKILL.state 受け入れテスト全件実行"
+        }
+      ],
+      "estimate_rounds": 1
+    }
+  ]
+}

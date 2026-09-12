@@ -135,7 +135,11 @@
             "items": { "type": "string", "enum": ["rubric", "history", "last_scores", "artifact_head", "must_fix", "upstream", "chain"] }
           },
           "artifact_head_bytes": { "type": "integer", "minimum": 0, "maximum": 20000 },
-          "upstream_head_bytes": { "type": "integer", "minimum": 0, "maximum": 200000 }
+          "upstream_head_bytes": { "type": "integer", "minimum": 0, "maximum": 200000 },
+          "projection": {
+            "type": "string",
+            "enum": ["standard", "skill_state"]
+          }
         }
       },
       "output": {
@@ -234,6 +238,48 @@
               "chain_rounds": { "type": "integer" },
               "chain_max_rounds": { "type": "integer" },
               "kickbacks": { "type": "integer" }
+            }
+          },
+          "skill_state": {
+            "type": "object",
+            "required": ["immutable_spec", "canonical_state", "recent_observation"],
+            "properties": {
+              "immutable_spec": {
+                "type": "object",
+                "required": ["task", "loop_mode", "criteria_summary", "allowed_tools"],
+                "properties": {
+                  "task": { "type": "string" },
+                  "loop_mode": { "type": "string" },
+                  "criteria_summary": { "type": "array", "items": { "type": "string" } },
+                  "allowed_tools": { "type": "array", "items": { "type": "string" } }
+                }
+              },
+              "canonical_state": {
+                "type": "object",
+                "required": ["session_id", "round", "state", "must_fix", "trial_history"],
+                "properties": {
+                  "session_id": { "type": "string" },
+                  "round": { "type": "integer" },
+                  "state": { "type": "string" },
+                  "must_fix": { "type": "array", "items": { "type": "string" } },
+                  "trial_history": {
+                    "type": "object",
+                    "properties": {
+                      "visited_files": { "type": "array", "items": { "type": "string" } },
+                      "failed_hypotheses": { "type": "array", "items": { "type": "string" } }
+                    }
+                  }
+                }
+              },
+              "recent_observation": {
+                "type": "object",
+                "required": ["type", "summary"],
+                "properties": {
+                  "type": { "type": "string", "enum": ["commit_ack", "eval_verdict", "sanitized_test"] },
+                  "summary": { "type": "string" },
+                  "details": { "type": "object" }
+                }
+              }
             }
           },
           "next_action": { "type": "object" },

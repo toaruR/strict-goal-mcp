@@ -59,6 +59,7 @@ function buildArtifactSection(sDir, artifactKind, round, recordDigest, { include
 }
 
 export function buildRounds(sDir, artifactKind, { includeArtifacts, includeDiffs }) {
+  const rejectedAll = listRejectedSubmissions(sDir);
   return listAcceptedRounds(sDir).map(({ round, record }) => {
     const scores = record.submission.scores.map((score) => ({
       criterion_id: score.criterion_id,
@@ -69,9 +70,27 @@ export function buildRounds(sDir, artifactKind, { includeArtifacts, includeDiffs
       weakness: score.weakness,
       evidence: score.evidence.map((ev, i) => ({ ...ev, evidence_digest: score.evidence_digests[i] })),
     }));
+
+    // Check if log file exists for this round
+    const logFileName = `test_r${round}.log`;
+    const logRelativePath = `logs/${logFileName}`;
+
+    const rejectedAttempts = rejectedAll
+      .filter((r) => r.round === round)
+      .map((r) => ({
+        error_code: r.error_code,
+        reason: r.error_detail?.reason || r.error_code,
+        timestamp: r.submitted_at,
+      }));
+
     return {
       round,
       state_at_scoring: 'SCORING',
+      artifact_digest: record.artifact_digest,
+      scores,
+      verdict: record.verdict,
+      logs_archive: logRelativePath,
+      rejected_attempts: rejectedAttempts,
       artifact: buildArtifactSection(sDir, artifactKind, round, record.artifact_digest, { includeArtifacts, includeDiffs }),
       submission: {
         submitted_at: record.submitted_at,

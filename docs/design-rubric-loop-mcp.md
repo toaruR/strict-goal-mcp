@@ -854,7 +854,7 @@ MCP 2026-07-28 で `inputSchema` / `outputSchema` は JSON Schema 2020-12 の任
     "next_action": { "type": "object" },
     "warnings": {
       "type": "array", "items": { "type": "string" },
-      "description": "次を必ず含む: (a) unchanged:true のとき『この周でスコアを上げる提出は拒否される』, (b) changed_ratio >= 0.9 のとき near_total_rewrite（ほぼ全書き換え＝前周からの連続性が無い）, (c) bytes が前周の 0.5 倍未満のとき suspicious_shrink（全文でなく差分を渡した疑い）。いずれも拒否はせず、監査 rounds[].artifact.warnings に残す"
+      "description": "次を必ず含む: (a) unchanged:true のとき『この周でスコアを上げる提出は拒否される』, (b) changed_ratio >= 0.9 のとき near_total_rewrite（ほぼ全書き換え＝前周からの連続性が無い）, (c) bytes が前周の 0.5 倍未満のとき suspicious_shrink（全文でなく差分を渡した疑い）, (d) (b) と (c) が同時に成立し、かつ bytes が絶対的に極小（既定 200 バイト未満）かつ前周 bytes がその十倍以上のとき destructive_overwrite（プレースホルダ等での破壊的上書きを疑う複合警告）。いずれも拒否はせず、監査 rounds[].artifact.warnings に残す"
     }
   }
 }

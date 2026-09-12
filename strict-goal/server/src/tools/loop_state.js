@@ -8,6 +8,7 @@ import { readChain } from '../chain/store.js';
 import { computeChainRounds } from '../chain/budget.js';
 import { checkSupersede } from '../chain/supersede.js';
 import { buildEnvelope } from '../mcp/envelope.js';
+import { projectSkillState } from '../skill_state/projector.js';
 
 const DEFAULT_INCLUDE = ['rubric', 'history', 'last_scores', 'must_fix'];
 
@@ -120,6 +121,12 @@ export function loopState({ input, persistence }) {
   }
   if (include.includes('chain')) {
     extra.chain = buildChainSummary(dataDir, session);
+  }
+
+  if (input.projection === 'skill_state') {
+    extra.skillState = projectSkillState({ dataDir, session });
+    // In skill_state projection, suppress bulky artifact body / heads
+    delete extra.currentArtifact;
   }
 
   return buildEnvelope({

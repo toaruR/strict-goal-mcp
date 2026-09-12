@@ -44,11 +44,27 @@ In chained runs (`design` → `plan` → `implement`) or complex projects, **del
 - **Claude Code**:
   - Direct execution: Launch `sg-coder` subagent via `Agent(subagent_type="sg-coder", prompt=...)`.
   - Hierarchical execution (recommended): Launch `sg-implementer` supervisor via `Agent(subagent_type="sg-implementer", prompt=...)`. The supervisor sequentially dispatches each task to `sg-worker` (`Agent(subagent_type="sg-worker", prompt=...)`).
-- **Hierarchical Task Delegation (子監督 → 孫タスク実装)**:
+- **Hierarchical Task Delegation (子監督 → 孫タスク実装 & Ephemeral Workers)**:
   The `sg-implementer` subagent acts as an in-loop supervisor:
   1. Opens the session via `loop_open` and parses `tasks[]` from upstream `plan`.
-  2. Sequentially spawns a grandchild subagent (`sg-worker` / `self`) for each individual task (or `must_fix` item), restricting each worker's scope strictly to that task's implementation and unit tests.
-  3. After each task completes, the supervisor verifies overall integrity, executes `helper.js` for test verification & fileset generation, and commits/scores the round.
+  2. Sequentially spawns a grandchild subagent for each discrete transaction:
+     - `sg-scout`: Investigates target files and symbols, returning only a factual summary without polluting parent context.
+     - `sg-worker`: Focuses strictly on implementing a single task or `must_fix` item and passing its tests.
+     - `sg-verifier`: Executes `helper.js test-run` and `helper.js fileset`, commits the artifact, and submits scores.
+  3. After each task completes, the supervisor verifies overall integrity, and repeats until the server returns FINAL.
+
+### Responsibility Split (責務分割表)
+
+| 責務・判断項目 | サーバー (strict-goal) | スキル (SKILL.md) | 親エージェント (Orchestrator) | 子ワーカー (sg-scout / sg-worker / sg-verifier) |
+|---|---|---|---|---|
+| 合否判定 (verdict) | サーバーのみ判定 (計算・確定) | 関与しない | 結果の受領・確認のみ | 関与しない |
+| FSM 状態の管理・永続化 | サーバーのみ決定 (ディスク保存) | 関与しない | 関与しない | 関与しない |
+| コンテキスト有界射影 (P, Sigma_t, O_t) | 提供 (データ生成) | 呼び出し構文の定義 | 取得して子ワーカーに注入 | 入力として消費 |
+| サブエージェントの起動・終了 | 関与しない | 手順の案内 | 実行制御 | 自身の責務完了で終了 |
+| コード調査・探索 | 関与しない | 関与しない | 関与しない | sg-scout が実行 |
+| コード編集・単体テスト | 関与しない | 関与しない | 関与しない | sg-worker が実行 |
+| テスト実行・採点・コミット | 受理・検証・拒否 | ガイドライン提示 | 関与しない | sg-verifier が実行 |
+
 - The subagent runs the full implement loop autonomously until the server returns FINAL, then reports back with the finalized digest and test summary.
 
 ## Procedure
@@ -100,8 +116,12 @@ To check the installed version of strict-goal:
 
 ## When Context Is Lost
 
-Call loop_state with just the session_id. Everything you need comes back. Don't try to recall
-from memory.
+Call loop_state with the session_id and projection: "skill_state".
+The server returns the bounded execution triad (P, Sigma_t, O_t):
+- immutable_spec: task specification and criteria summary.
+- canonical_state: current round, state, must_fix items, and trial history.
+- recent_observation: sanitized observation from the previous step.
+Everything you need comes back in under 4,000 characters. Don't try to recall from memory.
 
 ## Human-Readable Dashboard
 

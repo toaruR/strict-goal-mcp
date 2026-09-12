@@ -1,7 +1,9 @@
 {
   "$schema": "https://agent-plugins.org/schemas/v1.0.0/plugin.json",
   "name": "strict-goal",
-  "version": "1.0.0",
-  "description": "AIの妥協やサボりを防ぎ、客観的なルーブリック検証を満たすまで厳格にゴール完遂を強制する MCP サーバとスキル",
-  "license": "MIT"
+  "version": "1.1.0",
+  "description": "Strict rubric-verified goal execution MCP server with SKILL.state stateless runtime support",
+  "license": "Apache-2.0",
+  "skills": "./skills",
+  "mcp": "./mcp.json"
 }

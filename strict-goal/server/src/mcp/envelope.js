@@ -51,6 +51,7 @@ export function buildEnvelope({
   escalation,
   reopened,
   exportInfo,
+  skillState,
 } = {}) {
   const envelope = {
     resultType: 'complete',
@@ -89,6 +90,7 @@ export function buildEnvelope({
   if (escalation !== undefined) envelope.escalation = escalation;
   if (reopened !== undefined) envelope.reopened = reopened;
   if (exportInfo !== undefined) envelope.export = exportInfo;
+  if (skillState !== undefined) envelope.skill_state = skillState;
   return envelope;
 }
 

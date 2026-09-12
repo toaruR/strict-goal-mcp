@@ -18,5 +18,6 @@ __pycache__/
 docs/knowledge-kit-usage.md
 .strict-goal/
 rubric-loop-agy/
+strict-goal-old/
 .agents/agents/
 .cursor/rules/
