@@ -45,6 +45,9 @@ export function extractFailures(rawOutput) {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    // TAP のコメント/要約行（"# fail 1" 等）を誤って失敗マーカーとして
+    // 拾わないよう、"#" で始まる行は先にスキップする。
+    if (line.trim().startsWith('#')) continue;
     const failMatch = line.match(/(?:✖|not ok|FAIL)\s+(?:test at\s+)?([^\r\n]+)/i);
     if (failMatch) {
       if (currentTest) {

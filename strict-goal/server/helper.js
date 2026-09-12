@@ -87,7 +87,10 @@ function parseTestOutput(rawOutput, exitCode) {
   let skipped = 0;
 
   for (const line of lines) {
-    if (line.trim().startsWith('ℹ')) continue;
+    const trimmed = line.trim();
+    // ℹ で始まる spec レポーターのサマリ行、# で始まる TAP のコメント/
+    // サマリ行（"# fail 1" 等）は実テスト結果行ではないため除外する。
+    if (trimmed.startsWith('ℹ') || trimmed.startsWith('#')) continue;
     const passMatch = line.match(/(?:✔|ok|PASS)\s+(?:test at\s+)?([^\r\n]+)/i);
     const failMatch = line.match(/(?:✖|not ok|FAIL)\s+(?:test at\s+)?([^\r\n]+)/i);
     const skipMatch = line.match(/(?:skip|# SKIP)\s+([^\r\n]+)/i);
@@ -124,9 +127,15 @@ function runCommand(commandStr) {
   const shell = isWin ? 'cmd.exe' : '/bin/sh';
   const flag = isWin ? '/c' : '-c';
 
+  // NODE_TEST_CONTEXT を継承したままだと、自分自身が node --test 配下で
+  // 実行されている場合にネストした `node --test` 呼び出しが「再帰呼び出し」
+  // と誤検知されてスキップされ、exit 0 を返してしまう(Linux で顕著)。
+  const { NODE_TEST_CONTEXT, ...env } = process.env;
+
   const res = spawnSync(shell, [flag, commandStr], {
     encoding: 'utf8',
     maxBuffer: 10 * 1024 * 1024,
+    env,
   });
 
   const stdout = res.stdout || '';
