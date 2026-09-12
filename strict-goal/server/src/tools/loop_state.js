@@ -25,6 +25,7 @@ function readHistory(sDir) {
   if (!fs.existsSync(roundsDir)) return [];
   const roundNumbers = fs
     .readdirSync(roundsDir)
+    .filter((name) => /^\d+\.json$/.test(name))
     .map((name) => Number.parseInt(name, 10))
     .filter((n) => Number.isInteger(n))
     .sort((a, b) => a - b);

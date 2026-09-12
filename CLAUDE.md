@@ -1,4 +1,4 @@
-<!-- knowledge-kit:begin section=general-instructions version=1.11.1 -->
+<!-- knowledge-kit:begin section=general-instructions version=1.12.0 -->
 ## Communication Style
 - Use Caveman mode.
 - Drop filler words, preambles, and recaps.
@@ -23,7 +23,7 @@ planモードで作成したマークダウンファイルは、<プロジェク
   - `sg-coder`: Autonomous implementer (completes smaller goals standalone through loop).
 <!-- knowledge-kit:end section=general-instructions -->
 
-<!-- knowledge-kit:begin section=recording-rules version=1.11.1 -->
+<!-- knowledge-kit:begin section=recording-rules version=1.12.0 -->
 ## 知見の記録ルール
 
 **作業中に重要な知見を発見したら、ユーザーの指示を待たず自動で記録すること。**
@@ -37,7 +37,7 @@ planモードで作成したマークダウンファイルは、<プロジェク
 記録したら「〇〇をハマりポイントに追記しました」と一言報告する。
 <!-- knowledge-kit:end section=recording-rules -->
 
-<!-- knowledge-kit:begin section=gotchas version=1.11.1 -->
+<!-- knowledge-kit:begin section=gotchas version=1.12.0 -->
 ## ハマりポイント
 
 <!--
@@ -84,4 +84,5 @@ planモードで作成したマークダウンファイルは、<プロジェク
 - **`strict-goal implement` 着手前に必ず `loop_open` を呼ぶこと**: セッション起票（DRAFTING）前にコード編集を始めるとダッシュボードに反映されない。上流 plan は `.strict-goal/index.json` から自動解決可能。
 - **fileset の `locator` 照合対象は個別ファイルではなくマニフェスト JSON である**: `excerpt` に個別ファイル本文を指定すると `E_EVIDENCE_NOT_FOUND` になる。マニフェスト文字列を指定するか、テスト検証には `kind: 'command'` を使うこと。
 - **Antigravity でワークスペース切り替え時に MCP サーバープロセスが残留する罠**: 別プロジェクト（例: `gedoku-proxy`）を開いた後に本プロジェクトを開いても、Language Server が起動した既存の MCP 子プロセス（`strict-goal` 等）が常駐・再利用され、`--data-dir` が前プロジェクトのパスのままになる。ワークスペース跨ぎで MCP を使う際は前プロセスの残留に注意し、必要に応じてプロセス終了またはウィンドウ再読み込みを行うこと。
+- **`loop_state` の `readHistory` が `1.commit.json` を拾って `ENOENT` で落ちる罠**: `roundsDir` を `readdirSync` して `parseInt` すると、`artifact_commit` で作られる `<round>.commit.json` も数値変換されて `<round>.json`（`score_submit` で作られるファイル）を読もうとし `ENOENT` になる。ファイル名が `/^\d+\.json$/` に完全一致するかフィルタする必要がある。
 <!-- knowledge-kit:end section=gotchas -->

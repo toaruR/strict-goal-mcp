@@ -1,4 +1,4 @@
-<!-- knowledge-kit:begin section=agents-entry version=1.11.1 -->
+<!-- knowledge-kit:begin section=agents-entry version=1.12.0 -->
 # AGENTS.md
 
 ## 最重要: CLAUDE.md を必ず先に読むこと
@@ -8,6 +8,7 @@
 ## Skills
 - `.claude/skills/` および `.agents/skills/` ディレクトリ配下に、特定のタスク（コミットなど）を実行するための詳細な手順やルールが `SKILL.md`（Markdown 形式）で定義されています。Claude Code・Codex CLI はこれらを自動的に発見します。これらのタスクを依頼された、もしくは実行する際は、必ず事前に対応する `SKILL.md` を読み込み、その指示や手順に従ってください。
 - Detailed instructions and rules for executing specific tasks (such as committing) are defined as `SKILL.md` files (Markdown) under the `.claude/skills/` and `.agents/skills/` directories. Claude Code and Codex CLI discover these automatically. When you are asked to perform these tasks or need to execute them, make sure to read the corresponding `SKILL.md` beforehand and follow its instructions.
+
 ## Agents / Subagents
 - Strict-goal subagents are defined under `.agents/agents/` for discovery and delegation by Codex CLI and harness environments:
   - `sg-implementer`: In-loop implementation supervisor (session lifecycle, task breakdown, delegation to `sg-worker`).
