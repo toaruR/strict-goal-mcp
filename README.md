@@ -1,6 +1,6 @@
 # Strict Goal MCP (`strict-goal`)
 
-> **サボらせない・妥協を許さないゴール完遂ハーネス**  
+> **Zero shortcuts, zero slacking: An uncompromising goal-completion harness**  
 > **Server-enforced iterative refinement loop for AI coding agents based on rubrics, compliant with Agent Plugins 1.0.0 and Model Context Protocol (MCP).**
 
 [日本語版 README (README.ja.md)](./README.ja.md)
@@ -16,6 +16,14 @@ When AI coding agents iterate using only self-prompts ("think step-by-step", "gr
 - **Criteria relaxation**: Silently weakening difficult criteria when stuck.
 
 **`Strict Goal MCP` (`strict-goal`)** solves this by moving state tracking, FSM validation, and convergence judgments **out of the LLM context and into a deterministic MCP server**. The agent commits artifacts, scores itself with mandatory line/command-level evidence and weaknesses, and the server independently evaluates threshold logic, detects stalls and gaming, and decides whether the process is `ITERATING` or `FINAL`.
+
+### Key Benefits of SKILL.state:
+
+Adopts the stateless execution architecture from **SKILL.state** (arXiv:2608.26263) for long-horizon agent execution. The server projects execution context into a bounded triad $(P, \Sigma_t, O_t)$ (immutable spec $P$, canonical state $\Sigma_t$, and sanitized recent observation $O_t$) under 4,000 characters, enabling disposable subagents (ephemeral workers: `sg-scout` / `sg-worker` / `sg-verifier`) to execute tasks atomically.
+
+- **Zero Token Explosion**: Eliminates quadratic token accumulation $\mathcal{O}(T^2)$ caused by append-only conversation histories, bounding per-step context to $\mathcal{O}(1)$ and overall consumption to linear $\mathcal{O}(T)$.
+- **Elimination of Context Pollution & Hallucination**: Raw stack traces and trial chatter are sanitized and aggregated on the server, preventing distraction and forgotten rules.
+- **Resilient State Restoration**: Full trial history and recent observations are deterministically persisted on the server, allowing instant and complete context recovery via a single `loop_state` call after interruptions.
 
 ---
 
@@ -280,6 +288,12 @@ strict-goal-mcp/
 ├── README.md                 # English documentation (this file)
 └── README.ja.md              # Japanese documentation
 ```
+
+---
+
+## References
+
+- [SKILL.state: Scalable Long-Horizon Agent Skills (arXiv:2608.26263)](https://arxiv.org/abs/2608.26263?ref=globalfeed.ai) - Theoretical foundation for the stateless execution model, bounded context projection $(P, \Sigma_t, O_t)$, and ephemeral subagent workers for scalable long-horizon agent skills.
 
 ---
 
