@@ -137,6 +137,7 @@ test('AT-SS-02: loop_state(projection: "skill_state") の有界三つ組検証',
 
 test('AT-SS-03: helper.js sanitize-test によるスタックトレース要約検証', () => {
   const dir = tmpDataDir();
+  writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ type: 'module' }));
   const failingScript = path.join(dir, 'fail.test.js');
   writeFileSync(
     failingScript,

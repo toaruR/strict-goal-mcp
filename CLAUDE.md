@@ -21,6 +21,8 @@ planモードで作成したマークダウンファイルは、<プロジェク
   - `sg-implementer`: In-loop implementation supervisor (session lifecycle, task breakdown, delegation to `sg-worker`).
   - `sg-worker`: Single-task worker (TDD implementation without strict-goal harness tools).
   - `sg-coder`: Autonomous implementer (completes smaller goals standalone through loop).
+  - `sg-scout`: Ephemeral codebase explorer (stateless fact gathering without context pollution).
+  - `sg-verifier`: Ephemeral test verification and evaluation submitter.
 <!-- knowledge-kit:end section=general-instructions -->
 
 <!-- knowledge-kit:begin section=recording-rules version=1.12.0 -->
@@ -85,5 +87,7 @@ planモードで作成したマークダウンファイルは、<プロジェク
 - **fileset の `locator` 照合対象は個別ファイルではなくマニフェスト JSON である**: `excerpt` に個別ファイル本文を指定すると `E_EVIDENCE_NOT_FOUND` になる。マニフェスト文字列を指定するか、テスト検証には `kind: 'command'` を使うこと。
 - **Antigravity でワークスペース切り替え時に MCP サーバープロセスが残留する罠**: 別プロジェクト（例: `gedoku-proxy`）を開いた後に本プロジェクトを開いても、Language Server が起動した既存の MCP 子プロセス（`strict-goal` 等）が常駐・再利用され、`--data-dir` が前プロジェクトのパスのままになる。ワークスペース跨ぎで MCP を使う際は前プロセスの残留に注意し、必要に応じてプロセス終了またはウィンドウ再読み込みを行うこと。
 - **`loop_state` の `readHistory` が `1.commit.json` を拾って `ENOENT` で落ちる罠**: `roundsDir` を `readdirSync` して `parseInt` すると、`artifact_commit` で作られる `<round>.commit.json` も数値変換されて `<round>.json`（`score_submit` で作られるファイル）を読もうとし `ENOENT` になる。ファイル名が `/^\d+\.json$/` に完全一致するかフィルタする必要がある。
+- **`.gitignore`の`.agents/agents/`は新規サブエージェントmdを丸ごと隠す罠**: `.claude/agents/`にファイルを足しても`.agents/agents/`ミラーへ`git add -f`し忘れるとCIだけ`E_ENOENT`級の存在検査で落ちる（ローカルは未追跡でも実ファイルがあるので気づけない）。新規sg-*.md追加時は両ミラー＋git追跡を確認すること。
+- **CI(Linux/Node22)と手元(Windows/Node24)で`node --test <一時ファイル>`のESM自動判定挙動が違う**: 一時ディレクトリに`package.json`が無いテストファイルは、Node24だと構文検出で自動的にESM再解釈されるが、Node22では効かず0テスト実行のまま`exit 0`成功扱いになることがある。`node --test`をサブプロセスで叩くテストは一時ディレクトリに`{"type":"module"}`の`package.json`を明示的に置くこと。
 - **`artifact_commit` の `near_total_rewrite`/`suspicious_shrink`/`unchanged` は設計上「拒否せず警告のみ」（§6.4.3 明記）**: プレースホルダ誤送信のような事故は単独指標では「正当な全面リライト」と区別できない（行の多重集合差分は言い換えでも重なり0になる）。両方同時発生＋絶対バイト数が極小（前周の10倍以上あった内容が200バイト未満に潰れる）という複合条件でのみ `destructive_overwrite` 警告を追加した（`config/defaults.js` の `DESTRUCTIVE_OVERWRITE_*`）。既存の「拒否しない」方針は変えていない（`warnings` は free-form 配列なのでスキーマ互換）。
 <!-- knowledge-kit:end section=gotchas -->

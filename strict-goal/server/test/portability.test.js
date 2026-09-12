@@ -15,8 +15,8 @@ function readJson(relPath) {
   return JSON.parse(readJsonRaw(relPath));
 }
 
-// 9.1: 直下のコンポーネントは skills/ と mcp.json の2種のみ（mcp.http.json は固定位置ではないため発見されない）。
-test('パッケージ直下のコンポーネントが skills/ と mcp.json の2種だけである', () => {
+// 9.1: 直下のコンポーネントは skills/, agents/, mcp.json の3種のみ（mcp.http.json は固定位置ではないため発見されない）。
+test('パッケージ直下のコンポーネントが skills/, agents/, mcp.json の3種だけである', () => {
   assert.ok(existsSync(path.join(packageRoot, 'skills')), 'skills/ が必要');
   assert.ok(statSync(path.join(packageRoot, 'skills')).isDirectory());
   assert.ok(existsSync(path.join(packageRoot, 'mcp.json')), 'mcp.json が必要');
@@ -24,7 +24,7 @@ test('パッケージ直下のコンポーネントが skills/ と mcp.json の2
 
   const entries = readdirSync(packageRoot);
   const nonComponentEntries = new Set(['plugin.json', 'mcp.http.json', 'presets', 'server']);
-  const unexpected = entries.filter((e) => e !== 'skills' && e !== 'mcp.json' && !nonComponentEntries.has(e));
+  const unexpected = entries.filter((e) => e !== 'skills' && e !== 'agents' && e !== 'mcp.json' && !nonComponentEntries.has(e));
   assert.deepEqual(unexpected, [], `未知のトップレベル項目: ${unexpected.join(', ')}`);
 });
 

@@ -14,4 +14,6 @@
   - `sg-implementer`: In-loop implementation supervisor (session lifecycle, task breakdown, delegation to `sg-worker`).
   - `sg-worker`: Single-task worker (TDD implementation without strict-goal harness tools).
   - `sg-coder`: Autonomous implementer (completes smaller goals standalone through loop).
+  - `sg-scout`: Ephemeral codebase explorer (stateless fact gathering without context pollution).
+  - `sg-verifier`: Ephemeral test verification and evaluation submitter.
 <!-- knowledge-kit:end section=agents-entry -->
