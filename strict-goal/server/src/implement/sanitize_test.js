@@ -1,6 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { SANITIZE_MAX_ERROR_CHARS } from '../config/defaults.js';
+import {
+  SANITIZE_MAX_ERROR_CHARS,
+  SANITIZE_MAX_FAILURES_RETURNED,
+  SANITIZE_MAX_TOTAL_CHARS,
+} from '../config/defaults.js';
 import { saveSessionLog, ensureLogsDir } from '../store/log_store.js';
 
 export function findActiveSession(dataDir) {
@@ -142,11 +146,35 @@ export function executeAndSanitize(runResult, dataDir = null) {
     };
   }
 
-  const failures = extractFailures(runResult.combined);
-  return {
+  const allFailures = extractFailures(runResult.combined);
+  const failures = allFailures.slice(0, SANITIZE_MAX_FAILURES_RETURNED);
+  const summary = allFailures.length > failures.length
+    ? `${allFailures.length} test(s) failed (showing first ${failures.length})`
+    : `${allFailures.length} test(s) failed`;
+
+  return shrinkToFit({
     exit_code: runResult.exitCode,
-    summary: `${failures.length} test(s) failed`,
+    summary,
     failures,
     log_path: normalizedLogPath,
-  };
+  });
+}
+
+// 出力先(helper.js の `JSON.stringify(payload, null, 2)`)がバウンド外に
+// 膨らまないよう、Node バージョン差などで assertion_error が想定より
+// 大きくなった場合でも SANITIZE_MAX_TOTAL_CHARS 以内に収まるまで縮める。
+function shrinkToFit(payload, maxTotalChars = SANITIZE_MAX_TOTAL_CHARS) {
+  let maxChars = SANITIZE_MAX_ERROR_CHARS;
+  let candidate = payload;
+  while (JSON.stringify(candidate, null, 2).length > maxTotalChars && maxChars > 20) {
+    maxChars = Math.floor(maxChars / 2);
+    candidate = {
+      ...payload,
+      failures: payload.failures.map((f) => ({
+        ...f,
+        assertion_error: sanitizeStackTrace(f.assertion_error, maxChars),
+      })),
+    };
+  }
+  return candidate;
 }

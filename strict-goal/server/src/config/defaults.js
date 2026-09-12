@@ -68,4 +68,6 @@ export const MODE_POLICY_DEFAULTS = Object.freeze({
 
 export const MAX_LOG_HISTORY_ROUNDS = 5;
 export const SANITIZE_MAX_ERROR_CHARS = 500;
+export const SANITIZE_MAX_FAILURES_RETURNED = 3;
+export const SANITIZE_MAX_TOTAL_CHARS = 700;
 
