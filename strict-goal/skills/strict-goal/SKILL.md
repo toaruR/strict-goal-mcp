@@ -2,13 +2,16 @@
 name: strict-goal
 description: Enforces iterative rubric validation until the server itself returns a passing verdict, preventing compromises or shortcuts. Triggered by natural language requests or command syntax like "strict-goal [design|plan|implement|設計|計画|実装] <target/instruction>" or "/strict-goal <goal>".
 ---
+<!-- knowledge-kit version=1.12.0 (自動調整済み: 移植先固有の書き換えあり) -->
 
 ## Principles
 
 The server decides pass/fail, not you. Your job is to submit artifacts,
-self-score them with evidence, and resolve the must_fix items the server returns.
+score them objectively with rigorous evidence, and resolve the must_fix items the server returns.
 Never decide on your own that "this is good enough."
 FINAL is a verdict only the server can issue; the model is forbidden from declaring FINAL itself.
+
+- **Verifier Separation (評価の独立分離).** Never grade your own creation. Author models have inherent self-enhancement bias that causes single-round premature completion (especially in advanced models like Gemini). Always delegate evaluation, fault-finding (粗探し), and scoring to the adversarial subagent `sg-verifier`. The verifier operates under zero-trust, relentlessly searches for edge-case omissions, strictly penalizes deficiencies, and enforces iterative refinement loops.
 
 ## Command Syntax & Mode Selection (モードの選び方)
 
@@ -40,18 +43,18 @@ In chained runs (`design` → `plan` → `implement`) or complex projects, **del
 - **Antigravity**:
   Call `invoke_subagent` with `TypeName: "self"` (or custom supervisor), passing:
   `Role: "Implementation Supervisor"`, `Workspace: "inherit"`, and a prompt such as:
-  `"Execute strict-goal implement <plan_doc_path>. Pin upstream plan digest, sequentially delegate plan tasks to grandchild workers, generate fileset/evidence via helper.js, run autonomous loop until the server returns FINAL, and report back with the finalized digest."`
+  `"Execute strict-goal implement <plan_doc_path>. Pin upstream plan digest, sequentially delegate plan tasks to grandchild workers (sg-worker), delegate adversarial verification and scoring to sg-verifier (enforcing fault-finding and strict deductions), run autonomous loop until the server returns FINAL, and report back with the finalized digest."`
 - **Claude Code**:
   - Direct execution: Launch `sg-coder` subagent via `Agent(subagent_type="sg-coder", prompt=...)`.
-  - Hierarchical execution (recommended): Launch `sg-implementer` supervisor via `Agent(subagent_type="sg-implementer", prompt=...)`. The supervisor sequentially dispatches each task to `sg-worker` (`Agent(subagent_type="sg-worker", prompt=...)`).
+  - Hierarchical execution (recommended): Launch `sg-implementer` supervisor via `Agent(subagent_type="sg-implementer", prompt=...)`. The supervisor sequentially dispatches each task to `sg-worker` (`Agent(subagent_type="sg-worker", prompt=...)`), then calls `sg-verifier` (`Agent(subagent_type="sg-verifier", prompt=...)`) for scoring.
 - **Hierarchical Task Delegation (子監督 → 孫タスク実装 & Ephemeral Workers)**:
   The `sg-implementer` subagent acts as an in-loop supervisor:
   1. Opens the session via `loop_open` and parses `tasks[]` from upstream `plan`.
   2. Sequentially spawns a grandchild subagent for each discrete transaction:
      - `sg-scout`: Investigates target files and symbols, returning only a factual summary without polluting parent context.
      - `sg-worker`: Focuses strictly on implementing a single task or `must_fix` item and passing its tests.
-     - `sg-verifier`: Executes `helper.js test-run` and `helper.js fileset`, commits the artifact, and submits scores.
-  3. After each task completes, the supervisor verifies overall integrity, and repeats until the server returns FINAL.
+     - `sg-verifier`: Executes adversarial inspection, runs test suites, finds edge-case flaws, commits the artifact, and submits penalized scores.
+  3. If server returns `ITERATING`, the supervisor extracts `must_fix` and `weaknesses`, delegates fixes to `sg-worker`, and repeats verification until server returns FINAL.
 
 ### Responsibility Split (責務分割表)
 
@@ -63,7 +66,7 @@ In chained runs (`design` → `plan` → `implement`) or complex projects, **del
 | サブエージェントの起動・終了 | 関与しない | 手順の案内 | 実行制御 | 自身の責務完了で終了 |
 | コード調査・探索 | 関与しない | 関与しない | 関与しない | sg-scout が実行 |
 | コード編集・単体テスト | 関与しない | 関与しない | 関与しない | sg-worker が実行 |
-| テスト実行・採点・コミット | 受理・検証・拒否 | ガイドライン提示 | 関与しない | sg-verifier が実行 |
+| テスト実行・採点・コミット | 受理・検証・拒否 | ガイドライン提示 | **自己採点禁止 (委譲必須)** | **sg-verifier が粗探し・減点・コミット・採点を専任** |
 
 - The subagent runs the full implement loop autonomously until the server returns FINAL, then reports back with the finalized digest and test summary.
 
@@ -83,9 +86,10 @@ In chained runs (`design` → `plan` → `implement`) or complex projects, **del
      test_inventory instead of content. If you modified a test file, put its diff in
      test_inventory.diffs.
    - Tip: run `node strict-goal/server/helper.js fileset <paths...>` to compute files sha256 and manifest digest in one step.
-4. score_submit — score every criterion with a rationale (40+ characters), a weakness, and evidence.
-   Grading yourself generously gains nothing. The server compares against the previous round and
-   evidence; an unsubstantiated increase is rejected with E_SCORE_INFLATION.
+4. score_submit — **Delegate to `sg-verifier` (Adversarial Verifier)**.
+   **Do NOT self-score if you are the author.**
+   Grading yourself generously gains nothing and circumvents iterative improvement.
+   The verifier inspects for boundary gaps, fragile assertions, and unhandled errors, strictly penalizing scores (6–8 in Round 1) to trigger `must_fix`:
    - **Crucial for implement (`fileset`)**: The server does NOT read workspace files on disk. Its artifact body is the raw manifest JSON (`sha256-<digest>.manifest.json`).
      - Never use `kind:"locator"` with excerpts from source/test/doc file contents; it will fail with `E_EVIDENCE_NOT_FOUND`.
      - For `plan_task_completion` & upstream plan references, use `kind:"upstream"` (excerpt matching the pinned upstream plan JSON). `verification:"auto"` criteria strictly require at least one `kind:"command"` evidence (`E_EVIDENCE_KIND`).
