@@ -56,17 +56,17 @@ In chained runs (`design` → `plan` → `implement`) or complex projects, **del
      - `sg-verifier`: Executes adversarial inspection, runs test suites, finds edge-case flaws, commits the artifact, and submits penalized scores.
   3. If server returns `ITERATING`, the supervisor extracts `must_fix` and `weaknesses`, delegates fixes to `sg-worker`, and repeats verification until server returns FINAL.
 
-### Responsibility Split (責務分割表)
+### Responsibility Split(責務分割表)
 
-| 責務・判断項目 | サーバー (strict-goal) | スキル (SKILL.md) | 親エージェント (Orchestrator) | 子ワーカー (sg-scout / sg-worker / sg-verifier) |
+| Responsibility / Decision Item | Server (strict-goal) | Skill (SKILL.md) | Parent Agent (Orchestrator) | Child Workers (sg-scout / sg-worker / sg-verifier) |
 |---|---|---|---|---|
-| 合否判定 (verdict) | サーバーのみ判定 (計算・確定) | 関与しない | 結果の受領・確認のみ | 関与しない |
-| FSM 状態の管理・永続化 | サーバーのみ決定 (ディスク保存) | 関与しない | 関与しない | 関与しない |
-| コンテキスト有界射影 (P, Sigma_t, O_t) | 提供 (データ生成) | 呼び出し構文の定義 | 取得して子ワーカーに注入 | 入力として消費 |
-| サブエージェントの起動・終了 | 関与しない | 手順の案内 | 実行制御 | 自身の責務完了で終了 |
-| コード調査・探索 | 関与しない | 関与しない | 関与しない | sg-scout が実行 |
-| コード編集・単体テスト | 関与しない | 関与しない | 関与しない | sg-worker が実行 |
-| テスト実行・採点・コミット | 受理・検証・拒否 | ガイドライン提示 | **自己採点禁止 (委譲必須)** | **sg-verifier が粗探し・減点・コミット・採点を専任** |
+| Pass/Fail Judgment (verdict) | Server only (computes & finalizes) | Not involved | Receives & confirms result only | Not involved |
+| FSM State Management & Persistence | Server only (persists to disk) | Not involved | Not involved | Not involved |
+| Bounded Context Projection (P, Sigma_t, O_t) | Provides (generates projection data) | Defines invocation syntax | Retrieves & injects into child workers | Consumes as input |
+| Subagent Lifecycle (Spawn / Terminate) | Not involved | Guides workflow & procedures | Controls execution | Terminates upon completing own task |
+| Code Investigation & Exploration | Not involved | Not involved | Not involved | Executed by `sg-scout` |
+| Code Editing & Unit Testing | Not involved | Not involved | Not involved | Executed by `sg-worker` |
+| Test Execution, Scoring, & Artifact Commit | Accepts, verifies, or rejects | Outlines guidelines | **Self-scoring strictly prohibited (delegation required)** | **`sg-verifier` exclusively handles flaw detection, penalty deductions, commit, & scoring** |
 
 - The subagent runs the full implement loop autonomously until the server returns FINAL, then reports back with the finalized digest and test summary.
 

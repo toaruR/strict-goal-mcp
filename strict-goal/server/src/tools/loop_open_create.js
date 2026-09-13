@@ -34,6 +34,8 @@ function freshCounters() {
     relaxation_approved: false,
     rejected_submissions: 0,
     extra_rounds_granted: 0,
+    first_round_must_fix_count: 0,
+    min_rounds_enforced_count: 0,
   };
 }
 

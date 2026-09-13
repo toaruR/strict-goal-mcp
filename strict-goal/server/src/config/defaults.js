@@ -60,10 +60,16 @@ export const ARTIFACT_KIND_BY_MODE = Object.freeze({
   implement: 'fileset',
 });
 
+export const MIN_ROUNDS_DEFAULT = 2;
+export const FIRST_ROUND_CEILING_DEFAULT = 8;
+export const MIN_FIRST_ROUND_MUST_FIX_DEFAULT = 1;
+
+const makeModeDefaults = (base, extra) => Object.freeze(Object.assign(Object.create(extra), base));
+
 export const MODE_POLICY_DEFAULTS = Object.freeze({
-  design: Object.freeze({ max_rounds: 12, stall_window: 3, stall_epsilon: 0.25 }),
-  plan: Object.freeze({ max_rounds: 8, stall_window: 2, stall_epsilon: 0.25 }),
-  implement: Object.freeze({ max_rounds: 16, stall_window: 4, stall_epsilon: 0.2 }),
+  design: makeModeDefaults({ max_rounds: 12, stall_window: 3, stall_epsilon: 0.25 }, { min_rounds: 2, first_round_ceiling: 8, min_first_round_must_fix: 2 }),
+  plan: makeModeDefaults({ max_rounds: 8, stall_window: 2, stall_epsilon: 0.25 }, { min_rounds: 2, first_round_ceiling: 8, min_first_round_must_fix: 1 }),
+  implement: makeModeDefaults({ max_rounds: 16, stall_window: 4, stall_epsilon: 0.2 }, { min_rounds: 2, first_round_ceiling: 8, min_first_round_must_fix: 1 }),
 });
 
 export const MAX_LOG_HISTORY_ROUNDS = 5;

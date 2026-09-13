@@ -49,6 +49,9 @@ export const CODES = Object.freeze({
   E_WEAKNESS_REQUIRED: { detailKeys: [] },
   E_TEST_REGRESSION: { detailKeys: ['prev', 'now', 'raised_criteria'] },
   E_TEST_NOT_GREEN: { detailKeys: ['criteria'] },
+  E_MIN_ROUNDS_NOT_REACHED: { detailKeys: ['current_round', 'min_rounds', 'gap'] },
+  E_FIRST_ROUND_UNCRITICAL: { detailKeys: ['round', 'failing_criteria_count', 'required_failing_count'] },
+  E_WEAKNESS_EVASIVE: { detailKeys: ['criterion_id', 'matched_pattern', 'weakness_excerpt'] },
 
   // rubric_amend 固有
   E_THRESHOLD_IMMUTABLE: { detailKeys: [] },
@@ -114,6 +117,8 @@ export const TOOL_ERRORS = Object.freeze({
     'E_FROZEN',
     'E_SUPERSEDED',
     'E_CHAIN_BUDGET_EXHAUSTED',
+    'E_FIRST_ROUND_UNCRITICAL',
+    'E_WEAKNESS_EVASIVE',
   ],
   rubric_amend: [
     'E_STATE_VIOLATION',

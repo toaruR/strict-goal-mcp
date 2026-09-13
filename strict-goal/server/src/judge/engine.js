@@ -21,9 +21,17 @@ export function computeMinScore(scores) {
   return Math.min(...scores.map((s) => s.score));
 }
 
-// 手順12: 判定。
 export function decideVerdict({ minScoreValue, weightedMeanValue, policy, session, roundsWithoutImprovement }) {
   const passed = minScoreValue >= policy.pass_score && weightedMeanValue >= policy.pass_weighted_mean;
+
+  // 1. min_rounds ハードガード: 最低ラウンド数に達していない場合は FINAL を絶対に発行しない
+  if (passed && policy.min_rounds && session.round < policy.min_rounds) {
+    return {
+      verdict: 'ITERATING',
+      verdict_reason: 'min_rounds_not_reached',
+      enforced_iteration: true,
+    };
+  }
 
   if (passed) {
     if (session.counters.relaxation_count > 0) {

@@ -104,6 +104,7 @@ export function buildRounds(sDir, artifactKind, { includeArtifacts, includeDiffs
         total_count: scores.length,
         verdict: record.verdict,
         verdict_reason: record.verdict_reason,
+        enforced_iteration: record.enforced_iteration ?? false,
         decided_by: 'server',
         decided_at: record.submitted_at,
       },

@@ -1,0 +1,259 @@
+{
+  "plan_version": 1,
+  "summary": "Antigravity等のLLM実行環境においてRound 1で満点自己採点による即時FINAL終了が発生する問題を根本根絶するため、サーバ側での強制反復機構（policy.min_rounds >= 2、初回スコア上限first_round_ceiling、逃避Weakness検知E_WEAKNESS_EVASIVE、初回必須指摘E_FIRST_ROUND_UNCRITICAL）をstrict-goalコアエンジンおよびhelper CLIに実装する。上流設計書の失敗モードF-01〜F-08（F-01:T004, F-02:T002, F-03:T006, F-04:T003, F-05:T003, F-06:T006, F-07:T005, F-08:T005）および受け入れテストAT-01〜AT-03（T007）を完全網羅し、各タスク中断時もGitアトミックリセットで安全性を担保する。",
+  "assumptions": [
+    "strict-goal MCP サーバおよび helper CLI は Node.js >= 20 ESM 環境で動作する",
+    "既存のテストスイート（481件）に対する後方互換性を完全に維持する",
+    "Antigravity 等の単一エージェント環境では helper.js verify-doc を通じた静的検査による機械的減点生成を併用する",
+    "各タスク中断時は git checkout -- <files> による単一タスク単位のクリーンリセットが可能である"
+  ],
+  "tasks": [
+    {
+      "id": "T001",
+      "title": "定数・エラーコード・ポリシースキーマの拡張定義",
+      "intent": "最低ラウンド数や初回スコア天井、逃避Weakness検知に必要な定数、エラーコード、スキーマプロパティを各定義ファイルに追加する。F-01〜F-08の共通基盤となる。",
+      "design_refs": [
+        "## 1. 概要・背景・目的",
+        "## 3. インタフェース仕様 (Interface Completeness)",
+        "## 11. 配布パッケージ・適合性検査 (Packaging Conformance)",
+        "## 13. 既定値一覧 (Defaults Decided)"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "strict-goal/server/src/config/defaults.js",
+          "kind": "modify",
+          "note": "MIN_ROUNDS_DEFAULT, FIRST_ROUND_CEILING_DEFAULT, MIN_FIRST_ROUND_MUST_FIX_DEFAULT および MODE_POLICY_DEFAULTS の拡張"
+        },
+        {
+          "path": "strict-goal/server/src/errors/codes.js",
+          "kind": "modify",
+          "note": "E_MIN_ROUNDS_NOT_REACHED, E_FIRST_ROUND_UNCRITICAL, E_WEAKNESS_EVASIVE の登録"
+        },
+        {
+          "path": "strict-goal/server/src/rubric/schema.js",
+          "kind": "modify",
+          "note": "policy schema の拡張プロパティ検証追加"
+        },
+        {
+          "path": "strict-goal/server/schemas/tools.json",
+          "kind": "modify",
+          "note": "tools 定義へのエラーコード追加"
+        }
+      ],
+      "acceptance": [
+        "defaults.js に MIN_ROUNDS_DEFAULT(2), FIRST_ROUND_CEILING_DEFAULT(8), MIN_FIRST_ROUND_MUST_FIX_DEFAULT(1) がエクスポートされていること",
+        "codes.js に新規3件のエラーコードが正しくエクスポートされ、既存コードと重複しないこと",
+        "rubric schema のバリデーションにおいて min_rounds, first_round_ceiling, min_first_round_must_fix を含む policy が正常通過すること"
+      ],
+      "verify": [
+        {
+          "command": "node --test strict-goal/server/test/codes.test.js",
+          "expect_exit_code": 0,
+          "note": "エラーコードの整合性テスト"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T002",
+      "title": "逃避的 Weakness 検知バリデータの実装",
+      "intent": "「将来の課題」「スコープ外」等の逃避的 Weakness を正規表現ブラックリストにより検出し E_WEAKNESS_EVASIVE で拒絶するバリデータを実装する。失敗モード F-02 を完全防止する。",
+      "design_refs": [
+        "## 2. 失敗モード対応表 (Failure Mode Mapping)",
+        "### 3.1 新規・更新エラーコード",
+        "## 7. Anti-Gaming 機構",
+        "### 7.1 逃避的 Weakness パターンの検知ブラックリスト (`E_WEAKNESS_EVASIVE`)"
+      ],
+      "depends_on": ["T001"],
+      "changes": [
+        {
+          "path": "strict-goal/server/src/tools/score_submit.js",
+          "kind": "modify",
+          "note": "EVASIVE_WEAKNESS_PATTERNS 定義と assertWeaknessValid への逃避検知バリデーション追加"
+        }
+      ],
+      "acceptance": [
+        "EVASIVE_WEAKNESS_PATTERNS に一致する Weakness を含むスコア提出時に E_WEAKNESS_EVASIVE が返されること",
+        "正規の具体的欠陥指摘を含む Weakness ではエラーが発生せず正常に通過すること",
+        "エラー detail に criterion_id, matched_pattern, weakness_excerpt が含まれること"
+      ],
+      "verify": [
+        {
+          "command": "node --test strict-goal/server/test/score_submit.test.js",
+          "expect_exit_code": 0,
+          "note": "score_submit のバリデーション単体テスト"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T003",
+      "title": "Round 1 初回スコア上限および粗探し強制バリデータの実装",
+      "intent": "Round 1 において初回スコア上限を超える点数（9点以上）の乱発や、合格基準を満たしながら must_fix が存在しない状態を検知し E_FIRST_ROUND_UNCRITICAL で拒絶する。失敗モード F-04, F-05 を防止する。",
+      "design_refs": [
+        "## 2. 失敗モード対応表 (Failure Mode Mapping)",
+        "### 3.1 新規・更新エラーコード",
+        "### 7.2 初回スコア上限規律 (`first_round_ceiling`)"
+      ],
+      "depends_on": ["T001"],
+      "changes": [
+        {
+          "path": "strict-goal/server/src/tools/score_submit.js",
+          "kind": "modify",
+          "note": "Round 1 における first_round_ceiling および min_first_round_must_fix チェック関数の追加と呼び出し"
+        }
+      ],
+      "acceptance": [
+        "Round 1 で pass_score 未満の項目が min_first_round_must_fix 未満の場合に E_FIRST_ROUND_UNCRITICAL が返されること",
+        "Round 2 以降ではこの制限が発火せず、通常の合否判定へ進むこと",
+        "エラー detail に round, failing_criteria_count, required_failing_count が含まれること"
+      ],
+      "verify": [
+        {
+          "command": "node --test strict-goal/server/test/score_submit.test.js",
+          "expect_exit_code": 0,
+          "note": "score_submit の初回スコア上限検証テスト"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T004",
+      "title": "FSM 判定エンジンへの min_rounds ガードと強制 ITERATING 遷移の実装",
+      "intent": "decideVerdict において session.round < policy.min_rounds の場合は全基準が合格点であっても絶対に FINAL を発行せず ITERATING を強制する。失敗モード F-01 を根本解決する。",
+      "design_refs": [
+        "## 2. 失敗モード対応表 (Failure Mode Mapping)",
+        "## 4. 状態機械 (State Machine)",
+        "### 4.2 FSM 判定遷移のアルゴリズム詳細",
+        "## 6. 合否判定の所有権 (Verdict Ownership)",
+        "## 8. 収束性 (Convergence)"
+      ],
+      "depends_on": ["T001"],
+      "changes": [
+        {
+          "path": "strict-goal/server/src/fsm/engine.js",
+          "kind": "modify",
+          "note": "decideVerdict への min_rounds チェックと enforced_iteration フラグ付与"
+        }
+      ],
+      "acceptance": [
+        "session.round < policy.min_rounds かつスコア合格条件を満たす場合、verdict: 'ITERATING', verdict_reason: 'min_rounds_not_reached' が返されること",
+        "session.round >= policy.min_rounds に達した時点で初めて合格判定時に FINAL が発行されること",
+        "返却オブジェクトに enforced_iteration: true が設定されること"
+      ],
+      "verify": [
+        {
+          "command": "node --test strict-goal/server/test/engine.test.js",
+          "expect_exit_code": 0,
+          "note": "FSM 判定エンジンの単体テスト"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T005",
+      "title": "セッション永続化および監査エクスポートへの拡張情報記録",
+      "intent": "セッションファイルおよび監査エクスポートに min_rounds 関連のカウンタや強制イテレーション履歴を永続化・出力する。失敗モード F-07, F-08 に対応する。",
+      "design_refs": [
+        "## 2. 失敗モード対応表 (Failure Mode Mapping)",
+        "## 5. 状態外部化 (State Externalized)",
+        "### 5.1 永続化構造マッピング",
+        "## 9. 責務分割表 (Responsibility Split)",
+        "## 10. 監査可能性 (Auditability)"
+      ],
+      "depends_on": ["T004"],
+      "changes": [
+        {
+          "path": "strict-goal/server/src/store/session_store.js",
+          "kind": "modify",
+          "note": "counters (first_round_must_fix_count, min_rounds_enforced_count) の初期化と更新の永続化"
+        },
+        {
+          "path": "strict-goal/server/src/tools/audit_export.js",
+          "kind": "modify",
+          "note": "session_v1.json 出力時の policy 拡張プロパティおよび enforced_iteration 記録"
+        }
+      ],
+      "acceptance": [
+        "session.json に min_rounds 関連カウンタが正常に記録・永続化されること",
+        "audit_export 実行時に session_v1.json に policy.min_rounds および evaluation.enforced_iteration が出力されること",
+        "loop_state の projection: 'skill_state' で canonical_state にこれらが反映されること"
+      ],
+      "verify": [
+        {
+          "command": "node --test strict-goal/server/test/audit_export.test.js",
+          "expect_exit_code": 0,
+          "note": "監査ログエクスポートの単体テスト"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T006",
+      "title": "文書静的検査コマンド (helper.js verify-doc) の実装",
+      "intent": "Antigravity 環境等で設計・計画文書の静的欠落検査を機械的に実行し減点根拠を生成する CLI コマンドを追加する。失敗モード F-03, F-06 を解消する。",
+      "design_refs": [
+        "## 2. 失敗モード対応表 (Failure Mode Mapping)",
+        "## 12. ホスト差異吸収方針 (Host Portability)",
+        "### 12.1 Antigravity (単一エージェント / Windows / pwsh) 環境対応"
+      ],
+      "depends_on": ["T001"],
+      "changes": [
+        {
+          "path": "strict-goal/server/helper.js",
+          "kind": "modify",
+          "note": "verify-doc サブコマンドの実装と定量的判定基準サポート"
+        }
+      ],
+      "acceptance": [
+        "node strict-goal/server/helper.js verify-doc <doc_path> が実行可能であること",
+        "見出し網羅率100%未満、1セクション50文字未満、未解決プレースホルダ検知時にexit 1と減点サマリーJSONを出力すること",
+        "完全な文書に対しては exit code 0 と合格サマリー（score: 9相当）を出力すること"
+      ],
+      "verify": [
+        {
+          "command": "node strict-goal/server/helper.js verify-doc docs/plans/design-anti-round1-final.md",
+          "expect_exit_code": 0,
+          "note": "設計仕様書に対する静的検証 CLI の実行確認"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T007",
+      "title": "新規受け入れテスト (AT-01〜AT-03) および統合テストの実装",
+      "intent": "設計仕様書第14節に定義された受け入れテスト（AT-01: Round 1 強制 ITERATING、AT-02: 逃避 Weakness 拒絶、AT-03: Round 2 正常 FINAL）を統合テストとして実装・検証する。",
+      "design_refs": [
+        "## 14. 受け入れテスト (Acceptance Tests)",
+        "### AT-01: Round 1 で全項目9点を提出した場合の強制 ITERATING",
+        "### AT-02: 逃避的 Weakness 提出時の拒絶検査",
+        "### AT-03: Round 2 で改善を反映して提出した際の正常 FINAL",
+        "## 15. 自己適用記録 (Self Hosting)",
+        "## 16. 却下代替案 (Rejected Alternatives)"
+      ],
+      "depends_on": ["T002", "T003", "T004", "T005", "T006"],
+      "changes": [
+        {
+          "path": "strict-goal/server/test/at_anti_round1.test.js",
+          "kind": "add",
+          "note": "AT-01, AT-02, AT-03 の受け入れテストスイート実装"
+        }
+      ],
+      "acceptance": [
+        "AT-01: Round 1 で全スコア9点を提出した場合に verdict: 'ITERATING' かつ reason: 'min_rounds_not_reached' が返ること",
+        "AT-02: 逃避的 Weakness を含むスコア提出が E_WEAKNESS_EVASIVE で拒絶されること",
+        "AT-03: Round 2 で改善を反映して提出した際に正常に verdict: 'FINAL' となること",
+        "全既存テスト（node --test）および新規テストが 100% green でパスすること"
+      ],
+      "verify": [
+        {
+          "command": "node --test strict-goal/server/test/at_anti_round1.test.js",
+          "expect_exit_code": 0,
+          "note": "Round 1 即時終了防止受け入れテストの実行"
+        }
+      ],
+      "estimate_rounds": 1
+    }
+  ]
+}

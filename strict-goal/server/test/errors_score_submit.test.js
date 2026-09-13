@@ -436,8 +436,50 @@ expectCode('E_CHAIN_BUDGET_EXHAUSTED', () => {
   });
 });
 
-test('score_submit: 再現したコード集合がちょうど18件で E_INTERNAL 以外の未知コードが出ない', () => {
-  assert.equal(seen.size, 18);
+expectCode('E_FIRST_ROUND_UNCRITICAL', () => {
+  const persistence = durablePersistence();
+  const session = createSession(persistence, {
+    rubric: {
+      criteria: [
+        { id: 'impl_works', statement: '実装が仕様どおりに動作することの根拠が十分に示されている', weight: 1, verification: 'manual', anchors: { 1: '全く動かない', 5: '一部だけ動く', 9: '完全に動作する' } },
+      ],
+      policy: { min_first_round_must_fix: 1 },
+    },
+  });
+  const committed = commit(persistence, session.session_id, CONTENT_V1, 1);
+  scoreSubmit({
+    input: {
+      session_id: session.session_id,
+      submission_id: submissionId(),
+      expected_round: 1,
+      artifact_digest: committed.artifact.digest,
+      scores: [locatorScore('impl_works', 9, EXCERPT_IMPL)],
+    },
+    persistence,
+  });
+});
+
+expectCode('E_WEAKNESS_EVASIVE', () => {
+  const persistence = durablePersistence();
+  const session = createSession(persistence);
+  const committed = commit(persistence, session.session_id, CONTENT_V1, 1);
+  scoreSubmit({
+    input: {
+      session_id: session.session_id,
+      submission_id: submissionId(),
+      expected_round: 1,
+      artifact_digest: committed.artifact.digest,
+      scores: [
+        locatorScore('impl_works', 8, EXCERPT_IMPL, { weakness: '本課題は次フェーズの将来課題とする' }),
+        locatorScore('docs_clear', 9, EXCERPT_DOCS),
+      ],
+    },
+    persistence,
+  });
+});
+
+test('score_submit: 再現したコード集合がちょうど20件で E_INTERNAL 以外の未知コードが出ない', () => {
+  assert.equal(seen.size, 20);
   assert.deepEqual([...seen].sort(), [...TOOL_ERRORS.score_submit].sort());
   assert.ok(!seen.has('E_INTERNAL'));
 });

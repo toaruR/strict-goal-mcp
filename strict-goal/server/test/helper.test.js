@@ -40,3 +40,29 @@ test('helper.js test-run: test_inventory と command_evidence を出力する', 
   assert.ok(parsed.test_inventory.counts.total >= 1);
   assert.equal(parsed.command_evidence.kind, 'command');
 });
+
+test('helper.js verify-doc: 完全な文書に対して exit 0 と score: 9 を返す', () => {
+  const docPath = path.resolve(__dirname, '..', '..', '..', 'docs', 'plans', 'design-anti-round1-final.md');
+  const res = runHelper(['verify-doc', docPath]);
+  assert.equal(res.status, 0);
+  const parsed = JSON.parse(res.stdout);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.score, 9);
+});
+
+test('helper.js verify-doc: 短いセクションやプレースホルダがある文書に対して exit 1 と score: 6 を返す', async () => {
+  const { writeFileSync, unlinkSync } = await import('node:fs');
+  const tmpFile = path.resolve(__dirname, '..', '..', 'temp_invalid_doc.md');
+  try {
+    writeFileSync(tmpFile, '# タイトル\n## セクション1\n短すぎる\nTODO: 後で書く');
+    const res = runHelper(['verify-doc', 'temp_invalid_doc.md']);
+    assert.equal(res.status, 1);
+    const parsed = JSON.parse(res.stdout);
+    assert.equal(parsed.ok, false);
+    assert.equal(parsed.score, 6);
+    assert.ok(parsed.weaknesses.length >= 1);
+  } finally {
+    try { unlinkSync(tmpFile); } catch {}
+  }
+});
+

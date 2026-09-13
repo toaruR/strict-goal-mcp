@@ -244,6 +244,98 @@ Usage:
     }
     const content = readFileSync(targetFile);
     console.log(sha256Hex(content));
+  } else if (command === 'verify-doc') {
+    const docPath = args[1];
+    if (!docPath) {
+      console.error('Error: specify document path to verify');
+      process.exit(1);
+    }
+    const resolved = path.resolve(process.cwd(), docPath);
+    if (!existsSync(resolved)) {
+      console.error(`Error: file not found: ${resolved}`);
+      process.exit(1);
+    }
+    const content = readFileSync(resolved, 'utf8');
+    const lines = content.split(/\r?\n/);
+
+    const headings = [];
+    const sections = [];
+    let currentHeading = null;
+    let currentLevel = 0;
+    let currentLines = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const match = line.match(/^(#{1,6})\s+(.+)$/);
+      if (match) {
+        if (currentHeading) {
+          sections.push({
+            heading: currentHeading,
+            level: currentLevel,
+            content: currentLines.join('\n').trim(),
+          });
+        }
+        currentHeading = match[2].trim();
+        currentLevel = match[1].length;
+        headings.push({ heading: currentHeading, level: currentLevel });
+        currentLines = [];
+      } else {
+        currentLines.push(line);
+      }
+    }
+    if (currentHeading) {
+      sections.push({
+        heading: currentHeading,
+        level: currentLevel,
+        content: currentLines.join('\n').trim(),
+      });
+    }
+
+    const weaknesses = [];
+    if (headings.length === 0) {
+      weaknesses.push('文書に見出しが存在しない');
+    }
+
+    for (let i = 0; i < sections.length; i++) {
+      const sec = sections[i];
+      const nextSec = sections[i + 1];
+      const isParent = nextSec && nextSec.level > sec.level && sec.content.length === 0;
+      if (!isParent && sec.content.length < 50) {
+        weaknesses.push(`セクション「${sec.heading}」の記述が不十分（${sec.content.length}文字 < 50文字）`);
+      }
+    }
+
+    const placeholderPatterns = [
+      /\b(?:TODO|FIXME|TBD|WIP)\b/i,
+      /【(?:未定|要検討|検討中|保留|後日)】/,
+      /<<<.*?>>>/,
+    ];
+    for (const pattern of placeholderPatterns) {
+      const m = content.match(pattern);
+      if (m) {
+        weaknesses.push(`未解決プレースホルダ検出: "${m[0]}"`);
+      }
+    }
+
+    const ok = weaknesses.length === 0;
+    const score = ok ? 9 : 6;
+    const result = {
+      ok,
+      score,
+      total_headings: headings.length,
+      total_sections: sections.length,
+      weaknesses,
+      summary: ok
+        ? '文書静的検証合格: 全セクション十分な文字数、未解決プレースホルダなし'
+        : `文書静的検証不合格: ${weaknesses.length}件の不備を検出`,
+    };
+
+    console.log(JSON.stringify(result, null, 2));
+    if (!ok) {
+      process.exit(1);
+    } else {
+      process.exit(0);
+    }
   } else {
     console.error(`Unknown command: ${command}`);
     process.exit(1);

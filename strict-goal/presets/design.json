@@ -12,7 +12,10 @@
     "require_command_evidence_for": [
       "auto"
     ],
-    "chain_max_rounds": 28
+    "chain_max_rounds": 28,
+    "min_rounds": 2,
+    "first_round_ceiling": 8,
+    "min_first_round_must_fix": 2
   },
   "criteria": [
     {

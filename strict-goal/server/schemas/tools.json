@@ -68,7 +68,10 @@
                     "uniqueItems": true,
                     "items": { "type": "string", "enum": ["auto", "manual"] }
                   },
-                  "chain_max_rounds": { "type": "integer", "minimum": 1, "maximum": 200 }
+                  "chain_max_rounds": { "type": "integer", "minimum": 1, "maximum": 200 },
+                  "min_rounds": { "type": "integer", "minimum": 1, "maximum": 10 },
+                  "first_round_ceiling": { "type": "integer", "minimum": 1, "maximum": 10 },
+                  "min_first_round_must_fix": { "type": "integer", "minimum": 0, "maximum": 5 }
                 }
               }
             }

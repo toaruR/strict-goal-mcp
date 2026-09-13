@@ -33,6 +33,13 @@ function fail(code, message, detail = {}) {
   throw err;
 }
 
+export const EVASIVE_WEAKNESS_PATTERNS = [
+  /(?:将来|今後|次フェーズ|将来期|後日).*?(?:課題|対応|検討|拡張|改善)/u,
+  /(?:スコープ外|対象外|考慮外|対象としていない)/u,
+  /(?:OS|ブラウザ|プラットフォーム|外部ライブラリ|インフラ).*?に(?:依存|委ねる|任せる)/u,
+  /(?:特になし|問題なし|満たしている|完璧である|十分である)/u,
+];
+
 // weakness は score==10 のときのみ "none" を許す。それ以外は最低文字数の本文が必須
 // （スキーマの minLength は "none" を通すため外してあり、ここで手動検査する）。
 function assertWeaknessValid(score, index) {
@@ -49,6 +56,15 @@ function assertWeaknessValid(score, index) {
       path: `$.scores[${index}].weakness`,
       reason: 'too_short',
     });
+  }
+  for (const pattern of EVASIVE_WEAKNESS_PATTERNS) {
+    if (pattern.test(score.weakness)) {
+      fail('E_WEAKNESS_EVASIVE', `weakness contains evasive language: ${score.weakness.slice(0, 50)}`, {
+        criterion_id: score.criterion_id,
+        matched_pattern: pattern.source,
+        weakness_excerpt: score.weakness.slice(0, 200),
+      });
+    }
   }
 }
 
@@ -119,6 +135,20 @@ export function scoreSubmit({ input, persistence }) {
       const criteriaById = new Map(rubric.criteria.map((c) => [c.id, c]));
 
       checkCompleteness(input.scores, rubric.criteria);
+
+      // Round 1 初回スコア上限および粗探し強制バリデーション
+      if (session.round === 1 && rubric.policy.min_first_round_must_fix) {
+        const requiredFailingCount = rubric.policy.min_first_round_must_fix;
+        const passScore = rubric.policy.pass_score;
+        const failingCount = input.scores.filter((s) => s.score < passScore).length;
+        if (failingCount < requiredFailingCount) {
+          fail('E_FIRST_ROUND_UNCRITICAL', `Round 1 requires at least ${requiredFailingCount} criteria below pass_score (${passScore}), but found ${failingCount}`, {
+            round: 1,
+            failing_criteria_count: failingCount,
+            required_failing_count: requiredFailingCount,
+          });
+        }
+      }
 
       const artifactBody = readArtifactContent(sDir, currentDigest, session.artifact_kind);
 
@@ -192,13 +222,21 @@ export function scoreSubmit({ input, persistence }) {
           ? session.counters.rounds_without_improvement
           : nextRoundsWithoutImprovement(improvement, rubric.policy.stall_epsilon, session.counters.rounds_without_improvement);
 
-      const { verdict, verdict_reason: verdictReason } = decideVerdict({
+      const { verdict, verdict_reason: verdictReason, enforced_iteration: enforcedIteration } = decideVerdict({
         minScoreValue,
         weightedMeanValue,
         policy: rubric.policy,
         session,
         roundsWithoutImprovement,
       });
+
+      if (enforcedIteration) {
+        session.counters.min_rounds_enforced_count = (session.counters.min_rounds_enforced_count || 0) + 1;
+      }
+      if (session.round === 1) {
+        const failingCount = input.scores.filter((s) => s.score < rubric.policy.pass_score).length;
+        session.counters.first_round_must_fix_count = failingCount;
+      }
 
       let chainBudgetExhausted = false;
       let chainBudgetDetail = null;
@@ -265,6 +303,7 @@ export function scoreSubmit({ input, persistence }) {
         min_score: minScoreValue,
         verdict: effectiveVerdict,
         verdict_reason: effectiveVerdictReason,
+        enforced_iteration: Boolean(enforcedIteration),
         submission: { self_verdict_note: input.self_verdict_note ?? null, scores: perCriterion },
       };
       recordAcceptedRound(sDir, scoredRound, record);
@@ -277,6 +316,7 @@ export function scoreSubmit({ input, persistence }) {
         min_score: minScoreValue,
         verdict: effectiveVerdict,
         verdict_reason: effectiveVerdictReason,
+        enforced_iteration: Boolean(enforcedIteration),
         scores: perCriterion,
         must_fix: mustFix,
       };
@@ -318,6 +358,7 @@ export function scoreSubmit({ input, persistence }) {
           min_score: minScoreValue,
           passed_count: passedCount,
           total_count: perCriterion.length,
+          enforced_iteration: Boolean(enforcedIteration),
           ...(improvement !== null ? { improvement } : {}),
           per_criterion: perCriterion.map((c) => ({
             criterion_id: c.criterion_id,

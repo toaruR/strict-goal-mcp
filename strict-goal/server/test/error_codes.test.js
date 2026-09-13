@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { CODES, TOOL_ERRORS, RESERVED_JSONRPC_RANGE } from '../src/errors/codes.js';
 import { fromException } from '../src/errors/envelope.js';
 
-test('レジストリが公開するエラーコードがちょうど42件で重複が0件', () => {
+test('レジストリが公開するエラーコードがちょうど45件で重複が0件', () => {
   const keys = Object.keys(CODES);
-  assert.equal(keys.length, 42);
-  assert.equal(new Set(keys).size, 42);
+  assert.equal(keys.length, 45);
+  assert.equal(new Set(keys).size, 45);
 });
 
 test('共通6件が含まれる', () => {
@@ -43,7 +43,7 @@ test('ツール別のエラーコード割り当て件数が実装の到達可�
   assert.equal(TOOL_ERRORS.loop_open.length, 13);
   assert.equal(TOOL_ERRORS.loop_state.length, 2);
   assert.equal(TOOL_ERRORS.artifact_commit.length, 16);
-  assert.equal(TOOL_ERRORS.score_submit.length, 18);
+  assert.equal(TOOL_ERRORS.score_submit.length, 20);
   assert.equal(TOOL_ERRORS.rubric_amend.length, 8);
   assert.equal(TOOL_ERRORS.escalate.length, 8);
   assert.equal(TOOL_ERRORS.audit_export.length, 2);

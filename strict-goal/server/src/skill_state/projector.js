@@ -64,6 +64,8 @@ export function projectSkillState({ dataDir, session }) {
     state: session.state,
     must_fix: mustFix,
     trial_history: trialHistory,
+    counters: session.counters,
+    policy: session.policy,
   };
 
   let recentObservation;

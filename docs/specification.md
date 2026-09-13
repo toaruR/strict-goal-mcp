@@ -126,7 +126,7 @@
 
 ## 5. 人間向けインターフェース・スキル・補助CLI
 
-エージェントが自律的かつ人語でループを回すためのインターフェース層を提供する。
+AIエージェントおよび人間の開発者が自律的かつ自然言語で開発ループを円滑に回し、客観的検証と周回管理を遂行するためのインターフェース層と補助ツール群を提供する。
 
 ### 5.1 コマンド・人語連携スキル
 - **スラッシュコマンド・フェーズショートカット**:
@@ -152,8 +152,21 @@
   - 指定ファイル群の SHA-256 およびマニフェストダイジェストを JSON 出力（`artifact_commit` 用）。
 - `node strict-goal/server/helper.js test-run "<command>"`:
   - テストコマンドを実行し、終了コード、出力ダイジェスト、テスト件数（pass/fail/skip/total）を抽出し `test_inventory` 形式の JSON として出力（`score_submit` 用）。
+- `node strict-goal/server/helper.js verify-doc <docPath>`:
+  - Markdown 仕様書・設計書を静的解析し、見出し構造（H1〜H6）、各セクションの文字数・内容充実度を検証。検出された弱点リスト（weaknesses）および推奨スコアを JSON で出力（`design` モードの客観的検証用）。
 
-### 5.3 バージョン管理と確認方法
+### 5.3 Round 1 即時終了防止・反復推敲強制メカニズム (Anti-Round-1 Finalization)
+エージェントの自己評価バイアスによる初回（Round 1）での安易な合格判定と即時終了を防止するため、サーバーサイドで以下の強制規則を適用する。
+
+1. **反復保証ポリシー (`policy.min_rounds`)**:
+   - `min_rounds` (デフォルト: 2): セッション完了（`FINAL` 判定）に必要な最低周回数。Round 1 で全基準が合格スコア（例: 9点）に達していても、サーバーは判定 `ITERATING`、判定理由 `min_rounds_not_reached`、フラグ `enforced_iteration: true` を返し、強制的に次周での改善推敲を要求する。
+2. **初回スコア上限と粗探し強制 (`policy.first_round_ceiling`, `policy.min_first_round_must_fix`)**:
+   - `first_round_ceiling` (デフォルト: 8): 初回周回での各基準スコアの上限値。
+   - `min_first_round_must_fix` (デフォルト: 1): Round 1 で提出を義務付ける `pass_score` 未満の課題数。満たさない場合、`E_FIRST_ROUND_UNCRITICAL` エラーにより提出が拒絶される。
+3. **逃避的 Weakness ブラックリスト (`E_WEAKNESS_EVASIVE`)**:
+   - 課題・弱点（`weakness`）に自己満足的または逃避的な表現（`問題なし`、`特になし`、`満たしている`、`完璧である`、`十分である` 等）が含まれる場合、`E_WEAKNESS_EVASIVE` により採点提出を即時拒絶し、具体的・建設的な指摘を強制する。
+
+### 5.4 バージョン管理と確認方法
 - **単一情報源 (Single Source of Truth)**:
   - `strict-goal/server/src/version.js` (`VERSION = '1.0.0'`, `NAME = 'strict-goal'`)
 - **CLI からの確認**:
@@ -174,3 +187,4 @@
 - **環境変数フォールバック**:
   - データディレクトリ: `STRICT_GOAL_DATA` || `RUBRIC_LOOP_DATA` || `PLUGIN_DATA` || XDG
   - プラグインルート: `STRICT_GOAL_ROOT` || `RUBRIC_LOOP_ROOT` || `PLUGIN_ROOT`
+
