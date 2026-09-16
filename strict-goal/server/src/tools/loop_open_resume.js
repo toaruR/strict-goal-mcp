@@ -10,6 +10,12 @@ import { resolveByLabel } from '../store/index_store.js';
 import { loadRubric } from '../rubric/store.js';
 import { checkSupersede } from '../chain/supersede.js';
 import { buildEnvelope } from '../mcp/envelope.js';
+import {
+  resolveDataDirFromWorkspace,
+  resolveSessionDataDir,
+  registerSessionDataDir,
+  registerChainDataDir,
+} from '../store/session_registry.js';
 
 const MAX_CANDIDATES = 10;
 
@@ -72,7 +78,11 @@ export function loopOpenResume({ input, persistence }) {
   const ephemeralResult = enforceEphemeralPolicy(persistence.mode, input.allow_ephemeral);
 
   let dataDir = persistence.dir;
-  if (!dataDir) {
+  if (input.workspace_dir) {
+    dataDir = resolveDataDirFromWorkspace(input.workspace_dir);
+  } else if (input.session_id && resolveSessionDataDir(input.session_id)) {
+    dataDir = resolveSessionDataDir(input.session_id);
+  } else if (!dataDir) {
     dataDir = mkdtempSync(path.join(os.tmpdir(), 'strict-goal-ephemeral-'));
   }
 
@@ -86,13 +96,18 @@ export function loopOpenResume({ input, persistence }) {
     const rubric = loadRubric(sDir, session.rubric_version);
     const mustFix = session.last_evaluation?.must_fix ?? [];
 
+    registerSessionDataDir(sessionId, dataDir);
+    if (session.chain_id) {
+      registerChainDataDir(session.chain_id, dataDir);
+    }
+
     return buildEnvelope({
       ok: true,
       sessionId,
       state: session.state,
       round: session.round,
       rubricVersion: session.rubric_version,
-      persistence: persistence.mode,
+      persistence: input.workspace_dir ? 'persistent' : persistence.mode,
       warnings,
       loopMode: session.loop_mode,
       chainId: session.chain_id,

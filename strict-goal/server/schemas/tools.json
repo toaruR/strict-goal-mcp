@@ -7,6 +7,7 @@
         "required": ["mode", "submission_id"],
         "properties": {
           "mode": { "type": "string", "enum": ["create", "resume", "create_or_resume"] },
+          "workspace_dir": { "type": "string", "minLength": 1, "maxLength": 4096 },
           "submission_id": { "type": "string", "minLength": 8, "maxLength": 128 },
           "session_id": { "type": "string", "pattern": "^rl_[0-9A-HJKMNP-TV-Z]{26}$" },
           "label": { "type": "string", "minLength": 1, "maxLength": 120 },

@@ -76,7 +76,7 @@ In chained runs (`design` → `plan` → `implement`) or complex projects, **del
    Do NOT start editing files or implementing code before opening a session.
    Parse the objective and formulate a 20+ character task description.
    - In `loop_mode:"implement"`, you MUST supply `upstream` (`{ session_id, artifact_digest }`). If omitted in prompt, auto-resolve it: read `.strict-goal/index.json` to find the latest session where `loop_mode` was plan and server returns FINAL (or inspect via `loop_state`), then retrieve its `session_id` and `current_artifact.digest`.
-   - Call `loop_open` immediately. For a new session, pass mode:"create" + loop_mode + task + rubric_preset (and upstream for plan/implement); to resume, pass mode:"resume" + session_id. Always pass a fresh unique string as submission_id.
+   - Call `loop_open` immediately. Pass `workspace_dir` (current workspace root directory) so session data and the live dashboard are saved to `.strict-goal/` in your current workspace, even if the MCP server was started in a different directory. For a new session, pass mode:"create" + loop_mode + task + rubric_preset (and upstream for plan/implement); to resume, pass mode:"resume" + session_id. Always pass a fresh unique string as submission_id.
    - Calling `loop_open` puts the session in DRAFTING state and immediately updates the live dashboard (`<data_dir>/dashboard/index.html` and `<session_id>.html`).
 2. Follow the returned next_action. Proceed to write code, edit files, and run tests only after the session is created and in DRAFTING. Repeat this loop.
 3. artifact_commit — submit the full artifact every time (not a diff).

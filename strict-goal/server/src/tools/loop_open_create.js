@@ -11,6 +11,11 @@ import { validateRubric } from '../rubric/schema.js';
 import { saveRubric } from '../rubric/store.js';
 import { sessionDir } from '../store/session_store.js';
 import { persistSession } from '../store/persist.js';
+import {
+  resolveDataDirFromWorkspace,
+  registerSessionDataDir,
+  registerChainDataDir,
+} from '../store/session_registry.js';
 import { generateSessionId, generateChainId } from '../id/ulid.js';
 import { buildEnvelope } from '../mcp/envelope.js';
 import { ARTIFACT_KIND_BY_MODE } from '../config/defaults.js';
@@ -64,7 +69,9 @@ export function loopOpenCreate({ input, pluginRoot, pluginRootSource, persistenc
   const ephemeralResult = enforceEphemeralPolicy(persistence.mode, input.allow_ephemeral);
 
   let dataDir = persistence.dir;
-  if (!dataDir) {
+  if (input.workspace_dir) {
+    dataDir = resolveDataDirFromWorkspace(input.workspace_dir);
+  } else if (!dataDir) {
     dataDir = mkdtempSync(path.join(os.tmpdir(), 'strict-goal-ephemeral-'));
   }
 
@@ -140,12 +147,14 @@ export function loopOpenCreate({ input, pluginRoot, pluginRootSource, persistenc
         plugin_root: pluginRoot,
         plugin_root_source: pluginRootSource,
         data_dir: dataDir,
-        data_dir_source: persistence.source,
-        persistence: persistence.mode,
+        data_dir_source: input.workspace_dir ? 'workspace_dir' : persistence.source,
+        persistence: input.workspace_dir ? 'persistent' : persistence.mode,
       },
     };
 
     persistSession(dataDir, session);
+    registerSessionDataDir(sessionId, dataDir);
+    registerChainDataDir(chainId, dataDir);
 
     return buildEnvelope({
       ok: true,
@@ -153,7 +162,7 @@ export function loopOpenCreate({ input, pluginRoot, pluginRootSource, persistenc
       state: 'DRAFTING',
       round: 1,
       rubricVersion: 1,
-      persistence: persistence.mode,
+      persistence: input.workspace_dir ? 'persistent' : persistence.mode,
       warnings,
       loopMode,
       chainId,
