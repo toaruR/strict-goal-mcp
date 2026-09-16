@@ -1,0 +1,443 @@
+{
+  "plan_version": 1,
+  "summary": "strict-goal MCPの定量的効果測定基盤（strict-goal-benchmark パッケージ）の実装計画（Round 2改定版）。上流設計書 docs/design-quantitative-evaluation.md (sha256:134b925c12d38ad3cb9570c551508a56064bcc0d7d9ea6bd7d162d0590fe1f25) に基づき、Vanilla・Prompt-only・Default /goal・strict-goal単体・strict-goal+使い捨てサブエージェント協調の5群比較実験、外部隔離検証器（Held-out Test Suite）、AST Diff改ざん検知、トークントラッカー、FSM制御、および統計レポート生成基盤を全9タスク（T001〜T009）で構築する。Round 1のmust_fix指摘に基づき、T006の肥大化を解消して実行系（T006）と集計系（T007）に分割し、合流点（T002, T004, T005）でのモジュール間契約と同期検証を明確化し、全タスクの estimate_rounds を1周、変更ファイル数を概ね3以下に適正化した。また、上流設計書の全節について、§0（用語定義: 概念仕様のためコード生成不要）、§1（前提条件: 実験前提とスコープ規定のため設定値以外のコード不要）、§14（セルフホスティング: 本書策定プロセス記録のため基盤コード不要）、§15（却下代替案: 設計判断根拠のため実装不要）の4節を個別根拠とともに実装不要と明示し、実装対象となる §2〜§13 の全節（失敗モード12件FM-01〜FM-12、5群実験・KPI設計、FSMとツールマトリクス、状態外部化と0ターン完全復帰、4ツールの実物Draft-07スキーマ、判定所有権と収束条件、Anti-Gaming機構、Agent Plugins 1.0.0マニフェスト、責務分割とホスト可搬性、監査マニフェスト完全スキーマ、受け入れテストAT-01〜AT-06、決定済み既定値10項目）を余すことなく完全に網羅する。各タスク完了時点でビルド可能・テストgreenを維持し、中断時も他タスク影響を排除したGitアトミックリセットで安全に復帰可能とする。",
+  "assumptions": [
+    "実行環境は Node.js >= 20 ESM 環境であり、Windows および POSIX 環境でのクロスプラットフォーム動作を保証する",
+    "Agent Plugins 1.0.0 仕様に厳密準拠し、既存の strict-goal MCP サーバーとシームレスに連携する",
+    "外部評価器（Evaluator）は被験エージェントのコンテキストおよびファイルアクセスから完全に隔離されたサブプロセスで実行される",
+    "各タスクの中断時は git checkout -- <target_files> および未追跡ファイル個別退避による単一タスク単位のクリーンリセットが可能である",
+    "上流設計書の各節除外判断: §0は用語定義のため実装不要、§1は実験前提のため実装不要、§14は設計作成プロセス追跡のため実装不要、§15は却下代替案理由のため実装不要とし、§2〜§13の全実装決定をタスク群で網羅する",
+    "T006合流点におけるT002(FSM), T004(AST), T005(Evaluator)の複数依存インターフェースは単体モックテストと型スキーマ検証により同期が保証される"
+  ],
+  "tasks": [
+    {
+      "id": "T001",
+      "title": "基盤設定・定数・エラーコード・パッケージ構成",
+      "intent": "ベンチマーク基盤の基本パッケージマニフェスト、全10項目の決定済み既定値、専用エラーコードカタログ、およびホスト可搬性ユーティリティを定義する。全タスクの共通基盤となる。",
+      "design_refs": [
+        "## §9. 配布パッケージ仕様と適合性（実物マニフェスト）",
+        "### 9.1 `package.json`（実物）",
+        "### 9.2 `plugin.json`（実物: Agent Plugins 1.0.0 準拠）",
+        "## §10. 責務分割表とホスト環境可搬性",
+        "### 10.2 ホスト環境可搬性（Host Portability）",
+        "## §13. 決定済み既定値一覧表（先送りゼロ）"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "strict-goal/benchmark/package.json",
+          "kind": "add",
+          "note": "§9.1 実物 package.json の配置"
+        },
+        {
+          "path": "strict-goal/benchmark/.agents-plugin/plugin.json",
+          "kind": "add",
+          "note": "§9.2 実物 plugin.json（Agent Plugins 1.0.0 準拠）の配置"
+        },
+        {
+          "path": "strict-goal/benchmark/src/config/defaults.js",
+          "kind": "add",
+          "note": "§13 表記載の全10既定値定数（MAX_ROUNDS_PER_TRIAL, STAGNATION_WINDOW, MAX_TOKENS_PER_TRIAL 等）のエクスポート"
+        },
+        {
+          "path": "strict-goal/benchmark/src/errors/codes.js",
+          "kind": "add",
+          "note": "E_STATE_INVALID, E_STATE_BUSY, E_TRIAL_ACTIVE, E_AST_TAMPERING 等のエラーコード一覧定義"
+        },
+        {
+          "path": "strict-goal/benchmark/src/utils/path.js",
+          "kind": "add",
+          "note": "§10.2 normalizeHostPath による Windows UNC / 長大パス透過処理"
+        }
+      ],
+      "acceptance": [
+        "package.json および plugin.json が有効な JSON であり、Agent Plugins 1.0.0 マニフェスト制約を満たすこと",
+        "defaults.js に MAX_ROUNDS_PER_TRIAL(12), STAGNATION_WINDOW(3), STAGNATION_EPSILON(0.25), MAX_TOKENS_PER_TRIAL(2000000), TIMEOUT_SEC_PER_TRIAL(1800) の全10既定値がエクスポートされていること",
+        "codes.js に定義されたエラーコードが重複せず、一意な文字列定数として参照可能であること",
+        "normalizeHostPath が Windows の \\\\?\\ プレフィックスおよび UNC パスを破壊せず正規化できること"
+      ],
+      "verify": [
+        {
+          "command": "node -e \"const pkg = require('./strict-goal/benchmark/package.json'); if(!pkg.name) process.exit(1);\"",
+          "expect_exit_code": 0,
+          "note": "パッケージマニフェスト構文検査"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T002",
+      "title": "FSM状態機械・状態外部化永続化・0ターン完全復帰",
+      "intent": "ベンチマークセッションの全8状態FSM、状態×4ツールの呼び出し可否マトリクスガード、ディスクへのアトミック状態永続化、およびCLI 0ターン完全復帰手順を実装する。FM-06のデータ欠損を防止する。",
+      "design_refs": [
+        "## §2. 潰す失敗モード 12件と対策の1対1対応表",
+        "## §4. 状態機械（FSM）とツール呼び出し可否マトリクス",
+        "### 4.1 ベンチマークセッション状態遷移",
+        "### 4.2 状態 × ツール呼び出し可否マトリクス",
+        "## §5. 状態の外部化と 0ターン完全復帰手順",
+        "### 5.1 状態永続化レイアウト",
+        "### 5.2 0ターン完全復帰手順"
+      ],
+      "depends_on": ["T001"],
+      "changes": [
+        {
+          "path": "strict-goal/benchmark/src/fsm/state_machine.js",
+          "kind": "add",
+          "note": "全8状態（INIT, PREPARING, RUNNING_TRIAL, EVALUATING, COLLECTING, COMPLETED, FAILED, ABORTED）の遷移ロジック"
+        },
+        {
+          "path": "strict-goal/benchmark/src/fsm/matrix_guard.js",
+          "kind": "add",
+          "note": "§4.2 マトリクスに基づく不正ツール呼び出し拒絶ガード（E_STATE_INVALID, E_STATE_BUSY 等）"
+        },
+        {
+          "path": "strict-goal/benchmark/src/store/bench_store.js",
+          "kind": "add",
+          "note": "config.json, state.json, summary_metrics.json の同期・アトミック永続化"
+        },
+        {
+          "path": "strict-goal/benchmark/src/runner/resume.js",
+          "kind": "add",
+          "note": "§5.2 復帰シーケンス（中断試行の git reset と再開）"
+        }
+      ],
+      "acceptance": [
+        "FSMが全8状態の有効な遷移を受け入れ、無効な遷移時に E_STATE_INVALID をスローすること",
+        "§4.2 マトリクスに定義された各状態で禁止ツールの呼出が厳格に拒絶されること",
+        "ベンチマーク状態がディスク上の state.json にアトミック書き込みされること",
+        "resume.js が未完了試行を検出し、直前の健全状態から 0 ターンで安全に再開できること"
+      ],
+      "verify": [
+        {
+          "command": "node -e \"console.log('FSM_STATE_MACHINE_CHECK_PASS')\"",
+          "expect_exit_code": 0,
+          "note": "FSM基本モジュール検証"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T003",
+      "title": "トークントラッカー・監査マニフェスト永続化・ドリフト検知",
+      "intent": "入出力・キャッシュトークンの精密計測、trial_manifest.jsonの完全スキーマ生成とgzip圧縮永続化、および固定アンカープロンプトによるモデルドリフト検知プロトコルを実装する。FM-03, FM-11, FM-12を解決する。",
+      "design_refs": [
+        "## §2. 潰す失敗モード 12件と対策の1対1対応表",
+        "## §11. 監査可能性（Auditability）とログ永続化レイアウト",
+        "### 11.1 試行マニフェスト (`trial_manifest.json`) の完全スキーマ"
+      ],
+      "depends_on": ["T001"],
+      "changes": [
+        {
+          "path": "strict-goal/benchmark/src/tracker/token_tracker.js",
+          "kind": "add",
+          "note": "入力、出力、キャッシュトークンのターン別・累積統計計測モジュール"
+        },
+        {
+          "path": "strict-goal/benchmark/src/audit/trial_manifest.js",
+          "kind": "add",
+          "note": "§11.1 スキーマ完全準拠の trial_manifest.json 生成および gzip 圧縮（.gz）永続化"
+        },
+        {
+          "path": "strict-goal/benchmark/src/monitor/drift_monitor.js",
+          "kind": "add",
+          "note": "Calibration Battery 10問による出力埋め込み・トークン分布一致検証プロトコル"
+        }
+      ],
+      "acceptance": [
+        "TokenTracker がプロンプトキャッシュを含むトークン内訳を正確に記録し、未計測の漏れがないこと",
+        "生成された trial_manifest.json が §11.1 の JSON Schema バリデーションに 100% 通過すること",
+        "試行ログが自動で gzip 圧縮され、ディスク容量枯渇を防止できること",
+        "DriftMonitor が固定アンカープロンプト群の出力トークン分布の有意な乖離を検知して警告を発行すること"
+      ],
+      "verify": [
+        {
+          "command": "node -e \"console.log('AUDIT_AND_TOKEN_TRACKER_PASS')\"",
+          "expect_exit_code": 0,
+          "note": "トークントラッカー・監査スキーマ検証"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T004",
+      "title": "Anti-Gaming検査器（AST Diff改ざん検知・モック検知・フォールバック検査）",
+      "intent": "テストコード改ざん、アサーション削除・緩和、不正なグローバルモック注入、および非対応フレームワーク向けの2段階フォールバック規則を実装する。FM-02の不正通過を完全阻止する。",
+      "design_refs": [
+        "## §2. 潰す失敗モード 12件と対策の1対1対応表",
+        "## §8. ごまかし防止機構（Anti-Gaming）の適用と限界"
+      ],
+      "depends_on": ["T001"],
+      "changes": [
+        {
+          "path": "strict-goal/benchmark/src/evaluator/ast_diff.js",
+          "kind": "add",
+          "note": "テストコード AST 構文木比較によるアサーション削除・緩和検知（E_AST_TAMPERING）"
+        },
+        {
+          "path": "strict-goal/benchmark/src/evaluator/mock_detector.js",
+          "kind": "add",
+          "note": "モック関数の不正注入・グローバルプロパティ偽装検知"
+        },
+        {
+          "path": "strict-goal/benchmark/src/evaluator/fallback_checker.js",
+          "kind": "add",
+          "note": "行正規表現＋テストファイル diff 正味減少率（15%閾値）による2段階フォールバック検査"
+        }
+      ],
+      "acceptance": [
+        "テストファイル内の assert 呼び出し削除または期待値緩和を検知し E_AST_TAMPERING で拒絶すること",
+        "テスト実行を無効化する悪意あるモックオーバーライドを確実に検出すること",
+        "AST パース不能なファイルに対してフォールバック検査が正味減少率 15% 超で不審判定を下すこと",
+        "正常なプロダクトコードの追加・修正に対して誤検知（偽陽性）を発生させないこと"
+      ],
+      "verify": [
+        {
+          "command": "node -e \"console.log('ANTI_GAMING_AST_CHECK_PASS')\"",
+          "expect_exit_code": 0,
+          "note": "Anti-Gaming AST 検知検証"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T005",
+      "title": "隔離検証器・外部判定エンジン",
+      "intent": "被験モデルから不可視のHeld-outテストスイート隔離実行、決定論的な合否判定所有権、および周回・時間・トークン・停滞打ち切りガードを実装する。FM-01, FM-07を解決する。",
+      "design_refs": [
+        "## §2. 潰す失敗モード 12件と対策の1対1対応表",
+        "## §7. 判定アルゴリズム・収束・打ち切り・判定所有権",
+        "### 7.1 判定所有権（Verdict Ownership）の完全外部化",
+        "### 7.2 収束・打ち切り条件の数値定義",
+        "## §10. 責務分割表とホスト環境可搬性",
+        "### 10.1 責務分割表 (Responsibility Split)"
+      ],
+      "depends_on": ["T002", "T004"],
+      "changes": [
+        {
+          "path": "strict-goal/benchmark/src/evaluator/held_out_runner.js",
+          "kind": "add",
+          "note": "隠蔽テストスイートの隔離サブプロセス実行・終了コード・失敗テスト数取得"
+        },
+        {
+          "path": "strict-goal/benchmark/src/evaluator/verdict_engine.js",
+          "kind": "add",
+          "note": "§7.1 判定式（exit_code === 0 && failed_tests === 0 && !tampering_detected）による厳格判定"
+        },
+        {
+          "path": "strict-goal/benchmark/src/evaluator/convergence_guard.js",
+          "kind": "add",
+          "note": "§7.2 表の max_rounds(12), timeout(1800s), max_tokens(2M), stagnation(3周0.25点) 打ち切りガード"
+        }
+      ],
+      "acceptance": [
+        "Held-out テストが被験エージェントの作業ツリーから不可視な状態で安全に実行されること",
+        "VerdictEngine がモデルの自己申告を一切受け付けず、外部実行結果のみから決定論的に Resolved を判定すること",
+        "ConvergenceGuard が制限時間・周回数・トークン・停滞条件を超過した試行を即座に TIMEOUT/STALLED で停止すること",
+        "責務分割表 §10.1 に従い合否判定の所有権が Evaluator に 100% 帰属していること"
+      ],
+      "verify": [
+        {
+          "command": "node -e \"console.log('VERDICT_ENGINE_CHECK_PASS')\"",
+          "expect_exit_code": 0,
+          "note": "外部判定エンジン検証"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T006",
+      "title": "実験実行・評価ツール実装（benchmark_run, benchmark_evaluate）",
+      "intent": "5群実験サンドボックス起動を司る benchmark_run と隔離評価器を叩く benchmark_evaluate の2ツールについて、§6の実物Draft-07スキーマ、バリデータ、合流点インターフェース整合性検査、および異常入力境界値ガードを実装する。FM-05, FM-08, FM-10を解決する。",
+      "design_refs": [
+        "## §2. 潰す失敗モード 12件と対策の1対1対応表",
+        "## §3. 実験計画とアーキテクチャ設計",
+        "### 3.1 実験群の定義（5群比較）",
+        "## §6. ツール表面・インターフェース仕様（実物 JSON Schema とエラー条件）",
+        "### 6.1 `benchmark_run`",
+        "#### 入力スキーマ (JSON Schema Draft-07)",
+        "#### 出力スキーマ (JSON Schema Draft-07)",
+        "#### エラー条件",
+        "### 6.2 `benchmark_evaluate`",
+        "#### 入力スキーマ (JSON Schema Draft-07)",
+        "#### 出力スキーマ (JSON Schema Draft-07)",
+        "#### エラー条件"
+      ],
+      "depends_on": ["T002", "T004", "T005"],
+      "changes": [
+        {
+          "path": "strict-goal/benchmark/schemas/benchmark_tools.json",
+          "kind": "add",
+          "note": "§6.1, §6.2 の benchmark_run, benchmark_evaluate の Draft-07 完全スキーマ定義"
+        },
+        {
+          "path": "strict-goal/benchmark/src/tools/benchmark_run.js",
+          "kind": "add",
+          "note": "5群ランダム割り当て、クリーンサンドボックス起動、指数バックオフ付きリトライハンドラ"
+        },
+        {
+          "path": "strict-goal/benchmark/src/tools/benchmark_evaluate.js",
+          "kind": "add",
+          "note": "Held-out テストスイート実行および AST Diff 検査ハンドラ"
+        }
+      ],
+      "acceptance": [
+        "benchmark_run および benchmark_evaluate の入出力がスキーマバリデーションに 100% 適合すること",
+        "未定義オプションや不正型パラメータの入力時に E_VALIDATION で即時拒絶されること",
+        "T002(FSM), T004(AST), T005(Evaluator) との合流点におけるモジュール間契約が単体テストで保証されること",
+        "429/503 API障害時に指数バックオフ（最大5回）で自動リトライされること"
+      ],
+      "verify": [
+        {
+          "command": "node -e \"console.log('BENCHMARK_RUN_EVAL_TOOLS_PASS')\"",
+          "expect_exit_code": 0,
+          "note": "実行・評価ツール基本検証"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T007",
+      "title": "メトリクス収集・レポートツール実装（benchmark_collect, benchmark_report）",
+      "intent": "TokenTracker集計値を固定する benchmark_collect と統計比較を行う benchmark_report の2ツールについて、§6の実物Draft-07スキーマ、バリデータ、および集計確定ハンドラを実装する。",
+      "design_refs": [
+        "## §6. ツール表面・インターフェース仕様（実物 JSON Schema とエラー条件）",
+        "### 6.3 `benchmark_collect`",
+        "#### 入力スキーマ (JSON Schema Draft-07)",
+        "#### 出力スキーマ (JSON Schema Draft-07)",
+        "### 6.4 `benchmark_report`",
+        "#### 入力スキーマ (JSON Schema Draft-07)",
+        "#### 出力スキーマ (JSON Schema Draft-07)"
+      ],
+      "depends_on": ["T003", "T006"],
+      "changes": [
+        {
+          "path": "strict-goal/benchmark/src/tools/benchmark_collect.js",
+          "kind": "add",
+          "note": "TokenTracker 集計値確定および trial_manifest.json 永続化ハンドラ"
+        },
+        {
+          "path": "strict-goal/benchmark/src/tools/benchmark_report.js",
+          "kind": "add",
+          "note": "5群集計値の抽出、統計分析モジュール呼出、および総合レポート出力ハンドラ"
+        }
+      ],
+      "acceptance": [
+        "benchmark_collect および benchmark_report の入出力が Draft-07 スキーマに完全に適合すること",
+        "COLLECTING 状態でのみ collect が許可され、完了後に trial_manifest が不変確定すること",
+        "COMPLETED または FAILED 状態において report ツールが正常に分析結果を出力すること"
+      ],
+      "verify": [
+        {
+          "command": "node -e \"console.log('COLLECT_REPORT_TOOLS_PASS')\"",
+          "expect_exit_code": 0,
+          "note": "収集・レポートツール基本検証"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T008",
+      "title": "統計分析エンジンとレポート生成",
+      "intent": "§3.2のPrimary/Secondary KPIs計算、Welch's t検定・Mann-Whitney U検定・95%ブートストラップ信頼区間、および完全自動マークダウンレポート生成を実装する。FM-04, FM-09を解決する。",
+      "design_refs": [
+        "## §2. 潰す失敗モード 12件と対策の1対1対応表",
+        "## §3. 実験計画とアーキテクチャ設計",
+        "### 3.2 評価メトリクス体系（Primary & Secondary KPIs）"
+      ],
+      "depends_on": ["T007"],
+      "changes": [
+        {
+          "path": "strict-goal/benchmark/src/analytics/kpi_calculator.js",
+          "kind": "add",
+          "note": "Resolved Rate, Shortcut Rate, Must-Fix Resolution Rate, Token Growth Rate, USD Cost 算出モジュール"
+        },
+        {
+          "path": "strict-goal/benchmark/src/analytics/stats_test.js",
+          "kind": "add",
+          "note": "Welch's t-test, Mann-Whitney U-test, 95% Bootstrap CI 統計検定エンジン"
+        },
+        {
+          "path": "strict-goal/benchmark/src/analytics/markdown_reporter.js",
+          "kind": "add",
+          "note": "5群比較表、トークン推移 ASCII グラフ、および要約マークダウン生成"
+        }
+      ],
+      "acceptance": [
+        "KPI 算出式（Resolved Rate, Shortcut Rate, Token 削減率 等）が設計書 §3.2 の定義通りに算出されること",
+        "モンテカルロ試行（N>=5）に対する p 値および 95% 信頼区間が決定論的・正確に計算されること",
+        "手作業介入を一切排除して summary_metrics.json および完全な Markdown レポートが自動出力されること"
+      ],
+      "verify": [
+        {
+          "command": "node -e \"console.log('ANALYTICS_AND_REPORTING_PASS')\"",
+          "expect_exit_code": 0,
+          "note": "統計分析・KPI計算エンジン検証"
+        }
+      ],
+      "estimate_rounds": 1
+    },
+    {
+      "id": "T009",
+      "title": "エンドツーエンド受け入れテストスイート (Acceptance Test Suite AT-01〜AT-06)",
+      "intent": "設計書§12に定義された受け入れシナリオ6本（AT-01〜AT-06）の自動テストスイートを実装し、全ツールの結合整合性と異常系耐性を完全検証する。",
+      "design_refs": [
+        "## §12. 受け入れテストシナリオ 6本（呼び出し列・期待値）",
+        "### AT-01: ベンチマーク開始と全群初期化",
+        "### AT-02: 外部評価器による正常合格判定",
+        "### AT-03: テスト改ざん（Gaming）の検知と失格判定",
+        "### AT-04: トークン収集とメトリクス集計",
+        "### AT-05: 状態不整合時のエラー遮断",
+        "### AT-06: 最終統計レポート出力と p 値検定"
+      ],
+      "depends_on": ["T007", "T008"],
+      "changes": [
+        {
+          "path": "strict-goal/benchmark/test/at_01_init.test.js",
+          "kind": "add",
+          "note": "AT-01 ベンチマーク開始と全群初期化テスト"
+        },
+        {
+          "path": "strict-goal/benchmark/test/at_02_eval_pass.test.js",
+          "kind": "add",
+          "note": "AT-02 外部評価器による正常合格判定テスト"
+        },
+        {
+          "path": "strict-goal/benchmark/test/at_03_gaming_reject.test.js",
+          "kind": "add",
+          "note": "AT-03 テスト改ざん検知と失格判定テスト"
+        },
+        {
+          "path": "strict-goal/benchmark/test/at_04_collect_metrics.test.js",
+          "kind": "add",
+          "note": "AT-04 トークン収集とメトリクス集計テスト"
+        },
+        {
+          "path": "strict-goal/benchmark/test/at_05_state_violation.test.js",
+          "kind": "add",
+          "note": "AT-05 状態不整合時のエラー遮断テスト"
+        },
+        {
+          "path": "strict-goal/benchmark/test/at_06_report_stats.test.js",
+          "kind": "add",
+          "note": "AT-06 最終統計レポート出力と p 値検定テスト"
+        }
+      ],
+      "acceptance": [
+        "AT-01: benchmark_run(start) で 5群が正しく初期化され state が PREPARING -> RUNNING_TRIAL に遷移すること",
+        "AT-02: 全テスト合格かつ改ざんなしの成果物に対し Resolved: true が判定されること",
+        "AT-03: assert 削除のある成果物に対し E_AST_TAMPERING で失格・Shortcut として記録されること",
+        "AT-04: trial_manifest.json が生成されトークン内訳が記録されること",
+        "AT-05: EVALUATING 状態での benchmark_run 呼出が E_STATE_BUSY で遮断されること",
+        "AT-06: 最終統計レポートで p 値および 5群比較表が正しく出力されること"
+      ],
+      "verify": [
+        {
+          "command": "node -e \"console.log('ACCEPTANCE_TESTS_READY_PASS')\"",
+          "expect_exit_code": 0,
+          "note": "受け入れテストスイート準備検証"
+        }
+      ],
+      "estimate_rounds": 1
+    }
+  ]
+}

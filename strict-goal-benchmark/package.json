@@ -1,0 +1,30 @@
+{
+  "name": "@strict-goal/benchmark",
+  "version": "1.0.0",
+  "description": "Quantitative benchmark harness and evaluation framework for strict-goal MCP",
+  "type": "module",
+  "main": "./src/index.js",
+  "bin": {
+    "strict-benchmark": "./bin/runner.js"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "lint": "eslint src/ test/",
+    "check-manifest": "node ./bin/check-manifest.js"
+  },
+  "keywords": [
+    "mcp",
+    "benchmark",
+    "evaluation",
+    "strict-goal",
+    "rubric-loop"
+  ],
+  "author": "strict-goal team",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.0"
+  }
+}

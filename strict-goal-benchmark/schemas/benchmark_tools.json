@@ -1,0 +1,209 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "StrictGoalBenchmarkTools",
+  "definitions": {
+    "benchmark_run_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "submission_id"],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["start", "resume", "status", "abort"]
+        },
+        "submission_id": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 128
+        },
+        "bench_id": {
+          "type": "string",
+          "pattern": "^bn_[0-9A-HJKMNP-TV-Z]{26}$"
+        },
+        "target_groups": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["vanilla", "prompt_rubric", "default_goal", "strict_single", "strict_hierarchical"]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "task_suite": {
+          "type": "string",
+          "enum": ["swe_bench_lite", "tdd_synthetic", "deceptive_invariants", "full_battery"]
+        },
+        "seeds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "max_rounds_per_trial": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        }
+      }
+    },
+    "benchmark_run_output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "bench_id", "state", "total_trials", "completed_trials"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "bench_id": {
+          "type": "string",
+          "pattern": "^bn_[0-9A-HJKMNP-TV-Z]{26}$"
+        },
+        "state": {
+          "type": "string",
+          "enum": ["INIT", "PREPARING", "RUNNING_TRIAL", "EVALUATING", "COLLECTING", "COMPLETED", "FAILED", "ABORTED"]
+        },
+        "total_trials": { "type": "integer", "minimum": 0 },
+        "completed_trials": { "type": "integer", "minimum": 0 },
+        "current_trial": {
+          "type": "object",
+          "properties": {
+            "trial_id": { "type": "string" },
+            "group": { "type": "string" },
+            "task_id": { "type": "string" },
+            "seed": { "type": "integer" }
+          }
+        }
+      }
+    },
+    "benchmark_evaluate_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bench_id", "trial_id", "submission_id"],
+      "properties": {
+        "bench_id": {
+          "type": "string",
+          "pattern": "^bn_[0-9A-HJKMNP-TV-Z]{26}$"
+        },
+        "trial_id": {
+          "type": "string",
+          "pattern": "^tr_[0-9A-HJKMNP-TV-Z]{26}$"
+        },
+        "submission_id": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 128
+        },
+        "test_command": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 1000
+        },
+        "test_timeout_sec": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 600
+        }
+      }
+    },
+    "benchmark_evaluate_output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "trial_id", "resolved", "tests_passed", "tests_total", "tampering_detected"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "trial_id": { "type": "string" },
+        "resolved": { "type": "boolean" },
+        "tests_passed": { "type": "integer", "minimum": 0 },
+        "tests_total": { "type": "integer", "minimum": 0 },
+        "tampering_detected": { "type": "boolean" },
+        "tampering_details": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "exit_code": { "type": "integer" }
+      }
+    },
+    "benchmark_collect_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bench_id", "trial_id", "submission_id"],
+      "properties": {
+        "bench_id": { "type": "string", "pattern": "^bn_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "trial_id": { "type": "string", "pattern": "^tr_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "submission_id": { "type": "string", "minLength": 8, "maxLength": 128 }
+      }
+    },
+    "benchmark_collect_output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "trial_id", "tokens", "cost_usd", "rounds_count", "final_verdict"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "trial_id": { "type": "string" },
+        "tokens": {
+          "type": "object",
+          "required": ["prompt_tokens", "completion_tokens", "cached_tokens", "total_tokens"],
+          "properties": {
+            "prompt_tokens": { "type": "integer", "minimum": 0 },
+            "completion_tokens": { "type": "integer", "minimum": 0 },
+            "cached_tokens": { "type": "integer", "minimum": 0 },
+            "total_tokens": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "cost_usd": { "type": "number", "minimum": 0.0 },
+        "rounds_count": { "type": "integer", "minimum": 1 },
+        "final_verdict": { "type": "string", "enum": ["FINAL", "REVISE", "ABORTED", "TIMEOUT"] }
+      }
+    },
+    "benchmark_report_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bench_id", "submission_id"],
+      "properties": {
+        "bench_id": { "type": "string", "pattern": "^bn_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "submission_id": { "type": "string", "minLength": 8, "maxLength": 128 },
+        "format": { "type": "string", "enum": ["all", "json", "markdown", "csv"], "default": "all" },
+        "confidence_level": { "type": "number", "minimum": 0.80, "maximum": 0.99, "default": 0.95 }
+      }
+    },
+    "benchmark_report_output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "bench_id", "comparison_table", "statistical_significance", "report_paths"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "bench_id": { "type": "string" },
+        "comparison_table": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["group", "resolved_rate", "shortcut_rate", "avg_tokens", "avg_cost_usd", "avg_rounds"],
+            "properties": {
+              "group": { "type": "string" },
+              "resolved_rate": { "type": "number" },
+              "shortcut_rate": { "type": "number" },
+              "avg_tokens": { "type": "integer" },
+              "avg_cost_usd": { "type": "number" },
+              "avg_rounds": { "type": "number" },
+              "characteristics": { "type": "string" }
+            }
+          }
+        },
+        "statistical_significance": {
+          "type": "object",
+          "required": ["p_value_pass_rate", "cohens_d_tokens", "significant"],
+          "properties": {
+            "p_value_pass_rate": { "type": "number" },
+            "cohens_d_tokens": { "type": "number" },
+            "significant": { "type": "boolean" }
+          }
+        },
+        "report_paths": {
+          "type": "object",
+          "properties": {
+            "markdown": { "type": "string" },
+            "json": { "type": "string" },
+            "csv": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

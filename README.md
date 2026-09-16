@@ -86,7 +86,7 @@ Every round records artifact snapshots, diffs, self-scores, rationale, evidence 
 
 | Tool | Purpose | Key Inputs |
 |---|---|---|
-| `loop_open` | Start a new loop or resume an existing session | `mode` (`create` / `resume`), `loop_mode`, `task`, `rubric_preset`, `upstream` |
+| `loop_open` | Start a new loop or resume an existing session | `mode` (`create` / `resume`), `loop_mode`, `task`, `rubric_preset`, `upstream`, `workspace_dir` |
 | `loop_state` | Retrieve current status, FSM state, active rubric, and history | `session_id`, `include` (`["rubric", "history", "upstream"]`) |
 | `artifact_commit` | Commit full artifact content or fileset for the round | `session_id`, `expected_round`, `change_note`, `content` or `files`, `addresses` |
 | `score_submit` | Submit self-evaluations across all rubric criteria | `session_id`, `scores` (`[{ criterion_id, score, rationale, weakness, evidence }]`) |
@@ -149,6 +149,15 @@ node strict-goal/server/main.js --http --port 8971 --data-dir /path/to/data
 ```
 
 Point your client to `http://127.0.0.1:8971/mcp`.
+
+#### Dynamic Workspace Routing (`workspace_dir`)
+
+IDEs sometimes reuse an already-running MCP server process across projects, leaving
+`--data-dir` pointed at a stale workspace. To avoid this, pass `workspace_dir` (your
+current workspace root) to `loop_open` — the server routes that session's persistence
+to `<workspace_dir>/.strict-goal/` regardless of where the server process was launched,
+and all subsequent calls for that `session_id`/`chain_id` (`artifact_commit`,
+`score_submit`, etc.) are automatically routed to the same directory.
 
 ---
 

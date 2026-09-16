@@ -85,7 +85,7 @@ LLMエージェントがプロンプト内の自己反省（「段階的に考�
 
 | ツール名 | 役割・機能 | 主な入力引数 |
 |---|---|---|
-| `loop_open` | 新規ループセッションの開始、または既存セッションの再開 | `mode` (`create` / `resume`), `loop_mode`, `task`, `rubric_preset`, `upstream` |
+| `loop_open` | 新規ループセッションの開始、または既存セッションの再開 | `mode` (`create` / `resume`), `loop_mode`, `task`, `rubric_preset`, `upstream`, `workspace_dir` |
 | `loop_state` | 現在のFSM状態・周回番号・アクティブな基準・履歴の取得 | `session_id`, `include` (`["rubric", "history", "upstream"]`) |
 | `artifact_commit` | 周回の成果物全文（Markdown等）または fileset のコミット | `session_id`, `expected_round`, `change_note`, `content` または `files`, `addresses` |
 | `score_submit` | ルーブリック全基準に対する自己評価・理由・弱点・根拠の提出 | `session_id`, `scores` (`[{ criterion_id, score, rationale, weakness, evidence }]`) |
@@ -148,6 +148,15 @@ node strict-goal/server/main.js --http --port 8971 --data-dir /path/to/data
 ```
 
 クライアントから `http://127.0.0.1:8971/mcp` を参照するように設定します。
+
+#### ワークスペースによる保存先の動的ルーティング (`workspace_dir`)
+
+IDE によっては、別プロジェクトを開いた後も既存の MCP サーバープロセスを使い回し、
+`--data-dir` が古いワークスペースを指したままになることがあります。これを避けるため、
+`loop_open` に `workspace_dir`（現在のワークスペースのルートパス）を渡すと、サーバー起動時の
+ディレクトリに関わらず、そのセッションの保存先が `<workspace_dir>/.strict-goal/` に動的ルーティングされます。
+以降の同一 `session_id` / `chain_id` に対する呼び出し（`artifact_commit` / `score_submit` など）も
+自動的に同じディレクトリへ保存されます。
 
 ---
 
