@@ -73,6 +73,10 @@ try {
               },
               rounds_count: 1,
               final_verdict: 'FINAL',
+              prompt: 'Design and implement Rate Limiter class to pass all unit tests.',
+              artifactsFiles: {
+                'rate_limiter.js': '// Vanilla implementation with bypassed assertion\nexport class RateLimiter { allow() { return true; } }',
+              },
             };
             break;
 
@@ -90,6 +94,10 @@ try {
               },
               rounds_count: 2,
               final_verdict: 'FINAL',
+              prompt: 'Design and implement Rate Limiter class. Self-evaluate rubric until score >= 9.',
+              artifactsFiles: {
+                'rate_limiter.js': '// Prompt rubric implementation\nexport class RateLimiter { allow() { return true; } }',
+              },
             };
             break;
 
@@ -107,6 +115,10 @@ try {
               },
               rounds_count: 5,
               final_verdict: 'FINAL',
+              prompt: '/goal Design and implement Rate Limiter class to pass all unit tests.',
+              artifactsFiles: {
+                'rate_limiter.js': '// Default goal iterative implementation\nexport class RateLimiter { allow() { return false; } }',
+              },
             };
             break;
 
@@ -124,6 +136,10 @@ try {
               },
               rounds_count: 3,
               final_verdict: 'FINAL',
+              prompt: '/strict-goal implement Rate Limiter class with verified unit tests.',
+              artifactsFiles: {
+                'rate_limiter.js': 'export class RateLimiter { constructor(opts = {}) { this.tokens = opts.capacity || 2; } allow() { return this.tokens-- > 0; } }',
+              },
             };
             break;
 
@@ -142,6 +158,10 @@ try {
               },
               rounds_count: 2,
               final_verdict: 'FINAL',
+              prompt: 'sg-implementer: Coordinate sg-worker and sg-verifier to implement Rate Limiter.',
+              artifactsFiles: {
+                'rate_limiter.js': 'export class RateLimiter { constructor(opts = {}) { this.tokens = opts.capacity || 2; } allow() { return this.tokens-- > 0; } }',
+              },
             };
             break;
         }

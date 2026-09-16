@@ -47,7 +47,7 @@ export function benchmarkEvaluate(input, baseDir = process.cwd(), options = {}) 
   if (test_command) {
     testResult = runHeldOutTest(test_command, {
       test_timeout_sec: test_timeout_sec || 120,
-      cwd: baseDir,
+      cwd: options.cwd || input.cwd || baseDir,
     });
   }
 

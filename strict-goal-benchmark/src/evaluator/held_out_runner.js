@@ -12,19 +12,15 @@ export function runHeldOutTest(testCommand, options = {}) {
   const cleanEnv = { ...process.env };
   delete cleanEnv.NODE_TEST_CONTEXT;
 
-  // Cross-platform shell invocation (§10.2)
-  const isWindows = process.platform === 'win32';
-  const shellCmd = isWindows ? 'cmd.exe' : '/bin/sh';
-  const shellArgs = isWindows ? ['/d', '/s', '/c', testCommand] : ['-c', testCommand];
-
   let result;
   try {
-    result = spawnSync(shellCmd, shellArgs, {
+    result = spawnSync(testCommand, {
       cwd,
       env: cleanEnv,
       timeout: timeoutMs,
       encoding: 'utf8',
       maxBuffer: 10 * 1024 * 1024,
+      shell: true,
     });
   } catch (err) {
     if (err.code === 'ETIMEDOUT') {

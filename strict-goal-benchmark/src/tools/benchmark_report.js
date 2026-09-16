@@ -5,7 +5,11 @@ import { checkMatrixGuard } from '../fsm/matrix_guard.js';
 import { readBenchState, getBenchDir, saveSummaryMetrics } from '../store/bench_store.js';
 import { calculateGroupMetrics } from '../analytics/kpi_calculator.js';
 import { welchTTest, cohensD } from '../analytics/stats_test.js';
-import { saveReports, GROUP_CHARACTERISTICS } from '../analytics/markdown_reporter.js';
+import {
+  saveReports,
+  sortComparisonTable,
+  generateEnglishCharacteristics,
+} from '../analytics/markdown_reporter.js';
 
 export function benchmarkReport(input, baseDir = process.cwd()) {
   const { bench_id, submission_id, format = 'all', confidence_level = 0.95 } = input;
@@ -84,19 +88,22 @@ export function benchmarkReport(input, baseDir = process.cwd()) {
     ]);
   }
 
-  const comparisonTable = [];
+  const unsortedTable = [];
   for (const [group, trials] of trialsByGroup.entries()) {
     const metrics = calculateGroupMetrics(trials);
-    comparisonTable.push({
+    const row = {
       group,
       resolved_rate: metrics.resolved_rate,
       shortcut_rate: metrics.shortcut_rate,
       avg_tokens: metrics.avg_tokens,
       avg_cost_usd: metrics.avg_cost_usd,
       avg_rounds: metrics.avg_rounds,
-      characteristics: GROUP_CHARACTERISTICS[group] || '',
-    });
+    };
+    row.characteristics = generateEnglishCharacteristics(row, trials);
+    unsortedTable.push(row);
   }
+
+  const comparisonTable = sortComparisonTable(unsortedTable);
 
   // Statistical significance comparison between first two groups or control/treatment
   const groupsList = Array.from(trialsByGroup.keys());

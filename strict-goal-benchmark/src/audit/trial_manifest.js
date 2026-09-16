@@ -1,5 +1,5 @@
 import { gzipSync } from 'node:zlib';
-import { writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { writeFileSync, existsSync, mkdirSync, copyFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { ERROR_CODES, fail } from '../errors/codes.js';
 
@@ -46,6 +46,9 @@ export function createTrialManifest({
   started_at,
   finished_at,
   token_summary,
+  prompt,
+  artifacts,
+  error,
   fsm_history = [],
   ground_truth_eval = { resolved: false, tests_passed: 0, tests_total: 0, tampering_detected: false },
 }) {
@@ -80,8 +83,52 @@ export function createTrialManifest({
     },
   };
 
+  if (prompt !== undefined) manifest.prompt = prompt;
+  if (artifacts !== undefined) manifest.artifacts = artifacts;
+  if (error !== undefined) manifest.error = error;
+
   validateTrialManifest(manifest);
   return manifest;
+}
+
+export function saveTrialArtifacts(dirPath, { prompt, artifactsDir, files } = {}) {
+  if (!existsSync(dirPath)) {
+    mkdirSync(dirPath, { recursive: true });
+  }
+
+  // 1. Save prompt text if provided
+  if (prompt) {
+    writeFileSync(path.join(dirPath, 'prompt.txt'), prompt, 'utf8');
+  }
+
+  // 2. Save artifacts directory if provided
+  const targetArtifactsDir = path.join(dirPath, 'artifacts');
+  if (artifactsDir && existsSync(artifactsDir)) {
+    if (!existsSync(targetArtifactsDir)) {
+      mkdirSync(targetArtifactsDir, { recursive: true });
+    }
+    const entries = readdirSync(artifactsDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isFile()) {
+        copyFileSync(
+          path.join(artifactsDir, entry.name),
+          path.join(targetArtifactsDir, entry.name)
+        );
+      }
+    }
+  }
+
+  // 3. Save explicit files map if provided: { filename: content }
+  if (files && typeof files === 'object') {
+    if (!existsSync(targetArtifactsDir)) {
+      mkdirSync(targetArtifactsDir, { recursive: true });
+    }
+    for (const [filename, content] of Object.entries(files)) {
+      writeFileSync(path.join(targetArtifactsDir, filename), content, 'utf8');
+    }
+  }
+
+  return { targetArtifactsDir };
 }
 
 export function saveTrialManifestFiles(dirPath, manifest, compressGz = true) {

@@ -7,7 +7,11 @@ import {
   writeBenchState,
   getBenchDir,
 } from '../store/bench_store.js';
-import { createTrialManifest, saveTrialManifestFiles } from '../audit/trial_manifest.js';
+import {
+  createTrialManifest,
+  saveTrialManifestFiles,
+  saveTrialArtifacts,
+} from '../audit/trial_manifest.js';
 
 export function benchmarkCollect(input, baseDir = process.cwd(), options = {}) {
   const { bench_id, trial_id, submission_id } = input;
@@ -44,6 +48,14 @@ export function benchmarkCollect(input, baseDir = process.cwd(), options = {}) {
   const finalVerdict = options.final_verdict || (evalResult.resolved ? 'FINAL' : 'REVISE');
 
   const trialDir = path.join(getBenchDir(baseDir, bench_id), 'trials', trial_id);
+
+  // Save prompt and artifact files to trial directory
+  saveTrialArtifacts(trialDir, {
+    prompt: options.prompt,
+    artifactsDir: options.artifactsDir,
+    files: options.artifactsFiles,
+  });
+
   const trialManifest = createTrialManifest({
     trial_id,
     bench_id,
@@ -53,6 +65,8 @@ export function benchmarkCollect(input, baseDir = process.cwd(), options = {}) {
     started_at: options.started_at || new Date(Date.now() - 60000).toISOString(),
     finished_at: options.finished_at || new Date().toISOString(),
     token_summary: tokenSummary,
+    prompt: options.prompt,
+    error: options.error,
     fsm_history: options.fsm_history || [
       {
         round: 1,
