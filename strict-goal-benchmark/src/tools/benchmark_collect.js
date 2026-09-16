@@ -11,6 +11,7 @@ import {
   createTrialManifest,
   saveTrialManifestFiles,
   saveTrialArtifacts,
+  syncTrialSpecificationToTrials,
 } from '../audit/trial_manifest.js';
 
 export function benchmarkCollect(input, baseDir = process.cwd(), options = {}) {
@@ -47,7 +48,8 @@ export function benchmarkCollect(input, baseDir = process.cwd(), options = {}) {
   const roundsCount = options.rounds_count !== undefined ? options.rounds_count : 2;
   const finalVerdict = options.final_verdict || (evalResult.resolved ? 'FINAL' : 'REVISE');
 
-  const trialDir = path.join(getBenchDir(baseDir, bench_id), 'trials', trial_id);
+  const trialsDir = path.join(getBenchDir(baseDir, bench_id), 'trials');
+  const trialDir = path.join(trialsDir, trial_id);
 
   // Save prompt and artifact files to trial directory
   saveTrialArtifacts(trialDir, {
@@ -55,6 +57,19 @@ export function benchmarkCollect(input, baseDir = process.cwd(), options = {}) {
     artifactsDir: options.artifactsDir,
     files: options.artifactsFiles,
   });
+
+  const group = state.current_trial?.group || 'strict_hierarchical';
+  syncTrialSpecificationToTrials(
+    trialsDir,
+    trial_id,
+    group,
+    [
+      path.join(trialDir, 'artifacts'),
+      options.artifactsDir,
+      trialDir,
+    ],
+    options.artifactsFiles
+  );
 
   const generatedFsmHistory = options.fsm_history || (
     roundsCount <= 1

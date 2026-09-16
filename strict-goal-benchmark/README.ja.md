@@ -55,12 +55,12 @@ node strict-goal-benchmark/bin/runner.js resume --bench-id <bench_id>
 Claude Code CLI、Google Antigravity CLI (`agy`)、Codex CLI (`codex`) などの実体エージェントに具体的な指示（「〇〇を設計・実装して」）を与え、生成コードに対して隠蔽テスト（Held-out Suite）を実行して客観的スコア・トークン消費量を比較測定します。
 
 ```bash
-# エージェント CLI をヘッドレス起動して 5群自動計測（--agent claude | agy | codex）
+# エージェント CLI をヘッドレス起動して 4群自動計測（--agent claude | agy | codex）
 node strict-goal-benchmark/bin/run-agent-benchmark.js start \
   --agent agy \
   --instruction "Rate Limiter クラスを設計・実装し、単体テストをパスさせてください" \
   --test "strict-goal-benchmark/test/held_out/rate_limiter.test.js" \
-  --groups vanilla,prompt_rubric,default_goal,strict_single,strict_hierarchical \
+  --groups vanilla,prompt_rubric,default_goal,strict_hierarchical \
   --timeout 1800
 
 # 長文仕様書ファイルを指定して実行 (--instruction-file)
@@ -81,7 +81,6 @@ node strict-goal-benchmark/bin/run-agent-benchmark.js start --agent echo
 | **vanilla** | `<instruction>` | なし（単発プロンプト） |
 | **prompt_rubric** | `<instruction>` + ルーブリック自己評価反復指示 | なし（プロンプトのみで9点以上主張を強制） |
 | **default_goal** | `/goal <instruction>` | 標準 `/goal` コマンド |
-| **strict_single** | `/strict-goal implement <instruction>` | `strict-goal` MCP（単体ループ） |
 | **strict_hierarchical** | `sg-implementer として、sg-worker と sg-verifier を用いて完遂` | `strict-goal` MCP（階層サブエージェント） |
 
 ### 3.3 プログラマティック API 利用
@@ -98,7 +97,7 @@ import { benchmarkReport } from './src/tools/benchmark_report.js';
 const run = benchmarkRun({
   action: 'start',
   submission_id: 'sub_001_demo',
-  target_groups: ['vanilla', 'strict_single'],
+  target_groups: ['vanilla', 'strict_hierarchical'],
 });
 
 // 2. 外部隔離評価

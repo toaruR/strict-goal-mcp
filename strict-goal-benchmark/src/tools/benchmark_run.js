@@ -34,7 +34,6 @@ export function benchmarkRun(input, baseDir = process.cwd()) {
       'vanilla',
       'prompt_rubric',
       'default_goal',
-      'strict_single',
       'strict_hierarchical',
     ];
     const seeds = input.seeds || DEFAULTS.default_seeds;

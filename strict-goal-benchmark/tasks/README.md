@@ -1,6 +1,6 @@
 # ベンチマーク評価タスク・プロンプト集 (`strict-goal-benchmark/tasks/`)
 
-本ディレクトリには、交絡バイアス（中間成果物の質やプロンプト指示の非対称性）を完全に排除し、**5群共通の同一初期要求からスタートして公平に比較測定するための2種類の標準タスク**を格納しています。
+本ディレクトリには、交絡バイアス（中間成果物の質やプロンプト指示の非対称性）を完全に排除し、**4群共通の同一初期要求からスタートして公平に比較測定するための2種類の標準タスク**を格納しています。
 
 ---
 
@@ -32,7 +32,7 @@
 node strict-goal-benchmark/bin/run-agent-benchmark.js start \
   --agent codex \
   --instruction-file "strict-goal-benchmark/tasks/01_design.md" \
-  --groups vanilla,prompt_rubric,default_goal,strict_single,strict_hierarchical \
+  --groups vanilla,prompt_rubric,default_goal,strict_hierarchical \
   --timeout 1800
 ```
 
@@ -42,7 +42,7 @@ node strict-goal-benchmark/bin/run-agent-benchmark.js start \
   --agent agy \
   --instruction-file "strict-goal-benchmark/tasks/02_e2e.md" \
   --test "strict-goal-benchmark/test/held_out/rate_limiter.test.js" \
-  --groups vanilla,prompt_rubric,default_goal,strict_single,strict_hierarchical \
+  --groups vanilla,prompt_rubric,default_goal,strict_hierarchical \
   --timeout 1800
 ```
 

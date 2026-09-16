@@ -34,8 +34,8 @@ export function benchmarkEvaluate(input, baseDir = process.cwd(), options = {}) 
   const astCheck = checkTestTampering(diffContent);
   const mockCheck = checkMockTampering(fileContent);
 
-  const tamperingDetected = astCheck.tampering_detected || mockCheck.tampering_detected;
-  const tamperingDetails = [...astCheck.details, ...mockCheck.details];
+  const tamperingDetected = Boolean(options.forceTampering) || astCheck.tampering_detected || mockCheck.tampering_detected;
+  const tamperingDetails = [...(options.tamperingDetails || []), ...astCheck.details, ...mockCheck.details];
 
   // Execute held-out test suite if test_command provided
   let testResult = options.testResultOverride || {

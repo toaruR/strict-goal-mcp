@@ -5,7 +5,6 @@ export const GROUP_DISPLAY_ORDER = [
   'vanilla',
   'prompt_rubric',
   'default_goal',
-  'strict_single',
   'strict_hierarchical',
 ];
 
@@ -86,7 +85,7 @@ export function generateEnglishCharacteristics(row, trials = []) {
 
 /**
  * Sorts comparison table by the canonical order:
- * vanilla -> prompt_rubric -> default_goal -> strict_single -> strict_hierarchical
+ * vanilla -> prompt_rubric -> default_goal -> strict_hierarchical
  */
 export function sortComparisonTable(table) {
   return [...table].sort((a, b) => {

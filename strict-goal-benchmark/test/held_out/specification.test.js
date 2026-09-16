@@ -19,9 +19,9 @@ test('Held-out Suite: Specification verification', async () => {
 
   const lower = content.toLowerCase();
 
-  // 1. API Interface check
-  const hasInterface = lower.includes('ratelimiter') || lower.includes('windowms') || lower.includes('maxrequests') || lower.includes('allow(');
-  assert.ok(hasInterface, 'Specification must define RateLimiter interface, options (windowMs, maxRequests), or methods');
+  // 1. API Interface check (algorithm/API naming is left to the candidate, so match on the concept, not fixed identifiers)
+  const hasInterface = lower.includes('インターフェース') || lower.includes('interface') || lower.includes('引数') || lower.includes('戻り値') || lower.includes('クラス') || lower.includes('メソッド') || lower.includes('関数');
+  assert.ok(hasInterface, 'Specification must define an externally callable interface (class/function, arguments, return values)');
 
   // 2. Boundary condition / edge cases check
   const hasBoundary = lower.includes('boundary') || lower.includes('境界') || lower.includes('エッジケース') || lower.includes('edge') || lower.includes('補間') || lower.includes('offset');

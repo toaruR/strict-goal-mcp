@@ -241,7 +241,7 @@ statement: 外部インタフェースが名前・入力スキーマ・出力ス
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["vanilla", "prompt_rubric", "default_goal", "strict_single", "strict_hierarchical"]
+        "enum": ["vanilla", "prompt_rubric", "default_goal", "strict_hierarchical"]
       },
       "minItems": 1,
       "uniqueItems": true

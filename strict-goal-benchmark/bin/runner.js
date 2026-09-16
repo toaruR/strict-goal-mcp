@@ -30,7 +30,7 @@ try {
     case 'run': {
       const groups = options.groups
         ? options.groups.split(',')
-        : ['vanilla', 'prompt_rubric', 'default_goal', 'strict_single', 'strict_hierarchical'];
+        : ['vanilla', 'prompt_rubric', 'default_goal', 'strict_hierarchical'];
       const seeds = parseInt(options.seeds || '1', 10);
       const taskSuite = options.suite || 'tdd_synthetic';
 
@@ -122,26 +122,6 @@ try {
             };
             break;
 
-          case 'strict_single':
-            evalOptions = {
-              testResultOverride: { exit_code: 0, tests_passed: 10, tests_total: 10 },
-            };
-            collectOptions = {
-              tokenSummary: {
-                prompt_tokens: 245000,
-                completion_tokens: 38000,
-                cached_tokens: 110000,
-                total_tokens: 283000,
-                estimated_cost_usd: 0.852,
-              },
-              rounds_count: 3,
-              final_verdict: 'FINAL',
-              prompt: '/strict-goal implement Rate Limiter class with verified unit tests.',
-              artifactsFiles: {
-                'rate_limiter.js': 'export class RateLimiter { constructor(opts = {}) { this.tokens = opts.capacity || 2; } allow() { return this.tokens-- > 0; } }',
-              },
-            };
-            break;
 
           case 'strict_hierarchical':
           default:

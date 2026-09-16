@@ -10,6 +10,7 @@ import {
   sortComparisonTable,
   generateEnglishCharacteristics,
 } from '../analytics/markdown_reporter.js';
+import { syncTrialSpecificationToTrials } from '../audit/trial_manifest.js';
 
 export function benchmarkReport(input, baseDir = process.cwd()) {
   const { bench_id, submission_id, format = 'all', confidence_level = 0.95 } = input;
@@ -40,6 +41,10 @@ export function benchmarkReport(input, baseDir = process.cwd()) {
         try {
           const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
           const g = manifest.group || 'default';
+          syncTrialSpecificationToTrials(trialsDir, tId, g, [
+            path.join(trialsDir, tId, 'artifacts'),
+            path.join(trialsDir, tId),
+          ]);
           if (!trialsByGroup.has(g)) trialsByGroup.set(g, []);
           trialsByGroup.get(g).push(manifest);
         } catch {
@@ -70,13 +75,6 @@ export function benchmarkReport(input, baseDir = process.cwd()) {
         resource_usage: { total_tokens: 150000, estimated_cost_usd: 0.45 },
         fsm_history: [{}],
         ground_truth_eval: { resolved: false, tampering_detected: false },
-      },
-    ]);
-    trialsByGroup.set('strict_single', [
-      {
-        resource_usage: { total_tokens: 135000, estimated_cost_usd: 0.405 },
-        fsm_history: [{}, {}],
-        ground_truth_eval: { resolved: true, tampering_detected: false },
       },
     ]);
     trialsByGroup.set('strict_hierarchical', [

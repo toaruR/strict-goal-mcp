@@ -16,7 +16,7 @@ test('AT-07: プロンプト・成果物保存と指定表順序・英語Charact
   const benchRes = benchmarkRun({
     action: 'start',
     submission_id: `sub_at07_${Date.now()}`,
-    target_groups: ['strict_hierarchical', 'default_goal', 'vanilla', 'strict_single', 'prompt_rubric'],
+    target_groups: ['strict_hierarchical', 'default_goal', 'vanilla', 'prompt_rubric'],
     task_suite: 'at07_suite',
     seeds: 1,
   }, testDir);
@@ -84,14 +84,14 @@ test('AT-08: レポートの表順序と英語Characteristics', () => {
   const benchRes = benchmarkRun({
     action: 'start',
     submission_id: `sub_at08_${Date.now()}`,
-    target_groups: ['strict_hierarchical', 'default_goal', 'vanilla', 'strict_single', 'prompt_rubric'],
+    target_groups: ['strict_hierarchical', 'default_goal', 'vanilla', 'prompt_rubric'],
     task_suite: 'at08_suite',
     seeds: 1,
   }, testDir);
 
   const benchId = benchRes.bench_id;
 
-  // Run all 5 trials with dummy data
+  // Run all 4 trials with dummy data
   let currentTrial = benchRes.current_trial;
   let idx = 0;
   while (currentTrial) {

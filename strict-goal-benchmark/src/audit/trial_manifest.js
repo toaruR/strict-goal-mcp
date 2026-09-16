@@ -1,5 +1,5 @@
 import { gzipSync } from 'node:zlib';
-import { writeFileSync, existsSync, mkdirSync, copyFileSync, readdirSync, cpSync } from 'node:fs';
+import { writeFileSync, existsSync, mkdirSync, copyFileSync, readdirSync, cpSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { ERROR_CODES, fail } from '../errors/codes.js';
 
@@ -139,4 +139,65 @@ export function saveTrialManifestFiles(dirPath, manifest, compressGz = true) {
   }
 
   return { jsonPath, gzPath };
+}
+
+/**
+ * Synchronizes generated specification files from trial artifacts to trials root directory
+ * Naming convention: specification_[group]_[folderId].md
+ * (e.g. specification_strict_hierarchical_1FNQBXHBRNGD9F7CECHDA0HAVS.md)
+ */
+export function syncTrialSpecificationToTrials(trialsDir, trialId, group, searchDirs = [], files = null) {
+  if (!trialsDir || !existsSync(trialsDir)) return null;
+  const folderId = trialId.replace(/^tr_/, '');
+  const targetFileName = `specification_${group}_${folderId}.md`;
+  const targetPath = path.join(trialsDir, targetFileName);
+
+  // 1. If explicit in-memory files object is provided
+  if (files && typeof files === 'object') {
+    const specKey = Object.keys(files).find((k) => /spec.*\.md$/i.test(k));
+    if (specKey && files[specKey]) {
+      writeFileSync(targetPath, files[specKey], 'utf8');
+      return targetPath;
+    }
+  }
+
+  // 2. Candidate filenames to search in order of priority
+  const candidateNames = [
+    'specification.md',
+    `specification_${group}.md`,
+    'spec.md',
+    path.join('docs', 'specification.md'),
+    path.join('docs', 'spec.md'),
+  ];
+
+  for (const dir of searchDirs) {
+    if (!dir || !existsSync(dir)) continue;
+
+    for (const name of candidateNames) {
+      const candidate = path.join(dir, name);
+      if (existsSync(candidate)) {
+        try {
+          const st = statSync(candidate);
+          if (st.isFile() && st.size > 0) {
+            copyFileSync(candidate, targetPath);
+            return targetPath;
+          }
+        } catch {}
+      }
+    }
+
+    try {
+      const entries = readdirSync(dir, { withFileTypes: true, recursive: true });
+      for (const entry of entries) {
+        if (entry.isFile() && /spec.*\.md$/i.test(entry.name)) {
+          const parentDir = entry.parentPath || entry.path || dir;
+          const fullPath = path.join(parentDir, entry.name);
+          copyFileSync(fullPath, targetPath);
+          return targetPath;
+        }
+      }
+    } catch {}
+  }
+
+  return null;
 }

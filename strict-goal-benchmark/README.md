@@ -60,15 +60,15 @@ node strict-goal-benchmark/bin/runner.js resume --bench-id <bench_id>
 
 ### 3.2 Live AI Agent Benchmarking (`bin/run-agent-benchmark.js`)
 
-Launches external agent CLI instances (e.g. `claude -p`) in isolated sandboxes, executes tasks across the 5 groups, and verifies generated code using `benchmark_evaluate`.
+Launches external agent CLI instances (e.g. `claude -p`) in isolated sandboxes, executes tasks across the 4 groups, and verifies generated code using `benchmark_evaluate`.
 
 ```bash
-# Launch agent CLI for 5-group benchmark (--agent claude | agy | codex)
+# Launch agent CLI for 4-group benchmark (--agent claude | agy | codex)
 node strict-goal-benchmark/bin/run-agent-benchmark.js start \
   --agent agy \
   --instruction "Design and implement a Token Bucket Rate Limiter with unit tests" \
   --test "strict-goal-benchmark/test/held_out/rate_limiter.test.js" \
-  --groups vanilla,prompt_rubric,default_goal,strict_single,strict_hierarchical \
+  --groups vanilla,prompt_rubric,default_goal,strict_hierarchical \
   --timeout 1800
 
 # Specify long specifications via a file (--instruction-file)
@@ -82,14 +82,13 @@ node strict-goal-benchmark/bin/run-agent-benchmark.js start \
 node strict-goal-benchmark/bin/run-agent-benchmark.js start --agent echo
 ```
 
-#### 5 Treatment Group Prompts & Harness Configuration
+#### 4 Treatment Group Prompts & Harness Configuration
 
 | Treatment Group | Instruction Format Delivered to Agent | Harness / MCP Setup |
 |---|---|---|
 | **vanilla** | `<instruction>` | None (single-turn ReAct prompt) |
 | **prompt_rubric** | `<instruction>` + Self-reflection prompt (score ≥ 9 required) | None (prompt-only self-evaluation) |
 | **default_goal** | `/goal <instruction>` | Standard `/goal` command |
-| **strict_single** | `/strict-goal implement <instruction>` | `strict-goal` MCP (single iterative loop) |
 | **strict_hierarchical** | `sg-implementer supervising sg-worker and sg-verifier: <instruction>` | `strict-goal` MCP (hierarchical subagents) |
 
 ---
@@ -108,7 +107,7 @@ import { benchmarkReport } from './src/tools/benchmark_report.js';
 const run = benchmarkRun({
   action: 'start',
   submission_id: 'sub_api_demo',
-  target_groups: ['vanilla', 'strict_single'],
+  target_groups: ['vanilla', 'strict_hierarchical'],
 });
 
 // 2. Evaluate trial artifacts with held-out test suite
