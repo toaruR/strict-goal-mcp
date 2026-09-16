@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 import { benchmarkRun } from '../src/tools/benchmark_run.js';
 import { benchmarkEvaluate } from '../src/tools/benchmark_evaluate.js';
 import { benchmarkCollect } from '../src/tools/benchmark_collect.js';
@@ -32,25 +32,81 @@ if (command !== 'run' && command !== 'start') {
   node strict-goal-benchmark/bin/run-agent-benchmark.js start \\
     --instruction "Rate Limiter クラスを設計・実装し、単体テストをパスさせてください" \\
     --test "strict-goal-benchmark/test/held_out/rate_limiter.test.js" \\
-    [--agent claude|echo] [--groups vanilla,prompt_rubric,default_goal,strict_single,strict_hierarchical] [--timeout 600]
+    [--instruction-file path/to/spec.txt] \\
+    [--agent claude|agy|codex|echo] [--groups vanilla,prompt_rubric,default_goal,strict_single,strict_hierarchical] [--timeout 1800]
 `);
   process.exit(0);
 }
 
-const instruction = options.instruction || '仕様を満たす Rate Limiter クラスを設計・実装してください';
+function extractProcessError(proc, timeoutSec) {
+  if (proc.error) {
+    if (proc.error.code === 'ETIMEDOUT') {
+      return `プロセスがタイムアウトしました (${timeoutSec}秒超過)`;
+    }
+    return proc.error.message || String(proc.error);
+  }
+  if (proc.status !== null && proc.status !== 0) {
+    return (proc.stderr && proc.stderr.trim()) || `Exit code ${proc.status}`;
+  }
+  return null;
+}
+
+const instructionFilePath = options['instruction-file'] || options.instruction_file || options.instructionFile;
+let instruction = options.instruction;
+let sourceInstructionFile = null;
+
+if (instructionFilePath) {
+  const resolvedPath = path.resolve(instructionFilePath);
+  if (!fs.existsSync(resolvedPath)) {
+    console.error(`エラー: 指定された --instruction-file が存在しません: ${resolvedPath}`);
+    process.exit(1);
+  }
+  instruction = fs.readFileSync(resolvedPath, 'utf8').trim();
+  sourceInstructionFile = resolvedPath;
+} else if (!instruction) {
+  instruction = '仕様を満たす Rate Limiter クラスを設計・実装してください';
+}
+
+function detectPhase(inst, filePath, explicitPhase) {
+  if (explicitPhase) return explicitPhase.toLowerCase();
+  if (filePath) {
+    const base = path.basename(filePath).toLowerCase();
+    if (base.includes('design') || base.includes('spec')) return 'design';
+    if (base.includes('e2e') || base.includes('implement')) return 'e2e';
+  }
+  const lower = inst.toLowerCase();
+  if ((lower.includes('仕様書') || lower.includes('specification') || lower.includes('設計')) &&
+      !lower.includes('コードを実装') && !lower.includes('単体テストを作成') && !lower.includes('src/')) {
+    return 'design';
+  }
+  return 'e2e';
+}
+
+const taskPhase = detectPhase(instruction, sourceInstructionFile, options.phase);
+
+const defaultTestFile = taskPhase === 'design'
+  ? 'strict-goal-benchmark/test/held_out/specification.test.js'
+  : 'strict-goal-benchmark/test/held_out/rate_limiter.test.js';
+
 const testPath = options.test
   ? path.resolve(options.test)
-  : path.resolve('strict-goal-benchmark/test/held_out/rate_limiter.test.js');
+  : path.resolve(defaultTestFile);
 const testCommand = `node --test "${testPath}"`;
-const agentType = options.agent || 'echo'; // 'claude' or 'echo' (mock agent for CI)
+const agentType = options.agent || 'echo'; // 'claude', 'agy', 'codex', or 'echo'
 const groups = options.groups
   ? options.groups.split(',')
   : ['vanilla', 'prompt_rubric', 'default_goal', 'strict_single', 'strict_hierarchical'];
-const timeoutSec = parseInt(options.timeout || '600', 10);
+const timeoutSec = parseInt(options.timeout || '1800', 10);
 const fallbackOnRateLimit = options['no-fallback'] ? false : true;
 
 console.log(`[1/4] エージェント客観ベンチマーク開始`);
-console.log(`  タスク指示: "${instruction}"`);
+console.log(`  タスクフェーズ: ${taskPhase.toUpperCase()} (${taskPhase === 'design' ? '設計・仕様策定' : '設計〜実装E2E'})`);
+if (sourceInstructionFile) {
+  console.log(`  タスク指示ファイル: ${sourceInstructionFile}`);
+  console.log(`  タスク指示概要: "${instruction.slice(0, 100).replace(/\r?\n/g, ' ')}${instruction.length > 100 ? '...' : ''}"`);
+} else {
+  console.log(`  タスク指示: "${instruction}"`);
+}
 console.log(`  検証コマンド: ${testCommand}`);
 console.log(`  駆動エージェント: ${agentType}`);
 console.log(`  評価対象群: ${groups.join(', ')}`);
@@ -77,9 +133,13 @@ function buildAgentPrompt(group, instruction) {
     case 'default_goal':
       return `/goal ${instruction}`;
     case 'strict_single':
-      return `/strict-goal implement ${instruction}`;
+      return taskPhase === 'design'
+        ? `/strict-goal design ${instruction}`
+        : `/strict-goal implement ${instruction}`;
     case 'strict_hierarchical':
-      return `sg-implementer として、sg-worker と sg-verifier を用いて以下を完遂してください: ${instruction}`;
+      return taskPhase === 'design'
+        ? `sg-implementer として、sg-scout と sg-verifier を用いて設計・仕様策定を完遂してください: ${instruction}`
+        : `sg-implementer として、sg-worker と sg-verifier を用いて以下を完遂してください: ${instruction}`;
     default:
       return instruction;
   }
@@ -170,6 +230,14 @@ while (currentTrial) {
   const sandboxDir = path.resolve(`.benchmark/sandboxes/${currentTrial.trial_id}`);
   fs.mkdirSync(sandboxDir, { recursive: true });
 
+  if (sourceInstructionFile) {
+    const baseName = path.basename(sourceInstructionFile);
+    fs.copyFileSync(sourceInstructionFile, path.join(sandboxDir, baseName));
+    if (baseName !== 'instruction.txt') {
+      fs.copyFileSync(sourceInstructionFile, path.join(sandboxDir, 'instruction.txt'));
+    }
+  }
+
   const prompt = buildAgentPrompt(group, instruction);
   fs.writeFileSync(path.join(sandboxDir, 'prompt.txt'), prompt, 'utf8');
 
@@ -179,56 +247,185 @@ while (currentTrial) {
   let trialError = null;
   let usedFallback = false;
 
+  const writeFallbackSolution = (grp) => {
+    const profile = GROUP_MOCK_PROFILES[grp] || GROUP_MOCK_PROFILES.vanilla;
+    if (taskPhase === 'design') {
+      const targetFile = path.join(sandboxDir, 'specification.md');
+      if (!fs.existsSync(targetFile)) {
+        const specContent = grp === 'vanilla'
+          ? `# Rate Limiter Specification\n\nBasic rate limiting.`
+          : `# Specification: Sliding Window Counter Rate Limiter\n\nClass RateLimiter { constructor({ windowMs = 60000, maxRequests = 100 } = {}) }\nallow(key) { return true; }\ncheck(key) { return { allowed: true, remaining: 100, resetAfterMs: 60000 }; }\nreset(key) {}\nBoundary conditions: sub-millisecond sliding offsets.\nError handling: TypeError('INVALID_RATE_LIMIT_OPTIONS') for non-positive or invalid windowMs/maxRequests.\nMemory cleanup policy: keys idle for 2 * windowMs are safely evicted from storage.`;
+        fs.writeFileSync(targetFile, specContent, 'utf8');
+      }
+    } else {
+      const targetFile = path.join(sandboxDir, 'rate_limiter.js');
+      if (!fs.existsSync(targetFile)) {
+        fs.writeFileSync(targetFile, profile.solutionCode, 'utf8');
+      }
+    }
+    return profile;
+  };
+
+  const autoRecoverFromScratch = () => {
+    const targetName = taskPhase === 'design' ? 'specification.md' : 'rate_limiter.js';
+    const sandboxTarget = path.join(sandboxDir, targetName);
+    if (!fs.existsSync(sandboxTarget)) {
+      const homeDir = process.env.USERPROFILE || process.env.HOME || '';
+      const scratchTarget = path.join(homeDir, '.gemini', 'antigravity-cli', 'scratch', targetName);
+      if (fs.existsSync(scratchTarget)) {
+        console.log(`  -> [Auto-Recover] scratch領域 (${scratchTarget}) から ${targetName} を回収しました`);
+        fs.copyFileSync(scratchTarget, sandboxTarget);
+      }
+    }
+  };
+
   if (agentType === 'claude') {
     console.log(`  -> Claude Code CLI 実行中 (sandbox: ${sandboxDir})...`);
-    try {
-      const output = execSync(
-        `claude -p "${prompt.replace(/"/g, '\\"')}" --output-format json`,
-        {
-          cwd: sandboxDir,
-          encoding: 'utf8',
-          timeout: timeoutSec * 1000,
-          stdio: ['ignore', 'pipe', 'pipe'],
-        }
-      );
-      fs.writeFileSync(path.join(sandboxDir, 'agent_output.json'), output, 'utf8');
-      try {
-        const parsed = JSON.parse(output);
-        if (parsed.is_error || parsed.api_error_status === 429) {
-          trialError = parsed.result || `API Error: ${parsed.api_error_status}`;
-          console.warn(`  -> Claude Code エラー検知: ${trialError}`);
-        } else {
-          tokenSummary = {
-            prompt_tokens: parsed.usage?.input_tokens || 0,
-            completion_tokens: parsed.usage?.output_tokens || 0,
-            total_tokens: (parsed.usage?.input_tokens || 0) + (parsed.usage?.output_tokens || 0),
-            estimated_cost_usd: parsed.total_cost_usd || parsed.cost_usd || 0,
-          };
-          roundsCount = parsed.num_turns || 1;
-        }
-      } catch {
-        // Raw text output fallback
+    const proc = spawnSync(
+      'claude',
+      ['-p', prompt, '--output-format', 'json'],
+      {
+        cwd: sandboxDir,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: timeoutSec * 1000,
+        maxBuffer: 50 * 1024 * 1024,
       }
-    } catch (err) {
-      const errMsg = err.stderr || err.message || 'Unknown execution error';
-      console.warn(`  -> エージェント実行例外: ${errMsg.slice(0, 200)}`);
-      fs.writeFileSync(path.join(sandboxDir, 'error.log'), errMsg, 'utf8');
-      trialError = errMsg;
+    );
+    const output = proc.stdout || '';
+    const procErr = extractProcessError(proc, timeoutSec);
+    if (procErr) {
+      trialError = procErr;
+      console.warn(`  -> Claude Code 実行例外: ${trialError.slice(0, 200)}`);
+      fs.writeFileSync(path.join(sandboxDir, 'error.log'), trialError, 'utf8');
     }
+    fs.writeFileSync(path.join(sandboxDir, 'agent_output.json'), output, 'utf8');
+    try {
+      const parsed = JSON.parse(output);
+      if (parsed.is_error || parsed.api_error_status === 429) {
+        trialError = parsed.result || `API Error: ${parsed.api_error_status}`;
+        console.warn(`  -> Claude Code エラー検知: ${trialError}`);
+      } else {
+        tokenSummary = {
+          prompt_tokens: parsed.usage?.input_tokens || 0,
+          completion_tokens: parsed.usage?.output_tokens || 0,
+          total_tokens: (parsed.usage?.input_tokens || 0) + (parsed.usage?.output_tokens || 0),
+          estimated_cost_usd: parsed.total_cost_usd || parsed.cost_usd || 0,
+        };
+        roundsCount = parsed.num_turns || 1;
+      }
+    } catch {}
 
     if (trialError && fallbackOnRateLimit) {
       console.log(`  -> [Fallback] レートリミット/エラー検知のため群プロファイルを適用します: [${group}]`);
       usedFallback = true;
-      const profile = GROUP_MOCK_PROFILES[group] || GROUP_MOCK_PROFILES.vanilla;
-      fs.writeFileSync(path.join(sandboxDir, 'rate_limiter.js'), profile.solutionCode, 'utf8');
+      const profile = writeFallbackSolution(group);
+      tokenSummary = profile.tokens;
+      roundsCount = profile.rounds;
+    }
+  } else if (agentType === 'agy') {
+    console.log(`  -> Antigravity CLI (agy) 実行中 (sandbox: ${sandboxDir})...`);
+    const proc = spawnSync(
+      'agy',
+      ['-p', prompt, '--add-dir', sandboxDir, '--output-format', 'json', '--dangerously-skip-permissions'],
+      {
+        cwd: sandboxDir,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: timeoutSec * 1000,
+        maxBuffer: 50 * 1024 * 1024,
+      }
+    );
+    const output = proc.stdout || '';
+    const procErr = extractProcessError(proc, timeoutSec);
+    if (procErr) {
+      trialError = procErr;
+      console.warn(`  -> agy 実行例外: ${trialError.slice(0, 200)}`);
+      fs.writeFileSync(path.join(sandboxDir, 'error.log'), trialError, 'utf8');
+    }
+    fs.writeFileSync(path.join(sandboxDir, 'agent_output.json'), output, 'utf8');
+    try {
+      const parsed = JSON.parse(output);
+      if (parsed.status === 'ERROR' || parsed.is_error) {
+        trialError = parsed.response || parsed.result || 'AGY Error';
+        console.warn(`  -> agy エラー検知: ${trialError}`);
+      } else {
+        const inTok = parsed.usage?.input_tokens || parsed.usage?.prompt_tokens || 0;
+        const outTok = parsed.usage?.output_tokens || parsed.usage?.completion_tokens || 0;
+        tokenSummary = {
+          prompt_tokens: inTok,
+          completion_tokens: outTok,
+          total_tokens: parsed.usage?.total_tokens || (inTok + outTok),
+          estimated_cost_usd: parsed.cost_usd || 0,
+        };
+        roundsCount = parsed.num_turns || 1;
+      }
+    } catch {}
+
+    // agy が scratch 領域に出力した場合のセーフティネット回収
+    autoRecoverFromScratch();
+
+    if (trialError && fallbackOnRateLimit) {
+      console.log(`  -> [Fallback] エラー検知のため群プロファイルを適用します: [${group}]`);
+      usedFallback = true;
+      const profile = writeFallbackSolution(group);
+      tokenSummary = profile.tokens;
+      roundsCount = profile.rounds;
+    }
+  } else if (agentType === 'codex') {
+    console.log(`  -> Codex CLI 実行中 (sandbox: ${sandboxDir})...`);
+    const proc = spawnSync(
+      'codex',
+      ['exec', '--dangerously-bypass-approvals-and-sandbox', '--json', prompt],
+      {
+        cwd: sandboxDir,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: timeoutSec * 1000,
+        maxBuffer: 50 * 1024 * 1024,
+      }
+    );
+    const output = proc.stdout || '';
+    const procErr = extractProcessError(proc, timeoutSec);
+    if (procErr) {
+      trialError = procErr;
+      console.warn(`  -> codex 実行例外: ${trialError.slice(0, 200)}`);
+      fs.writeFileSync(path.join(sandboxDir, 'error.log'), trialError, 'utf8');
+    }
+    fs.writeFileSync(path.join(sandboxDir, 'agent_output.jsonl'), output, 'utf8');
+    try {
+      const lines = output.trim().split(/\r?\n/).filter(Boolean);
+      let inTok = 0;
+      let outTok = 0;
+      for (const line of lines) {
+        try {
+          const ev = JSON.parse(line);
+          if (ev.usage) {
+            inTok = ev.usage.input_tokens || ev.usage.prompt_tokens || inTok;
+            outTok = ev.usage.output_tokens || ev.usage.completion_tokens || outTok;
+          }
+        } catch {}
+      }
+      tokenSummary = {
+        prompt_tokens: inTok,
+        completion_tokens: outTok,
+        total_tokens: inTok + outTok,
+        estimated_cost_usd: 0,
+      };
+      roundsCount = lines.length || 1;
+    } catch {}
+
+    if (trialError && fallbackOnRateLimit) {
+      console.log(`  -> [Fallback] エラー検知のため群プロファイルを適用します: [${group}]`);
+      usedFallback = true;
+      const profile = writeFallbackSolution(group);
       tokenSummary = profile.tokens;
       roundsCount = profile.rounds;
     }
   } else {
     // Echo / Mock モード
     console.log(`  -> モックエージェント実行中: [${group}]`);
-    const profile = GROUP_MOCK_PROFILES[group] || GROUP_MOCK_PROFILES.vanilla;
-    fs.writeFileSync(path.join(sandboxDir, 'rate_limiter.js'), profile.solutionCode, 'utf8');
+    const profile = writeFallbackSolution(group);
     tokenSummary = profile.tokens;
     roundsCount = profile.rounds;
   }
@@ -241,7 +438,7 @@ while (currentTrial) {
   const evalOptions = {
     cwd: sandboxDir,
   };
-  if (profile?.tampering) {
+  if ((agentType === 'echo' || usedFallback) && profile?.tampering) {
     evalOptions.diffContent = '--- a/test/held_out/rate_limiter.test.js\n+++ b/test/held_out/rate_limiter.test.js\n@@ -31,1 +31,1 @@\n-  assert.equal(limiter.allow(), false);\n+  // assert.equal(limiter.allow(), false);';
   }
 

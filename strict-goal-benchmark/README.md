@@ -6,48 +6,19 @@ Evaluation harness package designed to quantitatively measure the effectiveness,
 
 ---
 
-## 1. Plan to Implementation Path Mapping
+## 1. Evaluation Focus & Verification Modules
+ 
+Key verification focus areas and mechanisms implemented to ensure evaluation rigor and integrity:
 
-In accordance with `docs/plans/plan-quantitative-evaluation.md`, all components are implemented under the standalone `strict-goal-benchmark/` package directory:
-
-| Upstream Plan Path (`strict-goal/benchmark/`) | Implemented Path (`strict-goal-benchmark/`) | Task ID | Description |
-|---|---|---|---|
-| `package.json` | `package.json` | T001 | npm package manifest (ESM, scripts, engines) |
-| `.agents-plugin/plugin.json` | `.agents-plugin/plugin.json` | T001 | Agent Plugins 1.0.0 tool manifest |
-| `src/config/defaults.js` | `src/config/defaults.js` | T001 | 10 locked default configuration parameters |
-| `src/errors/codes.js` | `src/errors/codes.js` | T001 | Dedicated benchmark error codes |
-| `src/utils/path.js` | `src/utils/path.js` | T001 | Windows UNC / long-path normalization |
-| `src/fsm/state_machine.js` | `src/fsm/state_machine.js` | T002 | 8-state deterministic FSM engine |
-| `src/fsm/matrix_guard.js` | `src/fsm/matrix_guard.js` | T002 | State × Tool call validation matrix |
-| `src/store/bench_store.js` | `src/store/bench_store.js` | T002 | Atomic disk persistence |
-| `src/runner/resume.js` | `src/runner/resume.js` | T002 | Zero-turn crash recovery protocol |
-| `src/tracker/token_tracker.js` | `src/tracker/token_tracker.js` | T003 | Accurate prompt/completion/cached token counter |
-| `src/audit/trial_manifest.js` | `src/audit/trial_manifest.js` | T003 | Per-trial manifest generator & gzip archiver |
-| `src/monitor/drift_monitor.js` | `src/monitor/drift_monitor.js` | T003 | Calibration Battery 10-probe drift monitor |
-| `src/evaluator/ast_diff.js` | `src/evaluator/ast_diff.js` | T004 | AST assertion tampering & test relaxation detector |
-| `src/evaluator/mock_detector.js` | `src/evaluator/mock_detector.js` | T004 | Mock monkey-patch & fake test bypass detector |
-| `src/evaluator/fallback_checker.js` | `src/evaluator/fallback_checker.js` | T004 | 2-stage fallback heuristic scanner |
-| `src/evaluator/held_out_runner.js` | `src/evaluator/held_out_runner.js` | T005 | Subprocess-isolated held-out test executor |
-| `src/evaluator/verdict_engine.js` | `src/evaluator/verdict_engine.js` | T005 | Deterministic external pass/fail verdict engine |
-| `src/evaluator/convergence_guard.js` | `src/evaluator/convergence_guard.js` | T005 | Max rounds, time, token, and stagnation guard |
-| `schemas/benchmark_tools.json` | `schemas/benchmark_tools.json` | T006 | JSON Schema Draft-07 specs for 4 tools |
-| `src/tools/benchmark_run.js` | `src/tools/benchmark_run.js` | T006 | 5-group experiment sandbox initializer tool |
-| `src/tools/benchmark_evaluate.js` | `src/tools/benchmark_evaluate.js` | T006 | Isolated evaluation & anti-gaming verification tool |
-| `src/tools/benchmark_collect.js` | `src/tools/benchmark_collect.js` | T007 | Token & telemetry collection tool |
-| `src/tools/benchmark_report.js` | `src/tools/benchmark_report.js` | T007 | Statistical analysis & 5-group reporter tool |
-| `src/analytics/kpi_calculator.js` | `src/analytics/kpi_calculator.js` | T008 | Primary (Pass@1, Shortcut rate) & Secondary KPIs |
-| `src/analytics/stats_test.js` | `src/analytics/stats_test.js` | T008 | Welch's t-test, Cohen's d, Bootstrap CIs |
-| `src/analytics/markdown_reporter.js` | `src/analytics/markdown_reporter.js` | T008 | Markdown, JSON, and CSV report generator |
-| `src/index.js` | `src/index.js` | T001 | Public package API entrypoint |
-| `bin/runner.js` | `bin/runner.js` | T001 | Automated CLI runner |
-| `bin/run-agent-benchmark.js` | `bin/run-agent-benchmark.js` | - | Live AI agent (Claude Code, etc.) driver CLI |
-| `bin/check-manifest.js` | `bin/check-manifest.js` | T001 | Manifest schema validator |
-| `test/at_01_init.test.js` | `test/at_01_init.test.js` | T009 | AT-01 Acceptance Test |
-| `test/at_02_eval_pass.test.js` | `test/at_02_eval_pass.test.js` | T009 | AT-02 Acceptance Test |
-| `test/at_03_gaming_reject.test.js` | `test/at_03_gaming_reject.test.js` | T009 | AT-03 Acceptance Test |
-| `test/at_04_collect_metrics.test.js` | `test/at_04_collect_metrics.test.js` | T009 | AT-04 Acceptance Test |
-| `test/at_05_state_violation.test.js` | `test/at_05_state_violation.test.js` | T009 | AT-05 Acceptance Test |
-| `test/at_06_report_stats.test.js` | `test/at_06_report_stats.test.js` | T009 | AT-06 Acceptance Test |
+- **T001**: Foundational Configuration, Constants, Error Codes & Package Structure
+- **T002**: FSM Engine, External State Persistence & Zero-Turn Recovery
+- **T003**: Token Tracker, Audit Manifest Persistence & Drift Monitor
+- **T004**: Anti-Gaming Verification Engine (AST Diff, Mock & Fallback Checks)
+- **T005**: Isolated Evaluator & External Verdict Engine
+- **T006**: Experiment & Evaluation Tools (benchmark_run, benchmark_evaluate)
+- **T007**: Metrics Collection & Reporting Tools (benchmark_collect, benchmark_report)
+- **T008**: Statistical Analysis Engine & Report Generator
+- **T009**: End-to-End Acceptance Test Suite (AT-01 to AT-06)
 
 ---
 
@@ -92,13 +63,20 @@ node strict-goal-benchmark/bin/runner.js resume --bench-id <bench_id>
 Launches external agent CLI instances (e.g. `claude -p`) in isolated sandboxes, executes tasks across the 5 groups, and verifies generated code using `benchmark_evaluate`.
 
 ```bash
-# Execute live Claude Code CLI across 5 treatment groups
+# Launch agent CLI for 5-group benchmark (--agent claude | agy | codex)
 node strict-goal-benchmark/bin/run-agent-benchmark.js start \
-  --agent claude \
+  --agent agy \
   --instruction "Design and implement a Token Bucket Rate Limiter with unit tests" \
   --test "strict-goal-benchmark/test/held_out/rate_limiter.test.js" \
   --groups vanilla,prompt_rubric,default_goal,strict_single,strict_hierarchical \
-  --timeout 600
+  --timeout 1800
+
+# Specify long specifications via a file (--instruction-file)
+# (Automatically reads file content and copies it into each trial sandbox)
+node strict-goal-benchmark/bin/run-agent-benchmark.js start \
+  --agent claude \
+  --instruction-file "tasks/rate_limiter_spec.md" \
+  --test "strict-goal-benchmark/test/held_out/rate_limiter.test.js"
 
 # Pipeline dry-run with mock agent (for CI / smoke tests)
 node strict-goal-benchmark/bin/run-agent-benchmark.js start --agent echo

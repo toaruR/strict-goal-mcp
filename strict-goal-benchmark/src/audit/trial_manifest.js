@@ -1,5 +1,5 @@
 import { gzipSync } from 'node:zlib';
-import { writeFileSync, existsSync, mkdirSync, copyFileSync, readdirSync } from 'node:fs';
+import { writeFileSync, existsSync, mkdirSync, copyFileSync, readdirSync, cpSync } from 'node:fs';
 import path from 'node:path';
 import { ERROR_CODES, fail } from '../errors/codes.js';
 
@@ -101,21 +101,13 @@ export function saveTrialArtifacts(dirPath, { prompt, artifactsDir, files } = {}
     writeFileSync(path.join(dirPath, 'prompt.txt'), prompt, 'utf8');
   }
 
-  // 2. Save artifacts directory if provided
+  // 2. Save artifacts directory if provided (recursive copy)
   const targetArtifactsDir = path.join(dirPath, 'artifacts');
   if (artifactsDir && existsSync(artifactsDir)) {
     if (!existsSync(targetArtifactsDir)) {
       mkdirSync(targetArtifactsDir, { recursive: true });
     }
-    const entries = readdirSync(artifactsDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.isFile()) {
-        copyFileSync(
-          path.join(artifactsDir, entry.name),
-          path.join(targetArtifactsDir, entry.name)
-        );
-      }
-    }
+    cpSync(artifactsDir, targetArtifactsDir, { recursive: true });
   }
 
   // 3. Save explicit files map if provided: { filename: content }

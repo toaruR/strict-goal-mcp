@@ -25,7 +25,7 @@ export function calculateGroupMetrics(trials) {
 
     totalTokens += trial.resource_usage?.total_tokens || 0;
     totalCost += trial.resource_usage?.estimated_cost_usd || 0;
-    totalRounds += trial.fsm_history?.length || 1;
+    totalRounds += trial.resource_usage?.rounds ?? (trial.fsm_history?.length || 1);
   }
 
   const n = trials.length;

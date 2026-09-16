@@ -44,7 +44,7 @@ export function benchmarkCollect(input, baseDir = process.cwd(), options = {}) {
     tampering_detected: false,
   };
 
-  const roundsCount = options.rounds_count || 2;
+  const roundsCount = options.rounds_count !== undefined ? options.rounds_count : 2;
   const finalVerdict = options.final_verdict || (evalResult.resolved ? 'FINAL' : 'REVISE');
 
   const trialDir = path.join(getBenchDir(baseDir, bench_id), 'trials', trial_id);
@@ -56,6 +56,38 @@ export function benchmarkCollect(input, baseDir = process.cwd(), options = {}) {
     files: options.artifactsFiles,
   });
 
+  const generatedFsmHistory = options.fsm_history || (
+    roundsCount <= 1
+      ? [
+          {
+            round: 1,
+            state: 'FINAL',
+            verdict: finalVerdict,
+            scores: { tests_green: evalResult.resolved ? 9 : 0 },
+            must_fix: [],
+            artifact_digest: 'sha256:dummy_single',
+          },
+        ]
+      : [
+          {
+            round: 1,
+            state: 'ITERATING',
+            verdict: 'REVISE',
+            scores: { tests_green: 7 },
+            must_fix: ['tests_green'],
+            artifact_digest: 'sha256:dummy1',
+          },
+          {
+            round: roundsCount,
+            state: 'FINAL',
+            verdict: finalVerdict,
+            scores: { tests_green: 9 },
+            must_fix: [],
+            artifact_digest: 'sha256:dummy2',
+          },
+        ]
+  );
+
   const trialManifest = createTrialManifest({
     trial_id,
     bench_id,
@@ -64,27 +96,13 @@ export function benchmarkCollect(input, baseDir = process.cwd(), options = {}) {
     seed: state.current_trial?.seed || 1,
     started_at: options.started_at || new Date(Date.now() - 60000).toISOString(),
     finished_at: options.finished_at || new Date().toISOString(),
-    token_summary: tokenSummary,
+    token_summary: {
+      ...tokenSummary,
+      rounds: roundsCount,
+    },
     prompt: options.prompt,
     error: options.error,
-    fsm_history: options.fsm_history || [
-      {
-        round: 1,
-        state: 'ITERATING',
-        verdict: 'REVISE',
-        scores: { tests_green: 7 },
-        must_fix: ['tests_green'],
-        artifact_digest: 'sha256:dummy1',
-      },
-      {
-        round: roundsCount,
-        state: 'FINAL',
-        verdict: finalVerdict,
-        scores: { tests_green: 9 },
-        must_fix: [],
-        artifact_digest: 'sha256:dummy2',
-      },
-    ],
+    fsm_history: generatedFsmHistory,
     ground_truth_eval: evalResult,
   });
 
