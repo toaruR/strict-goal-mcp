@@ -1,6 +1,6 @@
 ---
 name: strict-goal
-description: Enforces iterative rubric validation until the server itself returns a passing verdict, preventing compromises or shortcuts. Triggered by natural language requests or command syntax like "strict-goal [design|plan|implement|設計|計画|実装] <target/instruction>" or "/strict-goal <goal>".
+description: Enforces iterative rubric validation until the server returns a passing verdict. Use for strict-goal design, plan, or implement requests (設計・計画・実装), or /strict-goal followed by a goal.
 ---
 <!-- knowledge-kit version=1.12.0 (自動調整済み: 移植先固有の書き換えあり) -->
 
@@ -35,6 +35,18 @@ Users can invoke either the full chain or a single targeted phase using English 
 If you don't know the upstream digest, call `loop_state` on the upstream session to get it.
 For `implement`, if upstream session ID is omitted, auto-resolve it from the latest session in `.strict-goal/index.json` where server returns FINAL.
 Never guess it (the server rejects a wrong guess with `E_UPSTREAM_DIGEST_MISMATCH`).
+
+## Codex: state-only child transactions
+
+For Codex delegation in every phase (including design verification):
+
+1. Retrieve `loop_state({ session_id, projection: "skill_state", include: [] })` immediately before delegation. Extract only `response.skill_state`; do not forward the full envelope or full rubric/history.
+2. Create a fresh child for each transaction with `spawn_agent(task_name=..., message=..., fork_turns="none")`. Use the runtime's exposed tool schema. Never omit `fork_turns` or replace it with a global `fork_context` setting. If this runtime cannot express a no-history spawn, report the incompatibility instead of silently inheriting history.
+3. The message contains only `{ skill_state, transaction, paths, output_contract }`. Specify a single task, relevant workspace/artifact/helper.js paths, and a compact result contract (status, digest, verdict, must_fix, evidence paths). Read detailed artifacts from disk when needed; do not embed full artifacts, transcripts, test output, or parent instructions.
+4. Wait only after successful spawn. `collaboration.wait_agent` is a mailbox wait without receiver IDs; legacy `wait` takes the returned child ID. Use the actual schema, not a fabricated compatibility call.
+5. After a transaction finishes, refresh server state and spawn a new child for the next transaction. Do not reuse the previous child via followup_task/send_message for a new round: its accumulated context would survive. Return compact results and retain verbose evidence on disk.
+
+`fork_turns="none"` prevents parent conversation inheritance. It does not disable provider prompt caching or remove shared system/tool/project instructions. Use `sg-verifier` for verification and `sg-implementer` for implementation only when that agent type is exposed by the runtime; otherwise pass the bounded role in the message to the default agent.
 
 ## Subagent Delegation for Implementation (実装のサブエージェント委譲)
 
@@ -120,12 +132,12 @@ To check the installed version of strict-goal:
 
 ## When Context Is Lost
 
-Call loop_state with the session_id and projection: "skill_state".
+Call loop_state with the session_id, projection: "skill_state", and include: [].
 The server returns the bounded execution triad (P, Sigma_t, O_t):
 - immutable_spec: task specification and criteria summary.
 - canonical_state: current round, state, must_fix items, and trial history.
 - recent_observation: sanitized observation from the previous step.
-Everything you need comes back in under 4,000 characters. Don't try to recall from memory.
+Forward only the skill_state field; its size depends on the task and rubric. Don't try to recall from memory.
 
 ## Human-Readable Dashboard
 

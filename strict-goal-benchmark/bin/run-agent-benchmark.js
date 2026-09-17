@@ -6,6 +6,19 @@ import { benchmarkRun } from '../src/tools/benchmark_run.js';
 import { benchmarkEvaluate } from '../src/tools/benchmark_evaluate.js';
 import { benchmarkCollect } from '../src/tools/benchmark_collect.js';
 import { benchmarkReport } from '../src/tools/benchmark_report.js';
+import { inspectCodexHierarchy, findCodexRollout } from '../src/tracker/codex_hierarchy.js';
+
+function findCodexExe() {
+  try {
+    const { execSync } = require('child_process');
+    const which = execSync('where codex', { encoding: 'utf8' }).trim().split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const official = which.find(p => p.toLowerCase().includes('openai') && p.toLowerCase().includes('codex') && p.endsWith('.exe'));
+    if (official) return official.replace(/\\/g, '/');
+    const nonHermes = which.find(p => !p.includes('hermes') && /\.(exe|cmd)$/i.test(p));
+    if (nonHermes) return nonHermes.replace(/\\/g, '/');
+  } catch { }
+  return 'codex';
+}
 
 function parseArgs(args) {
   const parsed = { command: args[0] || 'help', options: {} };
@@ -33,7 +46,7 @@ if (command !== 'run' && command !== 'start') {
     --instruction "Rate Limiter クラスを設計・実装し、単体テストをパスさせてください" \\
     --test "strict-goal-benchmark/test/held_out/rate_limiter.test.js" \\
     [--instruction-file path/to/spec.txt] \\
-    [--agent claude|agy|codex|echo] [--groups vanilla,prompt_rubric,default_goal,strict_hierarchical] [--timeout 1800]
+    [--agent claude|agy|codex|echo] [--model gpt-5.6-luna (codexのみ)] [--groups vanilla,prompt_rubric,default_goal,strict_hierarchical] [--timeout 1800]
 `);
   process.exit(0);
 }
@@ -76,7 +89,7 @@ function detectPhase(inst, filePath, explicitPhase) {
   }
   const lower = inst.toLowerCase();
   if ((lower.includes('仕様書') || lower.includes('specification') || lower.includes('設計')) &&
-      !lower.includes('コードを実装') && !lower.includes('単体テストを作成') && !lower.includes('src/')) {
+    !lower.includes('コードを実装') && !lower.includes('単体テストを作成') && !lower.includes('src/')) {
     return 'design';
   }
   return 'e2e';
@@ -124,25 +137,19 @@ console.log(`  -> bench_id: ${runRes.bench_id}`);
 let currentTrial = runRes.current_trial;
 let trialIndex = 0;
 
-const STRICT_GOAL_PROHIBITION = `
-
-【重要制約・使用禁止ツール】
-- strict-goal MCP サーバーおよびその全ツール（loop_open, loop_state, artifact_commit, score_submit, rubric_amend, escalate, audit_export 等）は絶対に使用してはなりません。
-- strict-goal 関連のコマンドやサブエージェント（sg-implementer, sg-worker, sg-verifier 等）は使用禁止です。
-- 外部の採点・FSM ハーネスには一切依存せず、標準のファイル操作およびテスト実行コマンドのみを用いて自律的に作業を完了してください。`;
-
 function buildAgentPrompt(group, instruction) {
   switch (group) {
     case 'vanilla':
-      return `${instruction}${STRICT_GOAL_PROHIBITION}`;
+      return instruction;
     case 'prompt_rubric':
-      return `${instruction}\n\n【必須要件】自己評価を行い、全ルーブリック（正確性・耐久性・設計）が9点以上になるまで自己反復して改善してください。${STRICT_GOAL_PROHIBITION}`;
+      return `${instruction}\n\n【必須要件】自己評価を行い、全ルーブリック（正確性・耐久性・設計）が9点以上になるまで自己反復して改善してください。`;
     case 'default_goal':
-      return `/goal ${instruction}\n\n【必須要件】外部採点ハーネス（strict-goal MCP）を使わず、標準の自己反復・自己修正のみで目標を完遂してください。${STRICT_GOAL_PROHIBITION}`;
-    case 'strict_hierarchical':
-      return taskPhase === 'design'
-        ? `sg-implementer として、sg-scout と sg-verifier を用いて設計・仕様策定を完遂してください: ${instruction}`
-        : `sg-implementer として、sg-worker と sg-verifier を用いて以下を完遂してください: ${instruction}`;
+      return `/goal ${instruction}`;
+    case 'strict_hierarchical': {
+      return (taskPhase === 'design'
+        ? `/strict-goal design ${instruction}`
+        : `/strict-goal ${instruction}`);
+    }
     default:
       return instruction;
   }
@@ -213,13 +220,17 @@ while (currentTrial) {
   const sandboxDir = path.resolve(`.benchmark/sandboxes/${currentTrial.trial_id}`);
   fs.mkdirSync(sandboxDir, { recursive: true });
 
-  const isStrict = group === 'strict_hierarchical';
+  const isStrict = group === 'strict_hierarchical' || group === 'strict_single';
 
   // サンドボックスを独立した Git リポジトリとして初期化し、親ディレクトリ（rubric-loop-mcp）の探索を完全に遮断
   spawnSync('git', ['init', '-q'], { cwd: sandboxDir });
 
-  // MCP 設定ファイル mcp_config.json をサンドボックス内に生成
+  // MCP 設定ファイル mcp_config.json および .codex/config.toml をサンドボックス内に生成（親ディレクトリの探索を完全に遮断）
   const mcpConfigPath = path.join(sandboxDir, 'mcp_config.json');
+  const codexDir = path.join(sandboxDir, '.codex');
+  const codexConfigPath = path.join(codexDir, 'config.toml');
+  fs.mkdirSync(codexDir, { recursive: true });
+
   if (isStrict) {
     const serverPath = path.resolve('strict-goal/server/main.js');
     const mcpConfig = {
@@ -232,14 +243,51 @@ while (currentTrial) {
     };
     fs.writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig, null, 2), 'utf8');
 
+    // Codex 用の設定ファイル（strict-goal MCP を登録）
+    const codexToml = `[mcp_servers.strict-goal]
+command = "node"
+args = ["${serverPath.replace(/\\/g, '/')}", "--data-dir", "${sandboxDir.replace(/\\/g, '/')}"]
+`;
+    fs.writeFileSync(codexConfigPath, codexToml, 'utf8');
+
     // サブエージェント定義をサンドボックス内に複製
     const agentsSrcDir = path.resolve('.agents/agents');
     const agentsDestDir = path.join(sandboxDir, '.agents', 'agents');
     if (fs.existsSync(agentsSrcDir)) {
       fs.mkdirSync(agentsDestDir, { recursive: true });
       for (const f of fs.readdirSync(agentsSrcDir)) {
-        try { fs.copyFileSync(path.join(agentsSrcDir, f), path.join(agentsDestDir, f)); } catch {}
+        try { fs.copyFileSync(path.join(agentsSrcDir, f), path.join(agentsDestDir, f)); } catch { }
       }
+    }
+
+    // スキル定義（.agents/skills および .claude/skills）をサンドボックス内に複製
+    const skillsSrcDir = path.resolve('.agents/skills');
+    const skillsDestDir = path.join(sandboxDir, '.agents', 'skills');
+    if (agentType !== 'codex' && fs.existsSync(skillsSrcDir)) {
+      try { fs.cpSync(skillsSrcDir, skillsDestDir, { recursive: true, force: true }); } catch { }
+    }
+    if (agentType === 'claude') {
+      const claudeSkillsSrc = path.resolve('.claude/skills');
+      const claudeSkillsDest = path.join(sandboxDir, '.claude', 'skills');
+      if (fs.existsSync(claudeSkillsSrc)) {
+        try { fs.cpSync(claudeSkillsSrc, claudeSkillsDest, { recursive: true, force: true }); } catch { }
+      }
+    }
+
+    // Codex の子へ親の巨大なルール履歴を載せない。必要な strict-goal スキルと
+    // 最小限の委譲規約だけを置き、実行状態は loop_state(skill_state) で受け渡す。
+    if (agentType === 'codex') {
+      const strictGoalSkillSrc = path.resolve('.agents/skills/strict-goal');
+      const strictGoalSkillDest = path.join(skillsDestDir, 'strict-goal');
+      if (fs.existsSync(strictGoalSkillSrc)) {
+        try { fs.cpSync(strictGoalSkillSrc, strictGoalSkillDest, { recursive: true, force: true }); } catch { }
+      }
+      fs.writeFileSync(path.join(sandboxDir, 'AGENTS.md'), `# Codex benchmark hierarchy\nExplicitly delegate independent verification to a fresh child per transaction using spawn_agent with fork_turns: "none". Follow the exposed tool schema; if no-history spawn is unavailable, report the incompatibility instead of inheriting history. For design/plan delegate verification, not implementation. Fetch loop_state({ session_id, projection: "skill_state", include: [] }) before each spawn and pass only response.skill_state in { skill_state, transaction, paths, output_contract }. Never forward the full envelope, parent transcript, full artifacts, or test logs. Do not reuse children for new transactions; refresh state and spawn anew. Require a successful spawn before waiting. collaboration.wait_agent is a mailbox wait without receiver IDs; legacy wait requires the returned child ID. Return compact verdict/digest/must_fix/evidence paths.\n`, 'utf8');
+    } else {
+      try {
+        if (fs.existsSync(path.resolve('CLAUDE.md'))) fs.copyFileSync(path.resolve('CLAUDE.md'), path.join(sandboxDir, 'CLAUDE.md'));
+        if (fs.existsSync(path.resolve('AGENTS.md'))) fs.copyFileSync(path.resolve('AGENTS.md'), path.join(sandboxDir, 'AGENTS.md'));
+      } catch { }
     }
   } else {
     // strict_hierarchical 以外は空の MCP 設定（外部 MCP サーバーを完全に遮断）
@@ -248,11 +296,15 @@ while (currentTrial) {
     };
     fs.writeFileSync(mcpConfigPath, JSON.stringify(emptyMcpConfig, null, 2), 'utf8');
 
-    // クリーンなルールファイルをサンドボックス内に配置して親の strict-goal ルールを完全にオーバーライド
+    // Codex 用の空設定（親の .codex/config.toml 探索を遮断し、MCP を0件にする）
+    const emptyCodexToml = `# Isolated sandbox: no external MCP servers
+[mcp_servers]
+`;
+    fs.writeFileSync(codexConfigPath, emptyCodexToml, 'utf8');
+
+    // クリーンなルールファイルをサンドボックス内に配置して親ルールをオーバーライド
     const cleanGuidelines = `# Isolated Environment
-This is an isolated benchmark trial.
-Do NOT use strict-goal MCP tools or external evaluation FSMs.
-Complete the task using standard tools only.
+This is an isolated benchmark trial. Complete the task using standard tools only.
 `;
     fs.writeFileSync(path.join(sandboxDir, 'CLAUDE.md'), cleanGuidelines, 'utf8');
     fs.writeFileSync(path.join(sandboxDir, 'AGENTS.md'), cleanGuidelines, 'utf8');
@@ -282,12 +334,12 @@ Complete the task using standard tools only.
       if (!fs.existsSync(targetFile)) {
         const specContent = grp === 'vanilla'
           ? `# Rate Limiter Specification\n\nBasic rate limiting.`
-          : `# Specification: Sliding Window Counter Rate Limiter\n\nClass RateLimiter { constructor({ windowMs = 60000, maxRequests = 100 } = {}) }\nallow(key) { return true; }\ncheck(key) { return { allowed: true, remaining: 100, resetAfterMs: 60000 }; }\nreset(key) {}\nBoundary conditions: sub-millisecond sliding offsets.\nError handling: TypeError('INVALID_RATE_LIMIT_OPTIONS') for non-positive or invalid windowMs/maxRequests.\nMemory cleanup policy: keys idle for 2 * windowMs are safely evicted from storage.`;
+          : `# Specification: Sliding Window Counter Rate Limiter\n\n## 1. 外部インターフェース仕様 (Public Interface)\nクラス \`RateLimiter\` は以下のインターフェースおよびメソッドを提供します。\n\n\`\`\`javascript\nexport class RateLimiter {\n  /**\n   * 引数: options { windowMs?: number, maxRequests?: number }\n   */\n  constructor({ windowMs = 60000, maxRequests = 100 } = {}) {}\n\n  /**\n   * メソッド: allow(key: string): boolean\n   * 戻り値: リクエストが許容されれば true、制限超過時は false\n   */\n  allow(key) { return true; }\n\n  /**\n   * メソッド: check(key: string): { allowed: boolean, remaining: number, resetAfterMs: number }\n   * 戻り値: 判定結果オブジェクト\n   */\n  check(key) { return { allowed: true, remaining: 100, resetAfterMs: 60000 }; }\n\n  /**\n   * メソッド: reset(key: string): void\n   */\n  reset(key) {}\n}\n\`\`\`\n\n## 2. 境界条件・エッジケース (Boundary Conditions)\n- サブミリ秒単位のスライディング窓補間（sub-millisecond sliding offsets）を正確に計算。\n- 窓切り替わり境界における最大許容量のバーストを完全に防止。\n\n## 3. エラーハンドリング (Error Handling)\n- 不正な引数（0以下の windowMs または maxRequests）に対しては TypeError('INVALID_RATE_LIMIT_OPTIONS') の例外・エラーをスロー。\n\n## 4. メモリ管理・クリーンアップポリシー (Memory Cleanup & TTL)\n- アイドル状態のキー（2 * windowMs 以上アクセスのないエントリ）はメモリリーク防止のため自動的に安全に破棄・クリーンアップ（safe TTL eviction）。\n`;
         fs.writeFileSync(targetFile, specContent, 'utf8');
       }
       const groupSpecificFile = path.join(sandboxDir, `specification_${grp}.md`);
       if (!fs.existsSync(groupSpecificFile) && fs.existsSync(targetFile)) {
-        try { fs.copyFileSync(targetFile, groupSpecificFile); } catch {}
+        try { fs.copyFileSync(targetFile, groupSpecificFile); } catch { }
       }
     } else {
       const targetFile = path.join(sandboxDir, 'rate_limiter.js');
@@ -310,18 +362,18 @@ Complete the task using standard tools only.
         const destFile = path.join(sandboxDir, name);
         if (fs.existsSync(scratchFile) && !fs.existsSync(destFile)) {
           console.log(`  -> [Auto-Recover] scratch領域 (${scratchFile}) から回収しました`);
-          try { fs.copyFileSync(scratchFile, destFile); } catch {}
+          try { fs.copyFileSync(scratchFile, destFile); } catch { }
         }
       }
       for (const name of candidates) {
         const sFile = path.join(sandboxDir, name);
         if (fs.existsSync(sFile) && !fs.existsSync(sandboxTarget)) {
-          try { fs.copyFileSync(sFile, sandboxTarget); } catch {}
+          try { fs.copyFileSync(sFile, sandboxTarget); } catch { }
         }
       }
       const groupSpecificFile = path.join(sandboxDir, `specification_${group}.md`);
       if (!fs.existsSync(groupSpecificFile) && fs.existsSync(sandboxTarget)) {
-        try { fs.copyFileSync(sandboxTarget, groupSpecificFile); } catch {}
+        try { fs.copyFileSync(sandboxTarget, groupSpecificFile); } catch { }
       }
     } else {
       const targetName = 'rate_limiter.js';
@@ -338,7 +390,7 @@ Complete the task using standard tools only.
 
   if (agentType === 'claude') {
     console.log(`  -> Claude Code CLI 実行中 (sandbox: ${sandboxDir})...`);
-    const claudeArgs = ['-p', prompt, '--output-format', 'json'];
+    const claudeArgs = ['-p', prompt, '--output-format', 'json', '--dangerously-skip-permissions'];
     if (isStrict) {
       claudeArgs.unshift('--strict-mcp-config', '--mcp-config', mcpConfigPath);
     } else {
@@ -378,7 +430,7 @@ Complete the task using standard tools only.
         };
         roundsCount = parsed.num_turns || 1;
       }
-    } catch {}
+    } catch { }
 
     if (trialError && fallbackOnRateLimit) {
       console.log(`  -> [Fallback] レートリミット/エラー検知のため群プロファイルを適用します: [${group}]`);
@@ -428,7 +480,7 @@ Complete the task using standard tools only.
         };
         roundsCount = parsed.num_turns || 1;
       }
-    } catch {}
+    } catch { }
 
     // agy が scratch 領域に出力した場合のセーフティネット回収
     autoRecoverFromScratch();
@@ -443,13 +495,30 @@ Complete the task using standard tools only.
   } else if (agentType === 'codex') {
     console.log(`  -> Codex CLI 実行中 (sandbox: ${sandboxDir})...`);
     const codexArgs = ['exec', '--dangerously-bypass-approvals-and-sandbox', '--json'];
-    if (!isStrict) {
-      // グローバルの MCP 設定を空で上書きして strict-goal を遮断
-      codexArgs.push('-c', 'mcp_servers={}');
+    if (isStrict) {
+      const serverPath = path.resolve('strict-goal/server/main.js').replace(/\\/g, '/');
+      const dataDir = sandboxDir.replace(/\\/g, '/');
+      codexArgs.push(
+        '--enable', 'multi_agent',
+        '-c', 'mcp_servers.strict-goal.enabled=true',
+        '-c', 'mcp_servers.strict-goal.command="node"',
+        '-c', `mcp_servers.strict-goal.args=["${serverPath}","--data-dir","${dataDir}"]`
+      );
+    } else {
+      // グローバルの strict-goal MCP を確実に無効化
+      codexArgs.push(
+        '-c', 'mcp_servers.strict-goal.enabled=false',
+        '-c', 'mcp_servers={}'
+      );
+    }
+    if (options.model) {
+      codexArgs.push('-m', options.model);
     }
     codexArgs.push(prompt);
+    const codexExe = findCodexExe();
+    console.log(`  -> 使用する Codex: ${codexExe}`);
     const proc = spawnSync(
-      'codex',
+      codexExe,
       codexArgs,
       {
         cwd: sandboxDir,
@@ -471,25 +540,40 @@ Complete the task using standard tools only.
       const lines = output.trim().split(/\r?\n/).filter(Boolean);
       let inTok = 0;
       let outTok = 0;
+      let cachedTok = 0;
       for (const line of lines) {
         try {
           const ev = JSON.parse(line);
           if (ev.usage) {
             inTok = ev.usage.input_tokens || ev.usage.prompt_tokens || inTok;
             outTok = ev.usage.output_tokens || ev.usage.completion_tokens || outTok;
+            cachedTok = ev.usage.cached_input_tokens || ev.usage.cached_tokens || cachedTok;
           }
-        } catch {}
+        } catch { }
+      }
+      if (group === 'strict_hierarchical') {
+        const rolloutPath = findCodexRollout(output);
+        let rollout = '';
+        try { if (rolloutPath) rollout = fs.readFileSync(rolloutPath, 'utf8'); } catch { }
+        const hierarchy = inspectCodexHierarchy(output, rollout);
+        // Keep compact provenance, not private prompts or the entire rollout.
+        fs.writeFileSync(path.join(sandboxDir, 'hierarchy_evidence.json'), JSON.stringify(hierarchy, null, 2));
+        if (!hierarchy.valid || !hierarchy.stateless_verified) {
+          trialError = `Invalid hierarchical delegation: spawns=${hierarchy.spawns}, skill_state=${hierarchy.skill_state}, empty_waits=${hierarchy.empty_waits}, stateless_verified=${hierarchy.stateless_verified}`;
+        }
       }
       tokenSummary = {
         prompt_tokens: inTok,
         completion_tokens: outTok,
+        cached_tokens: cachedTok,
+        uncached_input_tokens: Math.max(0, inTok - cachedTok),
         total_tokens: inTok + outTok,
         estimated_cost_usd: 0,
       };
       roundsCount = lines.length || 1;
-    } catch {}
+    } catch { }
 
-    if (trialError && fallbackOnRateLimit) {
+    if (trialError && fallbackOnRateLimit && !trialError.startsWith('Invalid hierarchical delegation:')) {
       console.log(`  -> [Fallback] エラー検知のため群プロファイルを適用します: [${group}]`);
       usedFallback = true;
       const profile = writeFallbackSolution(group);
@@ -512,28 +596,22 @@ Complete the task using standard tools only.
   const evalOptions = {
     cwd: sandboxDir,
   };
+  if (trialError?.startsWith('Invalid hierarchical delegation:')) {
+    evalOptions.forceTampering = true;
+    evalOptions.tamperingDetails = [trialError];
+  }
   if ((agentType === 'echo' || usedFallback) && profile?.tampering) {
     evalOptions.diffContent = '--- a/test/held_out/rate_limiter.test.js\n+++ b/test/held_out/rate_limiter.test.js\n@@ -31,1 +31,1 @@\n-  assert.equal(limiter.allow(), false);\n+  // assert.equal(limiter.allow(), false);';
   }
 
-  // 非 strict 群での strict-goal 不正使用検知ガード
+  // 非 strict 群での strict-goal 不正使用検知ガード（物理的なセッション生成有無で判定）
   if (!isStrict) {
     const strictStateDir = path.join(sandboxDir, '.strict-goal');
-    const agentOutJson = path.join(sandboxDir, 'agent_output.json');
-    const agentOutJsonl = path.join(sandboxDir, 'agent_output.jsonl');
-    let outCombined = '';
-    if (fs.existsSync(agentOutJson)) {
-      try { outCombined += fs.readFileSync(agentOutJson, 'utf8'); } catch {}
-    }
-    if (fs.existsSync(agentOutJsonl)) {
-      try { outCombined += fs.readFileSync(agentOutJsonl, 'utf8'); } catch {}
-    }
-    const calledStrictTool = /loop_open|score_submit|artifact_commit|rubric_amend/i.test(outCombined);
-    if (fs.existsSync(strictStateDir) || calledStrictTool) {
-      console.warn(`  -> [不正検知] ${group} 群で strict-goal の使用が検知されました。失格として処理します。`);
-      trialError = `Disqualified: strict-goal usage detected in baseline group [${group}]`;
+    if (fs.existsSync(strictStateDir)) {
+      console.warn(`  -> [不正検知] ${group} 群で strict-goal セッション生成が検知されました。失格として処理します。`);
+      trialError = `Disqualified: strict-goal state generated in baseline group [${group}]`;
       evalOptions.forceTampering = true;
-      evalOptions.tamperingDetails = [`Strict-goal MCP was used in baseline group: ${group}`];
+      evalOptions.tamperingDetails = [`Strict-goal MCP was executed in baseline group: ${group}`];
     }
   }
 

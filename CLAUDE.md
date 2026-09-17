@@ -1,4 +1,4 @@
-<!-- knowledge-kit:begin section=general-instructions version=1.12.0 -->
+<!-- knowledge-kit:begin section=general-instructions version=1.12.1 -->
 ## Communication Style
 - Use Caveman mode.
 - Drop filler words, preambles, and recaps.
@@ -25,7 +25,7 @@ planモードで作成したマークダウンファイルは、<プロジェク
   - `sg-verifier`: Ephemeral test verification and evaluation submitter.
 <!-- knowledge-kit:end section=general-instructions -->
 
-<!-- knowledge-kit:begin section=recording-rules version=1.12.0 -->
+<!-- knowledge-kit:begin section=recording-rules version=1.12.1 -->
 ## 知見の記録ルール
 
 **作業中に重要な知見を発見したら、ユーザーの指示を待たず自動で記録すること。**
@@ -39,7 +39,7 @@ planモードで作成したマークダウンファイルは、<プロジェク
 記録したら「〇〇をハマりポイントに追記しました」と一言報告する。
 <!-- knowledge-kit:end section=recording-rules -->
 
-<!-- knowledge-kit:begin section=gotchas version=1.12.0 -->
+<!-- knowledge-kit:begin section=gotchas version=1.12.1 -->
 ## ハマりポイント
 
 <!--
@@ -94,4 +94,7 @@ planモードで作成したマークダウンファイルは、<プロジェク
 - **`artifact_commit` の `near_total_rewrite`/`suspicious_shrink`/`unchanged` は設計上「拒否せず警告のみ」（§6.4.3 明記）**: プレースホルダ誤送信のような事故は単独指標では「正当な全面リライト」と区別できない（行の多重集合差分は言い換えでも重なり0になる）。両方同時発生＋絶対バイト数が極小（前周の10倍以上あった内容が200バイト未満に潰れる）という複合条件でのみ `destructive_overwrite` 警告を追加した（`config/defaults.js` の `DESTRUCTIVE_OVERWRITE_*`）。既存の「拒否しない」方針は変えていない（`warnings` は free-form 配列なのでスキーマ互換）。
 - **`subagents.test.js` はエージェントプロンプトの `helper.js` 言及を必須パターンとしてアサートする**: サブエージェント（`sg-implementer`, `sg-coder` 等）のプロンプト定義を改定する際、テスト実行やマニフェスト計算の言及として `helper.js` を削ると `test/subagents.test.js` でアサーションエラーとなる。委譲先への指示文言等で必ず `helper.js` の言及を残すこと。
 - **`design` モードのルーブリックには `verification:"auto"` 基準が3件存在する**: `interface_completeness`, `packaging_conformance`, `defaults_decided` の3基準は `verification:"auto"` であり、`score_submit` 時に `command` 根拠が最低1件添付されていないと `E_EVIDENCE_KIND` で拒絶される。locator のみでは通らないため、本文を検索・検証するコマンド等の `command` 根拠を必ず付与すること。
+- **`rubric_preset:"design"` は strict-goal ハーネス自体（agentic loop/state machine/packaging等）の設計評価用ルーブリックであり、汎用ソフトウェアのクラス設計書のような通常のプログラミングタスクとは題材が根本的にミスマッチする**: `state_externalized`, `verdict_ownership`, `anti_gaming`, `state_machine`, `packaging_conformance`, `self_hosting` 等の基準は「ハーネス／エージェントループの設計」前提であり、RateLimiter のような一般的なクラス設計書では本質的に言及しようがなく score 1 に張り付く。汎用プログラミングタスクで `/goal` を使う場合は preset を使わず、`loop_open` の `rubric` パラメータでタスクに即したカスタム基準（API仕様の完全性・エラー処理・テスト容易性・エッジケース網羅等）を明示的に渡すこと。
+- **ベンチマークでのツール禁止はプロンプト縛りではなくサンドボックス設定で物理遮断すること**: プロンプトに「`loop_open` 等は使用禁止」と書くと、エージェントがプロンプトファイルを `cat` で読んだ際にログに文字列が現れ、不正検知の正規表現マッチで誤失格となる。プロンプトは純粋なタスク指示のみとし、Codex ならサンドボックス直下に空の `.codex/config.toml`、Claude なら `--strict-mcp-config` を配置して物理的にツールを提供しないこと。
 <!-- knowledge-kit:end section=gotchas -->
+

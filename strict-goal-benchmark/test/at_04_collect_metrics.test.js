@@ -48,6 +48,7 @@ test('AT-04: トークン収集とメトリクス集計', () => {
 
   assert.equal(colRes.ok, true);
   assert.ok(colRes.tokens.total_tokens > 0);
+  assert.equal(colRes.tokens.uncached_input_tokens, 57850);
   assert.equal(colRes.rounds_count, 2);
   assert.equal(colRes.final_verdict, 'FINAL');
 

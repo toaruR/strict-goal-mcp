@@ -71,6 +71,7 @@ export function createTrialManifest({
       prompt_tokens: token_summary?.prompt_tokens ?? 0,
       completion_tokens: token_summary?.completion_tokens ?? 0,
       cached_tokens: token_summary?.cached_tokens ?? 0,
+      uncached_input_tokens: token_summary?.uncached_input_tokens ?? Math.max(0, (token_summary?.prompt_tokens ?? 0) - (token_summary?.cached_tokens ?? 0)),
       total_tokens: token_summary?.total_tokens ?? 0,
       estimated_cost_usd: token_summary?.estimated_cost_usd ?? 0.0,
     },

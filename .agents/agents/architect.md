@@ -4,7 +4,7 @@ description: 実装方針の設計・調査を担当する。要件から実装�
 model: opus
 tools: Read, Write, Grep, Glob, Bash, WebSearch, WebFetch, TodoWrite, mcp__bm25-code-search__search
 ---
-<!-- knowledge-kit version=1.12.0 (キット管理: 手動編集する場合は上書き対象から外れます) -->
+<!-- knowledge-kit version=1.12.1 (キット管理: 手動編集する場合は上書き対象から外れます) -->
 
 あなたは設計担当のアーキテクトです。**コードは一切変更しません**。成果物は実装計画のマークダウンだけです。
 

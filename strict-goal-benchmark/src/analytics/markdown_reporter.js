@@ -68,6 +68,9 @@ export function generateEnglishCharacteristics(row, trials = []) {
         return 'Disqualified: test tampering detected during subagent orchestration.';
       }
       if (row.resolved_rate >= 1) {
+        if (row.avg_tokens > 500000) {
+          return 'Subagent orchestration achieved full verification, but incurred high token overhead from delegation cycles.';
+        }
         return 'Subagent delegation achieved full verification with substantial token reduction over monolithic loop.';
       }
       return 'Hierarchical subagents coordinated but failed to reach verified final state.';
@@ -109,14 +112,14 @@ export function generateMarkdownReport({
   md += `**Generated At**: \`${new Date().toISOString()}\`\n\n`;
 
   md += `## 1. 5-Group Comparative Performance\n\n`;
-  md += `| Treatment Group | Resolved Rate (Pass@1) | Shortcut Rate | Avg Tokens | Avg Cost (USD) | Avg Rounds | Characteristics (特徴) |\n`;
-  md += `|---|---|---|---|---|---|---|\n`;
+  md += `| Treatment Group | Resolved Rate (Pass@1) | Shortcut Rate | Avg billed tokens | Avg cached input | Avg non-cached input | Avg output | Avg Cost (USD) | Avg Rounds | Characteristics (特徴) |\n`;
+  md += `|---|---|---|---|---|---|---|---|---|---|\n`;
 
   for (const row of sortedTable) {
     const resPercent = `${(row.resolved_rate * 100).toFixed(1)}%`;
     const scPercent = `${(row.shortcut_rate * 100).toFixed(1)}%`;
     const charDesc = row.characteristics || generateEnglishCharacteristics(row);
-    md += `| **${row.group}** | ${resPercent} | ${scPercent} | ${row.avg_tokens.toLocaleString()} | $${row.avg_cost_usd.toFixed(3)} | ${row.avg_rounds} | ${charDesc} |\n`;
+    md += `| **${row.group}** | ${resPercent} | ${scPercent} | ${row.avg_tokens.toLocaleString()} | ${(row.avg_cached_tokens || 0).toLocaleString()} | ${(row.avg_uncached_input_tokens || 0).toLocaleString()} | ${(row.avg_completion_tokens || 0).toLocaleString()} | $${row.avg_cost_usd.toFixed(3)} | ${row.avg_rounds} | ${charDesc} |\n`;
   }
 
   md += `\n## 2. Statistical Hypothesis Testing\n\n`;
@@ -152,10 +155,10 @@ export function saveReports(outputDir, bench_id, reportData) {
   const jsonPath = path.join(outputDir, 'report.json');
   writeFileSync(jsonPath, JSON.stringify(normalizedReportData, null, 2), 'utf8');
 
-  let csvContent = 'group,resolved_rate,shortcut_rate,avg_tokens,avg_cost_usd,avg_rounds,characteristics\n';
+  let csvContent = 'group,resolved_rate,shortcut_rate,avg_billed_tokens,avg_prompt_tokens,avg_cached_input_tokens,avg_non_cached_input_tokens,avg_output_tokens,avg_cost_usd,avg_rounds,characteristics\n';
   for (const row of sortedTable) {
     const charDesc = `"${(row.characteristics || generateEnglishCharacteristics(row)).replace(/"/g, '""')}"`;
-    csvContent += `${row.group},${row.resolved_rate},${row.shortcut_rate},${row.avg_tokens},${row.avg_cost_usd},${row.avg_rounds},${charDesc}\n`;
+    csvContent += `${row.group},${row.resolved_rate},${row.shortcut_rate},${row.avg_tokens},${row.avg_prompt_tokens || 0},${row.avg_cached_tokens || 0},${row.avg_uncached_input_tokens || 0},${row.avg_completion_tokens || 0},${row.avg_cost_usd},${row.avg_rounds},${charDesc}\n`;
   }
   const csvPath = path.join(outputDir, 'report.csv');
   writeFileSync(csvPath, csvContent, 'utf8');

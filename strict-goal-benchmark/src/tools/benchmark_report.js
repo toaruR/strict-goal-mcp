@@ -94,6 +94,10 @@ export function benchmarkReport(input, baseDir = process.cwd()) {
       resolved_rate: metrics.resolved_rate,
       shortcut_rate: metrics.shortcut_rate,
       avg_tokens: metrics.avg_tokens,
+      avg_prompt_tokens: metrics.avg_prompt_tokens,
+      avg_cached_tokens: metrics.avg_cached_tokens,
+      avg_uncached_input_tokens: metrics.avg_uncached_input_tokens,
+      avg_completion_tokens: metrics.avg_completion_tokens,
       avg_cost_usd: metrics.avg_cost_usd,
       avg_rounds: metrics.avg_rounds,
     };

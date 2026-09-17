@@ -34,6 +34,7 @@ export function benchmarkCollect(input, baseDir = process.cwd(), options = {}) {
     prompt_tokens: 142050,
     completion_tokens: 18400,
     cached_tokens: 84200,
+    uncached_input_tokens: 57850,
     total_tokens: 160450,
     estimated_cost_usd: 0.485,
   };
@@ -142,6 +143,7 @@ export function benchmarkCollect(input, baseDir = process.cwd(), options = {}) {
       prompt_tokens: tokenSummary.prompt_tokens,
       completion_tokens: tokenSummary.completion_tokens,
       cached_tokens: tokenSummary.cached_tokens,
+      uncached_input_tokens: tokenSummary.uncached_input_tokens ?? Math.max(0, (tokenSummary.prompt_tokens ?? 0) - (tokenSummary.cached_tokens ?? 0)),
       total_tokens: tokenSummary.total_tokens,
     },
     cost_usd: tokenSummary.estimated_cost_usd,

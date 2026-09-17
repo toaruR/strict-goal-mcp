@@ -55,6 +55,8 @@ test('AT-06: 最終統計レポート出力と p 値検定', () => {
 
   assert.equal(reportRes.ok, true);
   assert.ok(reportRes.comparison_table.length > 0);
+  assert.ok(Object.hasOwn(reportRes.comparison_table[0], 'avg_cached_tokens'));
+  assert.ok(Object.hasOwn(reportRes.comparison_table[0], 'avg_uncached_input_tokens'));
   assert.ok(typeof reportRes.statistical_significance.p_value_pass_rate === 'number');
   assert.equal(reportRes.statistical_significance.significant, true);
   assert.ok(fs.existsSync(reportRes.report_paths.markdown));

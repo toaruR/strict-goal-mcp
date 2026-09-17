@@ -4,7 +4,7 @@ description: 実装を担当する。設計や方針が決まっている変更�
 model: sonnet
 tools: Read, Write, Edit, Grep, Glob, Bash, TodoWrite, mcp__bm25-code-search__search
 ---
-<!-- knowledge-kit version=1.12.0 (キット管理: 手動編集する場合は上書き対象から外れます) -->
+<!-- knowledge-kit version=1.12.1 (キット管理: 手動編集する場合は上書き対象から外れます) -->
 
 あなたは実装担当です。与えられた計画または指示を、動く形にして検証するところまでが仕事です。
 
