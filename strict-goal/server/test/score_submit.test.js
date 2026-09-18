@@ -299,3 +299,110 @@ test('受理された提出は rounds/<round>.json に、拒否された提出�
   const accepted = JSON.parse(readFileSync(acceptedPath, 'utf8'));
   assert.equal(accepted.verdict, 'FINAL');
 });
+
+test('buildMustFix は priority 降順 -> スコア昇順で並び替え、高優先・高得点が低優先・低得点より先頭に来る', () => {
+  const persistence = durablePersistence();
+  const rubricWithPriority = {
+    criteria: [
+      {
+        id: 'low_prio_low_score',
+        statement: '0123456789012345',
+        weight: 1,
+        priority: 0,
+        verification: 'manual',
+        anchors: { 1: 'weak-1', 5: 'fair-5', 9: 'good-9' },
+      },
+      {
+        id: 'high_prio_high_score',
+        statement: '0123456789012345',
+        weight: 1,
+        priority: 3,
+        verification: 'manual',
+        anchors: { 1: 'weak-1', 5: 'fair-5', 9: 'good-9' },
+      },
+      {
+        id: 'mid_prio',
+        statement: '0123456789012345',
+        weight: 1,
+        priority: 2,
+        verification: 'manual',
+        anchors: { 1: 'weak-1', 5: 'fair-5', 9: 'good-9' },
+      },
+      {
+        id: 'fourth_criterion',
+        statement: '0123456789012345',
+        weight: 1,
+        priority: 0,
+        verification: 'manual',
+        anchors: { 1: 'weak-1', 5: 'fair-5', 9: 'good-9' },
+      },
+    ],
+  };
+  const created = loopOpenCreate({
+    input: {
+      mode: 'create',
+      submission_id: submissionId(),
+      task: 'サンプルタスクの説明文で20文字以上になるようにする',
+      loop_mode: 'design',
+      rubric: rubricWithPriority,
+    },
+    persistence,
+  });
+  const committed = artifactCommit({
+    input: {
+      session_id: created.session_id,
+      submission_id: submissionId(),
+      expected_round: 1,
+      content: '本文は十分な長さを持っており検証可能な文です。\n'.repeat(10),
+      change_note: 'これは20文字以上ある変更理由の説明文です',
+    },
+    persistence,
+  });
+
+  const result = scoreSubmit({
+    input: {
+      session_id: created.session_id,
+      submission_id: submissionId(),
+      expected_round: 1,
+      artifact_digest: committed.artifact.digest,
+      scores: [
+        {
+          criterion_id: 'low_prio_low_score',
+          score: 5,
+          rationale: 'a'.repeat(45),
+          weakness: 'b'.repeat(15),
+          evidence: [{ kind: 'locator', locator: '§1', excerpt: '本文は十分な長さを持っており検証可能な文です。' }],
+        },
+        {
+          criterion_id: 'high_prio_high_score',
+          score: 8,
+          rationale: 'a'.repeat(45),
+          weakness: 'b'.repeat(15),
+          evidence: [{ kind: 'locator', locator: '§1', excerpt: '本文は十分な長さを持っており検証可能な文です。' }],
+        },
+        {
+          criterion_id: 'mid_prio',
+          score: 6,
+          rationale: 'a'.repeat(45),
+          weakness: 'b'.repeat(15),
+          evidence: [{ kind: 'locator', locator: '§1', excerpt: '本文は十分な長さを持っており検証可能な文です。' }],
+        },
+        {
+          criterion_id: 'fourth_criterion',
+          score: 4,
+          rationale: 'a'.repeat(45),
+          weakness: 'b'.repeat(15),
+          evidence: [{ kind: 'locator', locator: '§1', excerpt: '本文は十分な長さを持っており検証可能な文です。' }],
+        },
+      ],
+    },
+    persistence,
+  });
+
+  assert.equal(result.verdict, 'ITERATING');
+  assert.equal(result.must_fix.length, 3);
+  assert.deepEqual(
+    result.must_fix.map((m) => m.criterion_id),
+    ['high_prio_high_score', 'mid_prio', 'fourth_criterion'],
+  );
+});

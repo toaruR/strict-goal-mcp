@@ -75,3 +75,17 @@ test('policy に必須の閾値フィールドが含まれる', () => {
     assert.ok(key in rubric.policy, key);
   }
 });
+
+test('criterion の priority は 0〜3 の整数のみ受理され、範囲外や型違いは E_VALIDATION になる', () => {
+  assert.doesNotThrow(() => validateRubric({ criteria: [criterion('c1', { priority: 0 })], policy: policy() }));
+  assert.doesNotThrow(() => validateRubric({ criteria: [criterion('c1', { priority: 3 })], policy: policy() }));
+  assert.throws(() => validateRubric({ criteria: [criterion('c1', { priority: -1 })], policy: policy() }), { code: 'E_VALIDATION' });
+  assert.throws(() => validateRubric({ criteria: [criterion('c1', { priority: 4 })], policy: policy() }), { code: 'E_VALIDATION' });
+  assert.throws(() => validateRubric({ criteria: [criterion('c1', { priority: 1.5 })], policy: policy() }), { code: 'E_VALIDATION' });
+});
+
+test('policy の scope_guard_terms は配列として受理され、未知キーは additionalProperties:false で E_VALIDATION になる', () => {
+  assert.doesNotThrow(() => validateRubric({ criteria: [criterion('c1')], policy: policy({ scope_guard_terms: ['配布', 'CI'] }) }));
+  assert.throws(() => validateRubric({ criteria: [criterion('c1')], policy: policy({ unknown_policy_key: 'invalid' }) }), { code: 'E_VALIDATION' });
+});
+

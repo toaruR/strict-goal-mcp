@@ -21,3 +21,4 @@ rubric-loop-agy/
 strict-goal-old/
 .agents/agents/
 .cursor/rules/
+.benchmark/

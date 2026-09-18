@@ -23,6 +23,7 @@ export const RUBRIC_SCHEMA = {
           title: { type: 'string', minLength: 1, maxLength: 120 },
           description: { type: 'string', minLength: 1, maxLength: 2000 },
           weight: { type: 'integer', minimum: 1, maximum: 5 },
+          priority: { type: 'integer', minimum: 0, maximum: 3 },
           anchors: {
             type: 'object',
             additionalProperties: false,
@@ -60,6 +61,11 @@ export const RUBRIC_SCHEMA = {
         min_rounds: { type: 'integer', minimum: 1, maximum: 10 },
         first_round_ceiling: { type: 'integer', minimum: 1, maximum: 10 },
         min_first_round_must_fix: { type: 'integer', minimum: 0, maximum: 5 },
+        scope_guard_terms: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+        artifact_budget_bytes: { type: 'integer', minimum: 1 },
       },
     },
   },

@@ -12,6 +12,7 @@ export function convertInputCriterion(criterion) {
     title: criterion.id,
     description: criterion.statement,
     weight: criterion.weight,
+    priority: criterion.priority ?? 0,
     anchors: criterion.anchors,
     verification: criterion.verification,
     verify_hint: hint,

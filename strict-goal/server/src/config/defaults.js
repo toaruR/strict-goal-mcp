@@ -22,6 +22,8 @@ export const ARTIFACT_MAX_BYTES = 1000000;
 // 結果が絶対的に極小のとき「プレースホルダ等での破壊的上書き」を疑う複合警告。
 export const DESTRUCTIVE_OVERWRITE_MIN_BYTES = 200;
 export const DESTRUCTIVE_OVERWRITE_PREVIOUS_MULTIPLE = 10;
+export const APPENDIX_ACCRETION_PATTERN = /(?:補足|変更履歴|自己検証|レビュー記録|追記)/;
+export const APPENDIX_TAIL_RATIO = 0.2;
 export const CRITERIA_MAX = 40;
 export const PLAN_MAX_TASKS = 200;
 

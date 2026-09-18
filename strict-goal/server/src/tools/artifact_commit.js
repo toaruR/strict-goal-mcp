@@ -18,6 +18,7 @@ import { parsePlanContent } from '../artifact/plan_schema.js';
 import { checkPlan } from '../artifact/plan_checks.js';
 import { checkDesignRefs } from '../artifact/design_refs.js';
 import { checkSupersede } from '../chain/supersede.js';
+import { loadRubric } from '../rubric/store.js';
 import { recordCommitForRound } from '../judge/round_store.js';
 import { recordVisitedFile } from '../store/trial_history.js';
 import {
@@ -25,7 +26,10 @@ import {
   ARTIFACT_MAX_BYTES,
   DESTRUCTIVE_OVERWRITE_MIN_BYTES,
   DESTRUCTIVE_OVERWRITE_PREVIOUS_MULTIPLE,
+  APPENDIX_ACCRETION_PATTERN,
+  APPENDIX_TAIL_RATIO,
 } from '../config/defaults.js';
+import { scanHeadings } from '../artifact/heading_scan.js';
 import { buildEnvelope } from '../mcp/envelope.js';
 
 function fail(code, message, detail = {}) {
@@ -177,6 +181,22 @@ export function artifactCommit({ input, persistence }) {
         }
       }
       if (unchanged) warnings.push('artifact_unchanged');
+      const rubric = loadRubric(sDir, session.rubric_version);
+      if (rubric?.policy?.artifact_budget_bytes && bytes > rubric.policy.artifact_budget_bytes) {
+        warnings.push('over_budget');
+      }
+      if (session.artifact_kind === 'markdown' || session.artifact_kind === 'text') {
+        const headings = scanHeadings(input.content, APPENDIX_TAIL_RATIO);
+        if (headings.some((h) => h.isTail && APPENDIX_ACCRETION_PATTERN.test(h.raw))) {
+          warnings.push('appendix_accretion');
+        }
+        const terms = rubric?.policy?.scope_guard_terms;
+        if (Array.isArray(terms) && terms.length > 0) {
+          if (headings.some((h) => terms.some((term) => h.raw.includes(term)))) {
+            warnings.push('out_of_scope_section');
+          }
+        }
+      }
 
       currentArtifactState = { digest, bytes, committed_at: null };
     }
