@@ -48,8 +48,9 @@ export function scoreSubmitSkeleton(sessionId, round, artifactDigest) {
   };
 }
 
-export function artifactCommitSkeleton(sessionId, round, requiredAddress) {
+export function artifactCommitSkeleton(sessionId, round, requiredAddress, budgetBytes) {
   return {
+    ...(budgetBytes ? { artifact_budget_bytes: budgetBytes, note: 'check byte size before committing (e.g. wc -c); over budget is a warning, but it costs a round to fix' } : {}),
     session_id: sessionId ?? '<session_id>',
     submission_id: '<unique 8-128 chars>',
     expected_round: round ?? 1,
@@ -64,7 +65,7 @@ export function artifactCommitSkeleton(sessionId, round, requiredAddress) {
 }
 
 function defaultNextAction(state, ctx = {}) {
-  const { sessionId, round, artifactDigest, requiredAddress } = ctx;
+  const { sessionId, round, artifactDigest, requiredAddress, budgetBytes } = ctx;
   if (state && TERMINAL_STATES.has(state)) {
     return { tool: 'audit_export', input_skeleton: { session_id: sessionId ?? '<session_id>', scope: 'session' } };
   }
@@ -72,7 +73,7 @@ function defaultNextAction(state, ctx = {}) {
     return { tool: 'score_submit', input_skeleton: scoreSubmitSkeleton(sessionId, round, artifactDigest) };
   }
   if (state === 'DRAFTING') {
-    return { tool: 'artifact_commit', input_skeleton: artifactCommitSkeleton(sessionId, round, requiredAddress) };
+    return { tool: 'artifact_commit', input_skeleton: artifactCommitSkeleton(sessionId, round, requiredAddress, budgetBytes) };
   }
   if (state === 'STALLED' || state === 'ESCALATED') {
     return { tool: 'escalate', input_skeleton: { session_id: sessionId ?? '<session_id>', action: '<resolve|request_human|rebase|kickback|reopen>' } };
@@ -116,6 +117,7 @@ export function buildEnvelope({
   reopened,
   exportInfo,
   skillState,
+  warningHints,
 } = {}) {
   const envelope = {
     resultType: 'complete',
@@ -130,6 +132,7 @@ export function buildEnvelope({
       round,
       artifactDigest: artifact?.digest ?? currentArtifact?.digest,
       requiredAddress: Array.isArray(mustFix) && mustFix.length > 0 ? mustFix[0]?.criterion_id : undefined,
+      budgetBytes: rubric?.policy?.artifact_budget_bytes,
     }),
     warnings,
   };
@@ -160,6 +163,7 @@ export function buildEnvelope({
   if (reopened !== undefined) envelope.reopened = reopened;
   if (exportInfo !== undefined) envelope.export = exportInfo;
   if (skillState !== undefined) envelope.skill_state = skillState;
+  if (warningHints !== undefined && Object.keys(warningHints).length > 0) envelope.warning_hints = warningHints;
   return envelope;
 }
 

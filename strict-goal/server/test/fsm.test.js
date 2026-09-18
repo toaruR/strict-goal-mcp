@@ -45,7 +45,14 @@ test('DRAFTING で score_submit を呼ぶと E_STATE_VIOLATION になり expecte
 });
 
 test('SCORING で artifact_commit と rubric_amend が拒否される', () => {
-  assert.throws(() => checkStateTransition('SCORING', 'artifact_commit'), { code: 'E_STATE_VIOLATION' });
+  assert.throws(
+    () => checkStateTransition('SCORING', 'artifact_commit'),
+    (err) =>
+      err.code === 'E_STATE_VIOLATION' &&
+      err.detail.expected_tools.includes('score_submit') &&
+      err.message.includes('call score_submit') &&
+      err.message.includes('Do not revert your working file'),
+  );
   assert.throws(() => checkStateTransition('SCORING', 'rubric_amend'), { code: 'E_STATE_VIOLATION' });
 });
 

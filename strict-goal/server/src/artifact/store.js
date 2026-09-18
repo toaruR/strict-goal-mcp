@@ -67,6 +67,12 @@ export function artifactRelativePath(digest, artifactKind) {
   return `artifacts/sha256-${hex}${ext}`;
 }
 
+// 保存済み成果物の絶対パス。検証者は作業ファイルではなくこのコピーを読む
+// （コミット後に作業ファイルを編集しても採点対象がずれない＝著者は次周の下書きを続けられる）。
+export function artifactStoredPath(sDir, digest, artifactKind) {
+  return path.resolve(artifactPath(sDir, digest, artifactKind));
+}
+
 export function readArtifactIndex(sDir) {
   const target = indexPath(sDir);
   if (!fs.existsSync(target)) return {};

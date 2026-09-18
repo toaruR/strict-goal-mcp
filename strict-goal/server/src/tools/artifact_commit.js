@@ -12,6 +12,7 @@ import {
   readArtifactContent,
   recordArtifactForRound,
   computeContentDiff,
+  artifactStoredPath,
 } from '../artifact/store.js';
 import { validateFilesetManifest, computeFilesetDiff } from '../artifact/fileset.js';
 import { assertTestInventoryRequired, checkTestInventoryOnCommit } from '../implement/test_inventory.js';
@@ -242,6 +243,8 @@ export function artifactCommit({ input, persistence }) {
       const rubric = loadRubric(sDir, session.rubric_version);
       if (rubric?.policy?.artifact_budget_bytes && bytes > rubric.policy.artifact_budget_bytes) {
         warnings.push('over_budget');
+        artifact.budget_bytes = rubric.policy.artifact_budget_bytes;
+        artifact.over_budget_by = bytes - rubric.policy.artifact_budget_bytes;
       }
       if (session.artifact_kind === 'markdown' || session.artifact_kind === 'text') {
         const headings = scanHeadings(content, APPENDIX_TAIL_RATIO);
@@ -258,6 +261,10 @@ export function artifactCommit({ input, persistence }) {
 
       currentArtifactState = { digest, bytes, committed_at: null };
     }
+
+    // Verifiers must inspect the immutable committed snapshot, not a source_path file
+    // that the author may change while the session is in SCORING.
+    artifact.stored_path = artifactStoredPath(sDir, digest, session.artifact_kind);
 
     recordArtifactForRound(sDir, session.round, digest);
 
@@ -296,6 +303,34 @@ export function artifactCommit({ input, persistence }) {
       persistence: persistence.mode,
       warnings,
       artifact,
+      warningHints: buildWarningHints(warnings, artifact),
     });
   });
+}
+
+// 警告ごとに「今なにをすべきか」を添える。commit 直後は SCORING で成果物が凍結されているため、
+// 警告を見た著者が採点前に本文を直しに戻る（→ E_STATE_VIOLATION → 復元、で数分を失う）のを防ぐ。
+const FROZEN_NOTE =
+  'The artifact is frozen at this digest until score_submit returns. Do not edit or re-commit now; ' +
+  'the verifier reads artifact.stored_path, so you may keep drafting the next round in your working file.';
+
+export function buildWarningHints(warnings, artifact) {
+  const hints = {};
+  for (const w of warnings) {
+    if (w === 'over_budget') {
+      hints[w] =
+        `bytes ${artifact.bytes} exceed artifact_budget_bytes ${artifact.budget_bytes} by ${artifact.over_budget_by}. ` +
+        'This is a warning, not a rejection: score this round as-is and trim in the next round. ' + FROZEN_NOTE;
+    } else if (w === 'near_total_rewrite' || w === 'suspicious_shrink' || w === 'destructive_overwrite') {
+      hints[w] = 'Check that the committed body is the intended full artifact (not a placeholder or a partial file). ' +
+        'If it is correct, proceed to score_submit. ' + FROZEN_NOTE;
+    } else if (w === 'artifact_unchanged') {
+      hints[w] = 'Identical to the previous round. Score it anyway; anti-gaming checks will reject score increases without new evidence.';
+    } else if (w === 'appendix_accretion' || w === 'out_of_scope_section') {
+      hints[w] = 'Structural warning for the next revision; do not edit before scoring. ' + FROZEN_NOTE;
+    } else {
+      hints[w] = FROZEN_NOTE;
+    }
+  }
+  return hints;
 }

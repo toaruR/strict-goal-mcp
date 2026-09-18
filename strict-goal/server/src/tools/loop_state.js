@@ -7,6 +7,7 @@ import { loadRubric } from '../rubric/store.js';
 import { readChain } from '../chain/store.js';
 import { computeChainRounds } from '../chain/budget.js';
 import { checkSupersede } from '../chain/supersede.js';
+import { artifactStoredPath } from '../artifact/store.js';
 import { buildEnvelope } from '../mcp/envelope.js';
 import { projectSkillState } from '../skill_state/projector.js';
 
@@ -109,7 +110,10 @@ export function loopState({ input, persistence }) {
     extra.mustFix = session.last_evaluation?.must_fix ?? [];
   }
   if (include.includes('artifact_head') && session.current_artifact) {
-    extra.currentArtifact = session.current_artifact;
+    extra.currentArtifact = {
+      ...session.current_artifact,
+      stored_path: artifactStoredPath(sessionDir(dataDir, session.session_id), session.current_artifact.digest, session.artifact_kind),
+    };
   }
   if (include.includes('upstream')) {
     if (!session.upstream) {

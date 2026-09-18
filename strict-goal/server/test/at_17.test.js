@@ -232,6 +232,8 @@ test('AT-17: implementセッションのハンドル1個からloop_open(resume)�
   );
   assert.equal(state.current_artifact.digest, c1.artifact.digest);
   assert.ok(Array.isArray(state.current_artifact.files));
+  assert.equal(path.isAbsolute(state.current_artifact.stored_path), true);
+  assert.equal(state.current_artifact.stored_path, c1.artifact.stored_path);
 
   // 3. 上流(plan)セッションが物理的に消えている場合:
   // 設計書はorphan:true/warnings:["upstream_missing"]という縮退を期待するが、

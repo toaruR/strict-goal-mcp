@@ -400,13 +400,20 @@ test('policy.artifact_budget_bytes を超える本文で over_budget 警告が�
   });
 
   // 1. 28001 バイトの本文 -> over_budget 警告が出る
-  const bigContent = 'a'.repeat(28001);
+  const bigContent = `${'a'.repeat(28000)}\n`;
   const resBig = artifactCommit({
     input: { session_id: created.session_id, submission_id: submissionId(), expected_round: 1, content: bigContent, change_note: CHANGE_NOTE },
     persistence,
   });
   assert.ok(resBig.warnings.includes('over_budget'));
   assert.equal(resBig.ok, true);
+  assert.equal(resBig.artifact.budget_bytes, 28000);
+  assert.equal(resBig.artifact.over_budget_by, 1);
+  assert.equal(readFileSync(resBig.artifact.stored_path, 'utf8'), bigContent);
+  assert.match(resBig.warning_hints.over_budget, /warning, not a rejection/i);
+  assert.match(resBig.warning_hints.over_budget, /score this round as-is/i);
+  assert.match(resBig.warning_hints.over_budget, /do not edit or re-commit now/i);
+  assert.equal(resBig.next_action.tool, 'score_submit');
 
   // 2. 28000 バイト以下の本文 -> over_budget 警告は出ない
   let session = readSession(persistence.dir, created.session_id);
