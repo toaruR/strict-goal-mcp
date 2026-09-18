@@ -251,12 +251,31 @@ args = ["${serverPath.replace(/\\/g, '/')}", "--data-dir", "${sandboxDir.replace
     fs.writeFileSync(codexConfigPath, codexToml, 'utf8');
 
     // サブエージェント定義をサンドボックス内に複製
-    const agentsSrcDir = path.resolve('.agents/agents');
-    const agentsDestDir = path.join(sandboxDir, '.agents', 'agents');
+    // サンドボックスは独立 git リポジトリなので親の .claude/agents/ は探索されない。
+    // Claude Code は <cwd>/.claude/agents/ しか読まないため、.agents/agents/（Codex 用）と両方に置く。
+    const agentsSrcDir = fs.existsSync(path.resolve('.claude/agents'))
+      ? path.resolve('.claude/agents')
+      : path.resolve('.agents/agents');
+    const agentsDestDirs = [
+      path.join(sandboxDir, '.agents', 'agents'),
+      path.join(sandboxDir, '.claude', 'agents'),
+    ];
     if (fs.existsSync(agentsSrcDir)) {
-      fs.mkdirSync(agentsDestDir, { recursive: true });
-      for (const f of fs.readdirSync(agentsSrcDir)) {
-        try { fs.copyFileSync(path.join(agentsSrcDir, f), path.join(agentsDestDir, f)); } catch { }
+      for (const agentsDestDir of agentsDestDirs) {
+        fs.mkdirSync(agentsDestDir, { recursive: true });
+        for (const f of fs.readdirSync(agentsSrcDir)) {
+          try { fs.copyFileSync(path.join(agentsSrcDir, f), path.join(agentsDestDir, f)); } catch { }
+        }
+      }
+    }
+
+    // Codex のカスタムエージェント定義（.codex/agents/*.toml）も複製（config.toml は上で別途生成済み）
+    const codexAgentsSrcDir = path.resolve('.codex/agents');
+    const codexAgentsDestDir = path.join(codexDir, 'agents');
+    if (fs.existsSync(codexAgentsSrcDir)) {
+      fs.mkdirSync(codexAgentsDestDir, { recursive: true });
+      for (const f of fs.readdirSync(codexAgentsSrcDir)) {
+        try { fs.copyFileSync(path.join(codexAgentsSrcDir, f), path.join(codexAgentsDestDir, f)); } catch { }
       }
     }
 
@@ -422,10 +441,16 @@ This is an isolated benchmark trial. Complete the task using standard tools only
         trialError = parsed.result || `API Error: ${parsed.api_error_status}`;
         console.warn(`  -> Claude Code エラー検知: ${trialError}`);
       } else {
+        const cachedIn = parsed.usage?.cache_read_input_tokens || parsed.usage?.cached_tokens || 0;
+        const uncachedIn = (parsed.usage?.input_tokens || 0) + (parsed.usage?.cache_creation_input_tokens || 0);
+        const promptTok = cachedIn + uncachedIn;
+        const outTok = parsed.usage?.output_tokens || parsed.usage?.completion_tokens || 0;
         tokenSummary = {
-          prompt_tokens: parsed.usage?.input_tokens || 0,
-          completion_tokens: parsed.usage?.output_tokens || 0,
-          total_tokens: (parsed.usage?.input_tokens || 0) + (parsed.usage?.output_tokens || 0),
+          prompt_tokens: promptTok,
+          cached_tokens: cachedIn,
+          uncached_input_tokens: uncachedIn,
+          completion_tokens: outTok,
+          total_tokens: promptTok + outTok,
           estimated_cost_usd: parsed.total_cost_usd || parsed.cost_usd || 0,
         };
         roundsCount = parsed.num_turns || 1;
@@ -470,13 +495,31 @@ This is an isolated benchmark trial. Complete the task using standard tools only
         trialError = parsed.response || parsed.result || 'AGY Error';
         console.warn(`  -> agy エラー検知: ${trialError}`);
       } else {
-        const inTok = parsed.usage?.input_tokens || parsed.usage?.prompt_tokens || 0;
+        const cachedIn =
+          parsed.usage?.cache_read_tokens ||
+          parsed.usage?.cache_read_input_tokens ||
+          parsed.usage?.cached_tokens ||
+          parsed.usage?.cached_input_tokens ||
+          0;
+        const rawIn = parsed.usage?.input_tokens || parsed.usage?.prompt_tokens || 0;
+        const cacheCreation = parsed.usage?.cache_creation_input_tokens || 0;
+        let uncachedIn;
+        let promptTok;
+        if (rawIn >= cachedIn && cachedIn > 0 && cacheCreation === 0) {
+          promptTok = rawIn;
+          uncachedIn = rawIn - cachedIn;
+        } else {
+          uncachedIn = rawIn + cacheCreation;
+          promptTok = cachedIn + uncachedIn;
+        }
         const outTok = parsed.usage?.output_tokens || parsed.usage?.completion_tokens || 0;
         tokenSummary = {
-          prompt_tokens: inTok,
+          prompt_tokens: promptTok,
+          cached_tokens: cachedIn,
+          uncached_input_tokens: uncachedIn,
           completion_tokens: outTok,
-          total_tokens: parsed.usage?.total_tokens || (inTok + outTok),
-          estimated_cost_usd: parsed.cost_usd || 0,
+          total_tokens: parsed.usage?.total_tokens || (promptTok + outTok),
+          estimated_cost_usd: parsed.cost_usd || parsed.total_cost_usd || 0,
         };
         roundsCount = parsed.num_turns || 1;
       }
@@ -489,7 +532,9 @@ This is an isolated benchmark trial. Complete the task using standard tools only
       console.log(`  -> [Fallback] エラー検知のため群プロファイルを適用します: [${group}]`);
       usedFallback = true;
       const profile = writeFallbackSolution(group);
-      tokenSummary = profile.tokens;
+      if (!tokenSummary || tokenSummary.total_tokens === 0) {
+        tokenSummary = profile.tokens;
+      }
       roundsCount = profile.rounds;
     }
   } else if (agentType === 'codex') {
@@ -551,10 +596,31 @@ This is an isolated benchmark trial. Complete the task using standard tools only
           }
         } catch { }
       }
+      const rolloutPath = findCodexRollout(output);
+      let rollout = '';
+      try { if (rolloutPath) rollout = fs.readFileSync(rolloutPath, 'utf8'); } catch { }
+
+      // タイムアウト等で turn.completed が出力されなかった場合、rollout から最新の消費トークンを回収
+      if (inTok === 0 && rollout) {
+        const rLines = rollout.split(/\r?\n/).filter(Boolean);
+        for (let i = rLines.length - 1; i >= 0; i--) {
+          try {
+            const item = JSON.parse(rLines[i]);
+            const usage =
+              item.payload?.turn_token_usage ||
+              item.payload?.info?.total_token_usage ||
+              item.payload?.usage;
+            if (usage && usage.input_tokens) {
+              inTok = usage.input_tokens;
+              outTok = usage.output_tokens || outTok;
+              cachedTok = usage.cached_input_tokens || cachedTok;
+              break;
+            }
+          } catch { }
+        }
+      }
+
       if (group === 'strict_hierarchical') {
-        const rolloutPath = findCodexRollout(output);
-        let rollout = '';
-        try { if (rolloutPath) rollout = fs.readFileSync(rolloutPath, 'utf8'); } catch { }
         const hierarchy = inspectCodexHierarchy(output, rollout);
         // Keep compact provenance, not private prompts or the entire rollout.
         fs.writeFileSync(path.join(sandboxDir, 'hierarchy_evidence.json'), JSON.stringify(hierarchy, null, 2));
@@ -577,7 +643,9 @@ This is an isolated benchmark trial. Complete the task using standard tools only
       console.log(`  -> [Fallback] エラー検知のため群プロファイルを適用します: [${group}]`);
       usedFallback = true;
       const profile = writeFallbackSolution(group);
-      tokenSummary = profile.tokens;
+      if (!tokenSummary || tokenSummary.total_tokens === 0) {
+        tokenSummary = profile.tokens;
+      }
       roundsCount = profile.rounds;
     }
   } else {
