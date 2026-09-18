@@ -3,13 +3,22 @@ __pycache__/
 .knowledge-kit/
 .bm25_index.db
 .claude/settings.json
-.claude/skills/
-.claude/agents/
+# 本プロジェクト固有の skill/agent 定義は追跡する（他はキット管理のため無視）
+.claude/skills/*
+!.claude/skills/strict-goal/
+!.claude/skills/goal/
+!.claude/skills/spec-doc/
+.claude/agents/*
+!.claude/agents/sg-*.md
 .claude/hooks/
 .codex/config.toml
-.codex/agents/
+.codex/agents/*
+!.codex/agents/sg-*.toml
 .codex/hooks/
-.agents/skills/
+.agents/skills/*
+!.agents/skills/strict-goal/
+!.agents/skills/goal/
+!.agents/skills/spec-doc/
 .agents/mcp_config.json
 .mcp.json
 .cursor/mcp.json
@@ -19,6 +28,5 @@ docs/knowledge-kit-usage.md
 .strict-goal/
 rubric-loop-agy/
 strict-goal-old/
-.agents/agents/
 .cursor/rules/
 .benchmark/

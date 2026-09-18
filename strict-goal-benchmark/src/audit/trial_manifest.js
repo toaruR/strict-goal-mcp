@@ -76,6 +76,9 @@ export function createTrialManifest({
       estimated_cost_usd: token_summary?.estimated_cost_usd ?? 0.0,
       // 実ラウンド数。未指定時は fsm_history 長（ダミー生成分）に頼らず 1 とする
       rounds: token_summary?.rounds ?? (fsm_history.length || 1),
+      // Agent ツールで起動したサブエージェント分（total_tokens に含まれる内訳）
+      subagent_count: token_summary?.subagent_count ?? 0,
+      subagent_total_tokens: token_summary?.subagent_total_tokens ?? 0,
     },
     fsm_history,
     ground_truth_eval: {

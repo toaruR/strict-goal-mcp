@@ -13,6 +13,8 @@ const SUPPORTED_KEYWORDS = new Set([
   'minLength',
   'maxLength',
   'uniqueItems',
+  // 注釈キーワード。検証には使わず、tools/list でクライアント（モデル）に見せる説明文として許容する
+  'description',
 ]);
 
 function fail(path, reason) {
@@ -123,7 +125,12 @@ export function validate(schema, value, path = '$') {
   if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
     if (schema.required) {
       for (const key of schema.required) {
-        if (!(key in value)) fail(`${path}.${key}`, `missing required key: ${key}`);
+        // 欠落キーを一度に全部返す。1件ずつ返すとモデルが再送のたびに別のキーで弾かれ、
+        // 巨大な score_submit 引数を何度も出力し直す（実測: 1採点で6回拒否）。
+        if (!(key in value)) {
+          const missing = schema.required.filter((k) => !(k in value));
+          fail(`${path}.${key}`, `missing required key: ${missing.join(', ')}`);
+        }
       }
     }
     const props = schema.properties || {};

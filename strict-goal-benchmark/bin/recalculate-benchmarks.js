@@ -155,34 +155,63 @@ export function findClaudeProjectSession(trialId) {
   return null;
 }
 
+// 1 セッション（メイン or サブエージェント1本）の usage を集計する。
+// Claude Code の jsonl は assistant メッセージの content ブロックごとに 1 行を書き、
+// 各行に同一の usage を複写するため、message.id で重複排除しないと 2〜3 倍に過大計上される。
+function sumClaudeJsonl(sessionPath) {
+  const lines = fs.readFileSync(sessionPath, 'utf8').split(/\r?\n/).filter(Boolean);
+  const byMessage = new Map();
+  let totalCost = 0;
+  for (const l of lines) {
+    try {
+      const obj = JSON.parse(l);
+      const u = obj.message?.usage || obj.usage;
+      if (u) {
+        const key = obj.message?.id || obj.uuid || `${byMessage.size}`;
+        byMessage.set(key, u);
+      }
+      if (obj.message?.costUSD) totalCost += obj.message.costUSD;
+      else if (obj.costUSD) totalCost += obj.costUSD;
+    } catch { }
+  }
+  const acc = { input: 0, cached: 0, creation: 0, output: 0, turns: byMessage.size, cost: totalCost };
+  for (const u of byMessage.values()) {
+    acc.input += u.input_tokens || 0;
+    acc.cached += u.cache_read_input_tokens || 0;
+    acc.creation += u.cache_creation_input_tokens || 0;
+    acc.output += u.output_tokens || 0;
+  }
+  return acc;
+}
+
+// メインセッションに加えて <sessionDir>/<sessionId>/subagents/agent-*.jsonl（Agent ツールで起動した
+// サブエージェント）も合算する。strict_hierarchical の実消費は子を含めないと過少になる。
 export function parseClaudeSessionFile(sessionPath) {
   if (!sessionPath || !fs.existsSync(sessionPath)) return null;
   try {
-    const lines = fs.readFileSync(sessionPath, 'utf8').split(/\r?\n/).filter(Boolean);
-    let totalInput = 0;
-    let totalCached = 0;
-    let totalCreation = 0;
-    let totalOutput = 0;
-    let totalCost = 0;
-    let turns = 0;
-    for (const l of lines) {
-      try {
-        const obj = JSON.parse(l);
-        const u = obj.message?.usage || obj.usage;
-        if (u) {
-          turns++;
-          totalInput += u.input_tokens || 0;
-          totalCached += u.cache_read_input_tokens || 0;
-          totalCreation += u.cache_creation_input_tokens || 0;
-          totalOutput += u.output_tokens || 0;
-        }
-        if (obj.message?.costUSD) totalCost += obj.message.costUSD;
-        else if (obj.costUSD) totalCost += obj.costUSD;
-      } catch { }
+    const main = sumClaudeJsonl(sessionPath);
+    if (main.turns === 0) return null;
+
+    const sub = { input: 0, cached: 0, creation: 0, output: 0, turns: 0, cost: 0, files: 0 };
+    const subDir = path.join(
+      path.dirname(sessionPath),
+      path.basename(sessionPath, '.jsonl'),
+      'subagents'
+    );
+    if (fs.existsSync(subDir)) {
+      for (const f of fs.readdirSync(subDir)) {
+        if (!f.endsWith('.jsonl')) continue;
+        const s = sumClaudeJsonl(path.join(subDir, f));
+        sub.input += s.input; sub.cached += s.cached; sub.creation += s.creation;
+        sub.output += s.output; sub.turns += s.turns; sub.cost += s.cost; sub.files++;
+      }
     }
-    if (turns === 0) return null;
-    const uncachedIn = totalInput + totalCreation;
-    const promptTok = totalCached + uncachedIn;
+
+    const totalInput = main.input + sub.input;
+    const totalCached = main.cached + sub.cached;
+    const totalCreation = main.creation + sub.creation;
+    const totalOutput = main.output + sub.output;
+    let totalCost = main.cost + sub.cost;
     if (totalCost === 0) {
       // Standard Sonnet 3.5 estimate
       totalCost =
@@ -191,6 +220,8 @@ export function parseClaudeSessionFile(sessionPath) {
         (totalInput / 1e6) * 3.00 +
         (totalOutput / 1e6) * 15.00;
     }
+    const uncachedIn = totalInput + totalCreation;
+    const promptTok = totalCached + uncachedIn;
     return {
       prompt_tokens: promptTok,
       cached_tokens: totalCached,
@@ -198,7 +229,9 @@ export function parseClaudeSessionFile(sessionPath) {
       completion_tokens: totalOutput,
       total_tokens: promptTok + totalOutput,
       estimated_cost_usd: Math.round(totalCost * 1000) / 1000,
-      rounds: turns,
+      rounds: main.turns,
+      subagent_count: sub.files,
+      subagent_total_tokens: sub.cached + sub.creation + sub.input + sub.output,
     };
   } catch {
     return null;

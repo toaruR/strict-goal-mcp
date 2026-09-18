@@ -308,8 +308,16 @@ args = ["${serverPath.replace(/\\/g, '/')}", "--data-dir", "${sandboxDir.replace
       }
       fs.writeFileSync(path.join(sandboxDir, 'AGENTS.md'), `# Codex benchmark hierarchy\nExplicitly delegate independent verification to a fresh child per transaction using spawn_agent with fork_turns: "none". Follow the exposed tool schema; if no-history spawn is unavailable, report the incompatibility instead of inheriting history. For design/plan delegate verification, not implementation. Fetch loop_state({ session_id, projection: "skill_state", include: [] }) before each spawn and pass only response.skill_state in { skill_state, transaction, paths, output_contract }. Never forward the full envelope, parent transcript, full artifacts, or test logs. Do not reuse children for new transactions; refresh state and spawn anew. Require a successful spawn before waiting. collaboration.wait_agent is a mailbox wait without receiver IDs; legacy wait requires the returned child ID. Return compact verdict/digest/must_fix/evidence paths.\n`, 'utf8');
     } else {
+      // ルートの CLAUDE.md（開発メモ・ハマりポイント 24KB）はサンドボックスへ複製しない。
+      // Claude Code は cwd から親ディレクトリを遡って CLAUDE.md を読むためルート版は既に載っており、
+      // 複製すると同じ 13K 文字が毎呼び出し二重に入る（実測: 初回コンテキスト 99K）。
+      // 加えてハマりポイントの記述（preset 回避等）が被験エージェントの判断を汚染する。
+      const strictGuidelines = `# Benchmark trial (strict-goal)
+Complete the task with the /strict-goal skill. Delegate scoring to the sg-verifier subagent; never self-score.
+Use next_action.input_skeleton returned by the server for tool arguments. Do not read strict-goal server sources.
+`;
+      fs.writeFileSync(path.join(sandboxDir, 'CLAUDE.md'), strictGuidelines, 'utf8');
       try {
-        if (fs.existsSync(path.resolve('CLAUDE.md'))) fs.copyFileSync(path.resolve('CLAUDE.md'), path.join(sandboxDir, 'CLAUDE.md'));
         if (fs.existsSync(path.resolve('AGENTS.md'))) fs.copyFileSync(path.resolve('AGENTS.md'), path.join(sandboxDir, 'AGENTS.md'));
       } catch { }
     }
