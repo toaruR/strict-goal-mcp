@@ -33,7 +33,7 @@ node strict-goal-benchmark/bin/run-agent-benchmark.js start \
   --agent codex \
   --instruction-file "strict-goal-benchmark/tasks/01_design.md" \
   --groups vanilla,prompt_rubric,default_goal,strict_hierarchical \
-  --timeout 1800
+  --timeout 3600
 ```
 
 ### ② 設計〜実装 E2Eの比較 (End-to-End Benchmark + 隠蔽テスト検証)
@@ -43,6 +43,6 @@ node strict-goal-benchmark/bin/run-agent-benchmark.js start \
   --instruction-file "strict-goal-benchmark/tasks/02_e2e.md" \
   --test "strict-goal-benchmark/test/held_out/rate_limiter.test.js" \
   --groups vanilla,prompt_rubric,default_goal,strict_hierarchical \
-  --timeout 1800
+  --timeout 3600
 ```
 

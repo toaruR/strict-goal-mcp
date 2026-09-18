@@ -61,7 +61,7 @@ node strict-goal-benchmark/bin/run-agent-benchmark.js start \
   --instruction "Rate Limiter クラスを設計・実装し、単体テストをパスさせてください" \
   --test "strict-goal-benchmark/test/held_out/rate_limiter.test.js" \
   --groups vanilla,prompt_rubric,default_goal,strict_hierarchical \
-  --timeout 1800
+  --timeout 3600
 
 # 長文仕様書ファイルを指定して実行 (--instruction-file)
 # （自動でファイル内容をプロンプト化し、サンドボックス内にも仕様ファイルをコピー配置）

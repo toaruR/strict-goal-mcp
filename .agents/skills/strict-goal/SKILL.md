@@ -85,6 +85,10 @@ In chained runs (`design` → `plan` → `implement`) or complex projects, **del
    - For markdown/plan artifacts saved on disk, pass `source_path` (path under the workspace root,
      e.g. `"specification.md"`) instead of `content`. The server reads the file itself, so the
      full text never round-trips through your output. Use `content` only for text that has no file.
+   - **After `artifact_commit`, freeze the artifact until `score_submit` returns.** The session is in
+     `SCORING`; a second commit is `E_STATE_VIOLATION`, and the verifier's excerpts must match the
+     committed digest, so editing now only forces you to revert. Warnings on the commit response
+     (`over_budget`, `near_total_rewrite`, …) are inputs for the *next* round, not a reason to re-edit.
    addresses must always include the criterion id at the head of the previous must_fix.
    - In loop_mode:"implement", pass files + manifest_command + manifest_output_sha256 +
      test_inventory instead of content. If you modified a test file, put its diff in

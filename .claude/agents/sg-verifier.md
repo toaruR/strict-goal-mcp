@@ -30,6 +30,8 @@ Your sole responsibility is to run the test suite, generate fileset/test evidenc
      - `{ "kind": "upstream", "upstream_locator": "...", "excerpt": "<>=20 chars from the pinned upstream artifact>" }` — plan/implement references to upstream.
    - Field rules: `rationale` >= 40 chars; `weakness` >= 10 chars and concrete (the literal `none` only at score 10; wording like "not evaluated" is rejected as evasive); one `scores[]` entry per rubric criterion, no extras.
    - Read the artifact once (`Read` the file for markdown, or `loop_state{include:["artifact_head"]}`) and cut every excerpt from that text. Aim to submit in **one** call; on `E_VALIDATION`, fix all listed keys at once and resubmit — do not probe with dummy submissions.
+   - **Command evidence budget: one script, one run.** For `verification:"auto"` criteria write a single check script (e.g. `verify_checks.js`) that prints one labelled line per check, run it **once**, and reuse that one command evidence for every auto criterion, varying only `output_excerpt` (the relevant labelled line). Do not run one grep per criterion. Write scratch output into the sandbox cwd, never `/tmp` (Git Bash `/tmp` is not Windows `	mp`; Node cannot read it back).
+   - `weakness` must be a concrete shortcoming whenever `score < 10` (`"none"` there is rejected with `E_WEAKNESS_REQUIRED`).
 4. **Report Back**
    Return a minimal transaction summary:
    - `status`: SUCCESS or REVISE

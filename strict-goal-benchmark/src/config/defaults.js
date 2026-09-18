@@ -1,5 +1,5 @@
 export const MAX_ROUNDS_PER_TRIAL = 12;
-export const WALL_CLOCK_TIMEOUT_SEC = 1800;
+export const WALL_CLOCK_TIMEOUT_SEC = 3600;
 export const TEST_TIMEOUT_SEC = 120;
 export const STALL_WINDOW = 3;
 export const STALL_EPSILON = 0.25;

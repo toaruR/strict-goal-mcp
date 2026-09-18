@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { execSync, spawnSync } from 'node:child_process';
 import { benchmarkRun } from '../src/tools/benchmark_run.js';
 import { benchmarkEvaluate } from '../src/tools/benchmark_evaluate.js';
 import { benchmarkCollect } from '../src/tools/benchmark_collect.js';
 import { benchmarkReport } from '../src/tools/benchmark_report.js';
+import { WALL_CLOCK_TIMEOUT_SEC } from '../src/config/defaults.js';
 import { inspectCodexHierarchy, findCodexRollout } from '../src/tracker/codex_hierarchy.js';
 import { findClaudeProjectSession, parseClaudeSessionFile } from './recalculate-benchmarks.js';
 
@@ -47,7 +49,8 @@ if (command !== 'run' && command !== 'start') {
     --instruction "Rate Limiter クラスを設計・実装し、単体テストをパスさせてください" \\
     --test "strict-goal-benchmark/test/held_out/rate_limiter.test.js" \\
     [--instruction-file path/to/spec.txt] \\
-    [--agent claude|agy|codex|echo] [--model gpt-5.6-luna (codexのみ)] [--groups vanilla,prompt_rubric,default_goal,strict_hierarchical] [--timeout 1800]
+    [--agent claude|agy|codex|echo] [--model gpt-5.6-luna (codexのみ)] [--groups vanilla,prompt_rubric,default_goal,strict_hierarchical] [--timeout 3600] \
+    [--sandbox-root <dir>  既定: <OSの一時ディレクトリ>/strict-goal-bench（リポジトリ外。親 CLAUDE.md の遡り読込を遮断）]
 `);
   process.exit(0);
 }
@@ -114,7 +117,13 @@ const agentType = options.agent || 'echo'; // 'claude', 'agy', 'codex', or 'echo
 const groups = options.groups
   ? options.groups.split(',')
   : ['vanilla', 'prompt_rubric', 'default_goal', 'strict_hierarchical'];
-const timeoutSec = parseInt(options.timeout || '1800', 10);
+const timeoutSec = parseInt(options.timeout || String(WALL_CLOCK_TIMEOUT_SEC), 10);
+// サンドボックスはリポジトリ外に置く。Claude Code は cwd から親ディレクトリを遡って CLAUDE.md を読むため、
+// .benchmark/sandboxes/ 配下だとルートの CLAUDE.md（開発メモ・ハマりポイント）が被験エージェントに載り、
+// 判断を汚染する（実測: 「汚染に気づいた」と申告して作業前に停止した試行あり）。
+const sandboxRoot = path.resolve(
+  options['sandbox-root'] || options.sandbox_root || path.join(os.tmpdir(), 'strict-goal-bench')
+);
 const fallbackOnRateLimit = options['no-fallback'] ? false : true;
 
 console.log(`[1/4] エージェント客観ベンチマーク開始`);
@@ -128,6 +137,7 @@ if (sourceInstructionFile) {
 console.log(`  検証コマンド: ${testCommand}`);
 console.log(`  駆動エージェント: ${agentType}`);
 console.log(`  評価対象群: ${groups.join(', ')}`);
+console.log(`  サンドボックス根: ${sandboxRoot}`);
 
 const runRes = benchmarkRun({
   action: 'start',
@@ -222,8 +232,12 @@ while (currentTrial) {
   const group = currentTrial.group;
   console.log(`\n[2/4] (${trialIndex}/${runRes.total_trials}) 試行実行中: ${currentTrial.trial_id} [${group}]`);
 
-  const sandboxDir = path.resolve(`.benchmark/sandboxes/${currentTrial.trial_id}`);
+  const sandboxDir = path.join(sandboxRoot, currentTrial.trial_id);
   fs.mkdirSync(sandboxDir, { recursive: true });
+  // 再計算ツールや手動調査がサンドボックスの実体を辿れるよう、trial ディレクトリに所在を記録
+  const trialDirForRecord = path.join(process.cwd(), '.benchmark', 'runs', runRes.bench_id, 'trials', currentTrial.trial_id);
+  fs.mkdirSync(trialDirForRecord, { recursive: true });
+  fs.writeFileSync(path.join(trialDirForRecord, 'sandbox_path.txt'), sandboxDir, 'utf8');
 
   const isStrict = group === 'strict_hierarchical' || group === 'strict_single';
 

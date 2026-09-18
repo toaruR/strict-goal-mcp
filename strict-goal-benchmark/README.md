@@ -69,7 +69,7 @@ node strict-goal-benchmark/bin/run-agent-benchmark.js start \
   --instruction "Design and implement a Token Bucket Rate Limiter with unit tests" \
   --test "strict-goal-benchmark/test/held_out/rate_limiter.test.js" \
   --groups vanilla,prompt_rubric,default_goal,strict_hierarchical \
-  --timeout 1800
+  --timeout 3600
 
 # Specify long specifications via a file (--instruction-file)
 # (Automatically reads file content and copies it into each trial sandbox)

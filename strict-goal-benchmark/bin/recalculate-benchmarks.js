@@ -267,11 +267,25 @@ export function recalculateRun(baseDir, benchId, options = {}) {
       continue;
     }
 
-    // Check for raw agent output in sandbox or trial dir
+    // Check for raw agent output in sandbox or trial dir.
+    // サンドボックスはリポジトリ外（sandbox_path.txt に所在）が既定。旧ラン互換で .benchmark/sandboxes も探す。
     let agentOut = null;
+    let recordedSandbox = null;
+    try {
+      const sp = path.join(trialsDir, tId, 'sandbox_path.txt');
+      if (fs.existsSync(sp)) recordedSandbox = fs.readFileSync(sp, 'utf8').trim();
+    } catch { }
     const candidates = [
+      ...(recordedSandbox
+        ? [
+            { path: path.join(recordedSandbox, 'agent_output.json'), isJsonl: false },
+            { path: path.join(recordedSandbox, 'agent_output.jsonl'), isJsonl: true },
+          ]
+        : []),
       { path: path.join(sandboxesDir, tId, 'agent_output.json'), isJsonl: false },
       { path: path.join(sandboxesDir, tId, 'agent_output.jsonl'), isJsonl: true },
+      { path: path.join(trialsDir, tId, 'artifacts', 'agent_output.json'), isJsonl: false },
+      { path: path.join(trialsDir, tId, 'artifacts', 'agent_output.jsonl'), isJsonl: true },
       { path: path.join(trialsDir, tId, 'agent_output.json'), isJsonl: false },
       { path: path.join(trialsDir, tId, 'agent_output.jsonl'), isJsonl: true },
     ];
