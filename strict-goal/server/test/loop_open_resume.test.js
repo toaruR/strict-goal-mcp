@@ -106,7 +106,7 @@ test('再開応答だけで rubric 全文・round・state・must_fix・upstream�
   assert.equal(result.state, 'DRAFTING');
   assert.equal(result.round, 1);
   assert.ok(Array.isArray(result.rubric.criteria));
-  assert.equal(result.rubric.criteria.length, 15);
+  assert.equal(result.rubric.criteria.length, 8);
   assert.ok(Array.isArray(result.must_fix));
   assert.match(result.chain_id, /^ch_[0-9A-HJKMNP-TV-Z]{26}$/);
   assert.equal(result.upstream, null);
@@ -127,5 +127,5 @@ test('サーバプロセスを再起動しても同じハンドルで同じ状�
   assert.equal(result.session_id, created.session_id);
   assert.equal(result.state, 'DRAFTING');
   assert.equal(result.round, 1);
-  assert.equal(result.rubric.criteria.length, 15);
+  assert.equal(result.rubric.criteria.length, 8);
 });

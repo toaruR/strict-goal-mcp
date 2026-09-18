@@ -81,7 +81,11 @@ function checkCompleteness(scores, criteria) {
 function buildMustFix(perCriterion, criteriaById, passScore) {
   return [...perCriterion]
     .filter((c) => c.score < passScore)
-    .sort((a, b) => a.score - b.score)
+    .sort((a, b) => {
+      const pA = criteriaById.get(a.criterion_id)?.priority ?? 0;
+      const pB = criteriaById.get(b.criterion_id)?.priority ?? 0;
+      return (pB - pA) || (a.score - b.score);
+    })
     .slice(0, MUST_FIX_MAX)
     .map((c) => ({
       criterion_id: c.criterion_id,

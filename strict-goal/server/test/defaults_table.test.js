@@ -178,8 +178,8 @@ test('冪等キー submission_id の適用範囲は状態を変える5ツール'
   );
 });
 
-test('rubric プリセットは presets/{design,plan,implement}.json、verification:auto 比率は 20%/50%/78%', () => {
-  assert.equal(autoRatio(readPreset('design')), 0.2);
+test('rubric プリセットは presets/{design,plan,implement}.json、verification:auto 比率は 62.5%/50%/78%', () => {
+  assert.equal(autoRatio(readPreset('design')), 5 / 8);
   assert.equal(autoRatio(readPreset('plan')), 0.5);
   assert.ok(Math.abs(autoRatio(readPreset('implement')) - 7 / 9) < 1e-9);
 });
