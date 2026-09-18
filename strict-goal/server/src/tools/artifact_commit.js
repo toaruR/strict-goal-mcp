@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { validate } from '../schema/validate.js';
 import { TOOL_SCHEMAS } from '../schema/tools_schema.js';
 import { withIdempotency } from '../idempotency/guard.js';
@@ -39,14 +41,59 @@ function fail(code, message, detail = {}) {
   throw err;
 }
 
+// data_dir が <workspace>/.strict-goal ならその親、それ以外（--data-dir 直指定）は data_dir 自身をワークスペース根とみなす
+export function workspaceRootFromDataDir(dataDir) {
+  const resolved = path.resolve(dataDir);
+  return path.basename(resolved) === '.strict-goal' ? path.dirname(resolved) : resolved;
+}
+
+// source_path をワークスペース根配下に限定して解決し、本文を読む。
+// 成果物全文をモデル出力（content）で往復させずに済ませるための経路（§6.4 source_path）。
+export function readSourcePath(dataDir, sourcePath) {
+  const root = workspaceRootFromDataDir(dataDir);
+  const abs = path.isAbsolute(sourcePath) ? path.resolve(sourcePath) : path.resolve(root, sourcePath);
+  const rel = path.relative(root, abs);
+  if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) {
+    fail('E_VALIDATION', 'source_path must point inside the workspace root', {
+      path: '$.source_path',
+      reason: 'outside_workspace',
+    });
+  }
+  let stat;
+  try {
+    stat = fs.statSync(abs);
+  } catch {
+    fail('E_VALIDATION', `source_path not found: ${sourcePath}`, {
+      path: '$.source_path',
+      reason: 'source_not_found',
+    });
+  }
+  if (!stat.isFile()) {
+    fail('E_VALIDATION', 'source_path must be a regular file', {
+      path: '$.source_path',
+      reason: 'source_not_file',
+    });
+  }
+  const content = fs.readFileSync(abs, 'utf8');
+  if (content.length === 0) {
+    fail('E_VALIDATION', 'source_path file is empty', {
+      path: '$.source_path',
+      reason: 'source_empty',
+    });
+  }
+  return { content, resolved_path: abs, relative_path: rel.split(path.sep).join('/') };
+}
+
 export function artifactCommit({ input, persistence }) {
   validate(TOOL_SCHEMAS.artifact_commit.input, input);
 
-  const hasContent = input.content !== undefined;
+  const hasInlineContent = input.content !== undefined;
+  const hasSourcePath = input.source_path !== undefined;
   const hasFiles = input.files !== undefined;
-  if (hasContent === hasFiles) {
-    fail('E_VALIDATION', 'exactly one of content or files must be provided', {
-      path: hasFiles ? '$.files' : '$.content',
+  const provided = [hasInlineContent, hasSourcePath, hasFiles].filter(Boolean).length;
+  if (provided !== 1) {
+    fail('E_VALIDATION', 'exactly one of content, source_path or files must be provided', {
+      path: hasFiles ? '$.files' : hasSourcePath ? '$.source_path' : '$.content',
       reason: 'oneOf_content_or_files',
     });
   }
@@ -56,9 +103,21 @@ export function artifactCommit({ input, persistence }) {
       reason: 'too_short',
     });
   }
-  if (hasContent && Buffer.byteLength(input.content, 'utf8') > ARTIFACT_MAX_BYTES) {
+
+  const dataDir = persistence.dir;
+
+  // source_path は本文をサーバ側で読み、以降は content と同じ経路で扱う
+  let sourceInfo = null;
+  let content = input.content;
+  if (hasSourcePath) {
+    sourceInfo = readSourcePath(dataDir, input.source_path);
+    content = sourceInfo.content;
+  }
+  const hasContent = hasInlineContent || hasSourcePath;
+
+  if (hasContent && Buffer.byteLength(content, 'utf8') > ARTIFACT_MAX_BYTES) {
     fail('E_VALIDATION', `content exceeds ${ARTIFACT_MAX_BYTES} bytes`, {
-      path: '$.content',
+      path: hasSourcePath ? '$.source_path' : '$.content',
       reason: 'too_large',
     });
   }
@@ -73,7 +132,6 @@ export function artifactCommit({ input, persistence }) {
     assertTestInventoryRequired('fileset', input.test_inventory);
   }
 
-  const dataDir = persistence.dir;
   if (!sessionExists(dataDir, input.session_id)) {
     fail('E_SESSION_NOT_FOUND', `session_id not found: ${input.session_id}`, { session_id: input.session_id });
   }
@@ -157,19 +215,19 @@ export function artifactCommit({ input, persistence }) {
       };
     } else {
       if (session.artifact_kind === 'plan') {
-        const plan = parsePlanContent(input.content);
+        const plan = parsePlanContent(content);
         checkPlan(plan);
         if (session.upstream) {
           checkDesignRefs(dataDir, plan, session.upstream);
         }
       }
-      ({ digest, bytes } = saveContentArtifact(sDir, session.artifact_kind, input.content));
+      ({ digest, bytes } = saveContentArtifact(sDir, session.artifact_kind, content));
       const unchanged = previousDigest === digest;
 
       artifact = { digest, bytes, unchanged, previous_digest: previousDigest };
       if (previousDigest && !unchanged) {
         const previousContent = readArtifactContent(sDir, previousDigest, session.artifact_kind);
-        artifact.diff = computeContentDiff(previousContent, input.content);
+        artifact.diff = computeContentDiff(previousContent, content);
         if (artifact.diff.changed_ratio >= 0.9) warnings.push('near_total_rewrite');
         if (bytes < previousArtifact.bytes * 0.5) warnings.push('suspicious_shrink');
         if (
@@ -186,7 +244,7 @@ export function artifactCommit({ input, persistence }) {
         warnings.push('over_budget');
       }
       if (session.artifact_kind === 'markdown' || session.artifact_kind === 'text') {
-        const headings = scanHeadings(input.content, APPENDIX_TAIL_RATIO);
+        const headings = scanHeadings(content, APPENDIX_TAIL_RATIO);
         if (headings.some((h) => h.isTail && APPENDIX_ACCRETION_PATTERN.test(h.raw))) {
           warnings.push('appendix_accretion');
         }
@@ -215,6 +273,7 @@ export function artifactCommit({ input, persistence }) {
       diff: artifact.diff ?? null,
       committed_at: committedAt,
       ...(hasFiles ? { files: input.files, test_inventory: input.test_inventory } : {}),
+      ...(sourceInfo ? { source_path: sourceInfo.relative_path } : {}),
     });
 
     if (hasFiles && Array.isArray(input.files)) {

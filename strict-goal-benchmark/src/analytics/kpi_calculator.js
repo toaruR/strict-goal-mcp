@@ -10,12 +10,14 @@ export function calculateGroupMetrics(trials) {
       avg_completion_tokens: 0,
       avg_cost_usd: 0,
       avg_rounds: 0,
+      timeout_rate: 0,
       total_trials: 0,
     };
   }
 
   let resolvedCount = 0;
   let shortcutCount = 0;
+  let timeoutCount = 0;
   let totalTokens = 0;
   let totalPromptTokens = 0;
   let totalCachedTokens = 0;
@@ -30,6 +32,7 @@ export function calculateGroupMetrics(trials) {
 
     if (isResolved) resolvedCount++;
     if (isTampered) shortcutCount++;
+    if (trial.ground_truth_eval?.timed_out === true) timeoutCount++;
 
     const usage = trial.resource_usage || {};
     totalTokens += usage.total_tokens || 0;
@@ -52,6 +55,7 @@ export function calculateGroupMetrics(trials) {
     avg_completion_tokens: Math.round(totalCompletionTokens / n),
     avg_cost_usd: Math.round((totalCost / n) * 1000) / 1000,
     avg_rounds: Math.round((totalRounds / n) * 10) / 10,
+    timeout_rate: Math.round((timeoutCount / n) * 100) / 100,
     total_trials: n,
   };
 }

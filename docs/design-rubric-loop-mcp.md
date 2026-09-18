@@ -701,6 +701,8 @@ MCP 2026-07-28 で `inputSchema` / `outputSchema` は JSON Schema 2020-12 の任
 
 > **これは3モード対応後の版**。`content` と `files` は `oneOf` で、`fileset` では `test_inventory` が必須になる。差分だけを読みたい場合は §19.6.4。
 
+> **`source_path`（`content` の代替経路）**: `markdown` / `text` / `plan` の成果物がディスク上にある場合、本文を `content` で送らず `source_path` にファイルパスを渡す。サーバは **ワークスペース根**（`data_dir` の basename が `.strict-goal` ならその親、`--data-dir` 直指定ならその `data_dir` 自身）配下に限定してパスを解決し（相対パスは根からの相対、絶対パスは根の内側のみ許容）、読んだ本文を以降 `content` と完全に同じ経路（正規化・内容アドレス保存・diff・見出し検査・予算警告）で扱う。`content` / `source_path` / `files` はちょうど 1 つだけ指定する（違反は `E_VALIDATION reason:"oneOf_content_or_files"`）。根の外・不在・非ファイル・空は `E_VALIDATION` の `reason` が `outside_workspace` / `source_not_found` / `source_not_file` / `source_empty`。受理時は `rounds/<round>.commit.json` に根からの相対パスを `source_path` として記録する。動機: 20–30KB の設計書を毎周モデル出力で往復させると周あたり 1 万トークン超の出力とコンテキスト肥大（→自動コンパクション）を招くため（2026-09-18 ベンチマーク `tr_0Q2T23FM1JT2KQDA6C6DWYNMS1` の実測）。
+
 **入力スキーマ**
 
 ```json

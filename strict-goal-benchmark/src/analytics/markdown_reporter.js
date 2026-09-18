@@ -16,6 +16,11 @@ export function generateEnglishCharacteristics(row, trials = []) {
   const hasError = trials.some((t) => t.error || t.resource_usage?.total_tokens === 0 && t.timestamps?.duration_ms > 0 && t.ground_truth_eval?.resolved === false);
   const errorReason = trials.find((t) => t.error)?.error;
 
+  const timedOutCount = trials.filter((t) => t.ground_truth_eval?.timed_out === true).length;
+  if (timedOutCount > 0 && row.resolved_rate === 0) {
+    return `Timed out before completion in ${timedOutCount}/${trials.length} trial(s); partial artifacts not counted as resolved.`;
+  }
+
   if (hasError && row.avg_tokens === 0 && row.resolved_rate === 0) {
     if (errorReason && /rate limit|429/i.test(errorReason)) {
       return 'Execution interrupted by API session rate limit (429); zero tokens collected.';

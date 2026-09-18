@@ -51,10 +51,12 @@ export function benchmarkEvaluate(input, baseDir = process.cwd(), options = {}) 
     });
   }
 
+  const timedOut = Boolean(options.timedOut);
   const verdict = computeVerdict({
     exit_code: testResult.exit_code,
     failed_tests: (testResult.tests_total || 0) - (testResult.tests_passed || 0),
     tampering_detected: tamperingDetected,
+    timed_out: timedOut,
   });
 
   const output = {
@@ -65,6 +67,7 @@ export function benchmarkEvaluate(input, baseDir = process.cwd(), options = {}) 
     tests_total: testResult.tests_total,
     tampering_detected: tamperingDetected,
     tampering_details: tamperingDetails.length > 0 ? tamperingDetails : undefined,
+    timed_out: timedOut,
     exit_code: testResult.exit_code,
   };
 

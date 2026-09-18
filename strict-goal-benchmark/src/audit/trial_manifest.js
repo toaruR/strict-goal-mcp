@@ -74,6 +74,8 @@ export function createTrialManifest({
       uncached_input_tokens: token_summary?.uncached_input_tokens ?? Math.max(0, (token_summary?.prompt_tokens ?? 0) - (token_summary?.cached_tokens ?? 0)),
       total_tokens: token_summary?.total_tokens ?? 0,
       estimated_cost_usd: token_summary?.estimated_cost_usd ?? 0.0,
+      // 実ラウンド数。未指定時は fsm_history 長（ダミー生成分）に頼らず 1 とする
+      rounds: token_summary?.rounds ?? (fsm_history.length || 1),
     },
     fsm_history,
     ground_truth_eval: {
@@ -81,6 +83,7 @@ export function createTrialManifest({
       tests_passed: ground_truth_eval.tests_passed ?? 0,
       tests_total: ground_truth_eval.tests_total ?? 0,
       tampering_detected: ground_truth_eval.tampering_detected ?? false,
+      timed_out: ground_truth_eval.timed_out ?? false,
     },
   };
 

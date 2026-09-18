@@ -7,6 +7,7 @@ import { benchmarkEvaluate } from '../src/tools/benchmark_evaluate.js';
 import { benchmarkCollect } from '../src/tools/benchmark_collect.js';
 import { benchmarkReport } from '../src/tools/benchmark_report.js';
 import { inspectCodexHierarchy, findCodexRollout } from '../src/tracker/codex_hierarchy.js';
+import { findClaudeProjectSession, parseClaudeSessionFile } from './recalculate-benchmarks.js';
 
 function findCodexExe() {
   try {
@@ -49,6 +50,10 @@ if (command !== 'run' && command !== 'start') {
     [--agent claude|agy|codex|echo] [--model gpt-5.6-luna (codexのみ)] [--groups vanilla,prompt_rubric,default_goal,strict_hierarchical] [--timeout 1800]
 `);
   process.exit(0);
+}
+
+function isProcessTimeout(proc) {
+  return Boolean(proc.error && proc.error.code === 'ETIMEDOUT');
 }
 
 function extractProcessError(proc, timeoutSec) {
@@ -345,6 +350,8 @@ This is an isolated benchmark trial. Complete the task using standard tools only
   let roundsCount = 1;
   let trialError = null;
   let usedFallback = false;
+  // 壁時計タイムアウト。途中成果物が held-out を通っても resolved=false とし、群プロファイルへのフォールバックも行わない
+  let timedOut = false;
 
   const writeFallbackSolution = (grp) => {
     const profile = GROUP_MOCK_PROFILES[grp] || GROUP_MOCK_PROFILES.vanilla;
@@ -428,6 +435,7 @@ This is an isolated benchmark trial. Complete the task using standard tools only
       }
     );
     const output = proc.stdout || '';
+    timedOut = isProcessTimeout(proc);
     const procErr = extractProcessError(proc, timeoutSec);
     if (procErr) {
       trialError = procErr;
@@ -457,7 +465,18 @@ This is an isolated benchmark trial. Complete the task using standard tools only
       }
     } catch { }
 
-    if (trialError && fallbackOnRateLimit) {
+    // タイムアウト等で stdout の JSON が得られなかった場合、Claude のプロジェクトセッションログから実消費を回収
+    if (tokenSummary.total_tokens === 0) {
+      const sessionPath = findClaudeProjectSession(currentTrial.trial_id);
+      const recovered = parseClaudeSessionFile(sessionPath);
+      if (recovered) {
+        console.log(`  -> [Recover] セッションログから消費トークンを回収しました: ${sessionPath}`);
+        tokenSummary = recovered;
+        roundsCount = recovered.rounds || roundsCount;
+      }
+    }
+
+    if (trialError && fallbackOnRateLimit && !timedOut) {
       console.log(`  -> [Fallback] レートリミット/エラー検知のため群プロファイルを適用します: [${group}]`);
       usedFallback = true;
       const profile = writeFallbackSolution(group);
@@ -482,6 +501,7 @@ This is an isolated benchmark trial. Complete the task using standard tools only
       }
     );
     const output = proc.stdout || '';
+    timedOut = isProcessTimeout(proc);
     const procErr = extractProcessError(proc, timeoutSec);
     if (procErr) {
       trialError = procErr;
@@ -528,7 +548,7 @@ This is an isolated benchmark trial. Complete the task using standard tools only
     // agy が scratch 領域に出力した場合のセーフティネット回収
     autoRecoverFromScratch();
 
-    if (trialError && fallbackOnRateLimit) {
+    if (trialError && fallbackOnRateLimit && !timedOut) {
       console.log(`  -> [Fallback] エラー検知のため群プロファイルを適用します: [${group}]`);
       usedFallback = true;
       const profile = writeFallbackSolution(group);
@@ -574,6 +594,7 @@ This is an isolated benchmark trial. Complete the task using standard tools only
       }
     );
     const output = proc.stdout || '';
+    timedOut = isProcessTimeout(proc);
     const procErr = extractProcessError(proc, timeoutSec);
     if (procErr) {
       trialError = procErr;
@@ -639,7 +660,7 @@ This is an isolated benchmark trial. Complete the task using standard tools only
       roundsCount = lines.length || 1;
     } catch { }
 
-    if (trialError && fallbackOnRateLimit && !trialError.startsWith('Invalid hierarchical delegation:')) {
+    if (trialError && fallbackOnRateLimit && !timedOut && !trialError.startsWith('Invalid hierarchical delegation:')) {
       console.log(`  -> [Fallback] エラー検知のため群プロファイルを適用します: [${group}]`);
       usedFallback = true;
       const profile = writeFallbackSolution(group);
@@ -663,7 +684,11 @@ This is an isolated benchmark trial. Complete the task using standard tools only
   const profile = GROUP_MOCK_PROFILES[group];
   const evalOptions = {
     cwd: sandboxDir,
+    timedOut,
   };
+  if (timedOut) {
+    console.warn(`  -> [Timeout] ${timeoutSec}秒超過。途中成果物は resolved=false / timed_out=true として記録します`);
+  }
   if (trialError?.startsWith('Invalid hierarchical delegation:')) {
     evalOptions.forceTampering = true;
     evalOptions.tamperingDetails = [trialError];
@@ -708,6 +733,8 @@ This is an isolated benchmark trial. Complete the task using standard tools only
       tokenSummary,
       rounds_count: roundsCount,
       duration_ms: durationMs,
+      started_at: new Date(startTime).toISOString(),
+      finished_at: new Date(startTime + durationMs).toISOString(),
       prompt,
       artifactsDir: sandboxDir,
       error: usedFallback ? `Fallback used: ${trialError}` : trialError,
