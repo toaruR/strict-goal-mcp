@@ -260,7 +260,7 @@ node strict-goal/server/verify_audit.js ./path/to/audit.json
 
 ### Version Inspection
 
-Check the installed version of strict-goal (`2.0.0`):
+Check the installed version of strict-goal:
 
 ```bash
 # Server CLI

@@ -178,7 +178,7 @@ AIエージェントおよび人間の開発者が自律的かつ自然言語で
   - **状態外出しの徹底**: 過去ログを遡らず、`loop_state(projection: "skill_state")` の有界三つ組 $(P, \Sigma_t, O_t)$ のみで現在地と次アクションを決定する。
 
 ### 5.3 補助CLIツール (`strict-goal/server/helper.js`)
-- `node strict-goal/server/helper.js version`: バージョン文字列（`strict-goal 2.0.0`）を表示。
+- `node strict-goal/server/helper.js version`: バージョン文字列（`strict-goal <version>`）を表示。
 - `node strict-goal/server/helper.js fileset <path...>`: ファイル群の SHA-256 およびマニフェストダイジェストを出力。
 - `node strict-goal/server/helper.js test-run "<command>"`: テストコマンドを実行し、`test_inventory` および `command` 根拠を出力。
 - `node strict-goal/server/helper.js sanitize-test "<command>"`: テストを実行し、詳細ログを `sessions/<id>/logs/` に保存した上で、エラー長を制限したサニタイズ出力を返出（コンテキスト溢れ防止）。
@@ -258,13 +258,13 @@ AIエージェントおよび人間の開発者が自律的かつ自然言語で
 
 ### 5.6 バージョン管理と確認方法
 - **単一情報源 (Single Source of Truth)**:
-  - `strict-goal/server/src/version.js` (`VERSION = '2.0.0'`, `NAME = 'strict-goal'`)
+  - `strict-goal/server/package.json` の `version`（`strict-goal/server/src/version.js` が自動ロード、`NAME = 'strict-goal'`）
 - **CLI からの確認**:
-  - `node strict-goal/server/main.js --version` (または `-v`): `strict-goal 2.0.0` を出力し終了コード 0。
-  - `node strict-goal/server/helper.js version` (または `--version`, `-v`): `strict-goal 2.0.0` を出力し終了コード 0。
+  - `node strict-goal/server/main.js --version` (または `-v`): `strict-goal <version>` を出力し終了コード 0。
+  - `node strict-goal/server/helper.js version` (または `--version`, `-v`): `strict-goal <version>` を出力し終了コード 0。
 - **MCP プロトコルからの確認**:
-  - `initialize` ハンドラ: `serverInfo.name: "strict-goal"`, `serverInfo.version: "2.0.0"`
-  - `server/discover` ハンドラ: `serverInfo.name: "strict-goal"`, `serverInfo.version: "2.0.0"`
+  - `initialize` ハンドラ: `serverInfo.name: "strict-goal"`, `serverInfo.version: "<version>"`
+  - `server/discover` ハンドラ: `serverInfo.name: "strict-goal"`, `serverInfo.version: "<version>"`
 - **セッション永続化メタデータ**:
   - `loop_open` で生成される `session.json` の `server.version` に実行時バージョンが記録される。
 

@@ -10,7 +10,11 @@ import { handleDiscover } from '../src/mcp/discover.js';
 import { loopOpenCreate } from '../src/tools/loop_open_create.js';
 
 test('VERSION と NAME が正しく定義されている', () => {
-  assert.equal(VERSION, '2.0.0');
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  const plugin = JSON.parse(readFileSync(new URL('../../plugin.json', import.meta.url), 'utf8'));
+  assert.equal(VERSION, pkg.version);
+  assert.equal(pkg.version, plugin.version);
+  assert.match(VERSION, /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/);
   assert.equal(NAME, 'strict-goal');
 });
 
