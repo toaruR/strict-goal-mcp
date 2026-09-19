@@ -2,16 +2,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { handleToolsList, TOOL_ORDER } from '../src/mcp/tools_list.js';
 
-test('tools/list はちょうど7本を返す', () => {
+test('tools/list はちょうど8本を返す', () => {
   const result = handleToolsList();
-  assert.equal(result.tools.length, 7);
+  assert.equal(result.tools.length, 8);
 });
 
 test('順序が固定である', () => {
   const result = handleToolsList();
   assert.deepEqual(
     result.tools.map((t) => t.name),
-    ['loop_open', 'loop_state', 'artifact_commit', 'score_submit', 'rubric_amend', 'escalate', 'audit_export']
+    ['loop_open', 'loop_state', 'artifact_commit', 'score_submit', 'rubric_amend', 'escalate', 'audit_export', 'invoke_subagent']
   );
 });
 
@@ -25,6 +25,6 @@ test('ttlMs と cacheScope が付く', () => {
   assert.equal(result.cacheScope, 'private');
 });
 
-test('3モード対応後も7本以上に増えていない', () => {
-  assert.equal(TOOL_ORDER.length, 7);
+test('サブエージェント委譲追加後も8本以上に増えていない', () => {
+  assert.equal(TOOL_ORDER.length, 8);
 });

@@ -7,9 +7,9 @@ import { validate } from '../src/schema/validate.js';
 const toolsSchemaPath = fileURLToPath(new URL('../schemas/tools.json', import.meta.url));
 const tools = JSON.parse(readFileSync(toolsSchemaPath, 'utf8')).tools;
 
-test('7ツール分の入力と出力スキーマを持つ', () => {
+test('8ツール分の入力と出力スキーマを持つ', () => {
   const names = Object.keys(tools);
-  assert.equal(names.length, 7);
+  assert.equal(names.length, 8);
   for (const name of names) {
     assert.ok(tools[name].input, name);
     assert.ok(tools[name].output, name);

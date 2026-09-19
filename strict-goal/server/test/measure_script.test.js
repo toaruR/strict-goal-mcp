@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -36,7 +37,13 @@ test('.benchmark が存在しない一時ディレクトリでも --dry-run が�
   assert.equal(cols.length, 5);
 });
 
-test('実環境で実行時に各群の行が出力され、out_of_scope_sections が0以上の整数であること', () => {
+test('実環境で実行時に各群の行が出力され、out_of_scope_sections が0以上の整数であること', (t) => {
+  const benchmarkRuns = path.join(repoRoot, '.benchmark', 'runs');
+  if (!existsSync(benchmarkRuns)) {
+    t.skip('.benchmark/runs does not exist in this environment (e.g. CI)');
+    return;
+  }
+
   const result = spawnSync('bash', ['scripts/measure-rubric-effect.sh', '配布,CI'], {
     cwd: repoRoot,
     encoding: 'utf8',

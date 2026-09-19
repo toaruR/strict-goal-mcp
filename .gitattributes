@@ -5,3 +5,4 @@
 CLAUDE.md merge=union
 AGENTS.md merge=union
 docs/**/*.md merge=union
+*.sh text eol=lf

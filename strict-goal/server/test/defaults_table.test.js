@@ -102,7 +102,7 @@ test('tools/list の ttlMs は86400000、cacheScope は private', () => {
   assert.equal(defaults.TOOLS_LIST_CACHE_SCOPE, 'private');
 });
 
-test('ツール一覧の順序は loop_open, loop_state, artifact_commit, score_submit, rubric_amend, escalate, audit_export で固定', () => {
+test('ツール一覧の順序は loop_open, loop_state, artifact_commit, score_submit, rubric_amend, escalate, audit_export, invoke_subagent で固定', () => {
   assert.deepEqual(TOOL_ORDER, [
     'loop_open',
     'loop_state',
@@ -111,6 +111,7 @@ test('ツール一覧の順序は loop_open, loop_state, artifact_commit, score_
     'rubric_amend',
     'escalate',
     'audit_export',
+    'invoke_subagent',
   ]);
 });
 

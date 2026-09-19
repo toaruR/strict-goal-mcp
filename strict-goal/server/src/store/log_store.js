@@ -31,7 +31,7 @@ export function rotateSessionLogs(dataDir, sessionId, maxKeep = MAX_LOG_HISTORY_
       const stat = fs.statSync(fullPath);
       return { name: f, path: fullPath, mtime: stat.mtimeMs };
     })
-    .sort((a, b) => b.mtime - a.mtime);
+    .sort((a, b) => (b.mtime !== a.mtime ? b.mtime - a.mtime : b.name.localeCompare(a.name)));
 
   if (files.length > maxKeep) {
     const toRemove = files.slice(maxKeep);
