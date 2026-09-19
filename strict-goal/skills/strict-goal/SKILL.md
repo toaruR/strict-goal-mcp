@@ -1,6 +1,6 @@
 ---
 name: strict-goal
-description: Enforces iterative rubric validation until the server returns a passing verdict. Use for strict-goal design, plan, or implement requests (設計・計画・実装), or /strict-goal followed by a goal.
+description: Enforces iterative rubric validation until the server returns a passing verdict. Use for strict-goal design, plan, or implement requests (設計・計画・実装), or "/strict-goal" followed by a goal.
 ---
 <!-- knowledge-kit version=1.12.0 (自動調整済み: 移植先固有の書き換えあり) -->
 
@@ -23,7 +23,7 @@ Users can invoke either the full chain or a single targeted phase using English 
 | `strict-goal design --preset design.harness <instruction>`<br>`strict-goal 設計 --preset design.harness <指示>` | `design.harness` only | Creates specification document for harnesses/protocols. Runs rubric iteration loop until server returns FINAL, then stops. |
 | `strict-goal plan <design_doc_path> [instruction]`<br>`strict-goal 計画 <設計書パス> [指示]` | `plan` only | Reads the given design document, generates task DAG & acceptance criteria (JSON), and iterates until server returns FINAL, then stops (does not advance to implement). If no upstream design session exists, immediately creates and finalizes a minimal design session referencing the document to satisfy server chain integrity. |
 | `strict-goal implement <plan_doc_path> [instruction]`<br>`strict-goal 実装 <計画書パス> [指示]` | `implement` only | Reads the given plan. Before touching code, calls `loop_open` first (auto-resolving upstream plan from `.strict-goal/index.json`'s latest session where server returned FINAL) to enter DRAFTING, then implements code & tests, runs verification, and iterates until server returns FINAL. |
-| `strict-goal <goal>`<br>`/strict-goal <goal>`<br>`/goal <goal>` | `design` → `plan` → `implement` | Default: Executes the entire sequential pipeline until the final implement phase's server returns FINAL. |
+| `strict-goal <goal>`<br>`/strict-goal <goal>` | `design` → `plan` → `implement` | Default: Executes the entire sequential pipeline until the final implement phase's server returns FINAL. |
 
 ### Pipeline Overview
 

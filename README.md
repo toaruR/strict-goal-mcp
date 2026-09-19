@@ -161,7 +161,7 @@ and all subsequent calls for that `session_id`/`chain_id` (`artifact_commit`,
 
 ---
 
-## Human-Friendly Interfaces (`/goal` & Natural Language)
+## Human-Friendly Interfaces (`/strict-goal` & Natural Language)
 
 `strict-goal` provides not only low-level MCP tools but also built-in skill definitions and slash command adapters so coding agents can run the iterative loop autonomously.
 
@@ -169,11 +169,11 @@ and all subsequent calls for that `session_id`/`chain_id` (`artifact_commit`,
 In Claude Code, Antigravity, Codex CLI, etc., trigger the full pipeline with a single command:
 
 ```bash
-/goal Add rate limiting to authentication API with complete unit test coverage
-```
-or
-```bash
 /strict-goal Add rate limiting to authentication API with complete unit test coverage
+```
+or CLI prefix:
+```bash
+strict-goal Add rate limiting to authentication API with complete unit test coverage
 ```
 
 ### 2. Natural Language Instructions

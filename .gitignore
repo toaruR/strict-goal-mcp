@@ -8,6 +8,7 @@ __pycache__/
 !.claude/skills/strict-goal/
 !.claude/skills/goal/
 !.claude/skills/spec-doc/
+!.claude/skills/session-tokens/
 .claude/agents/*
 !.claude/agents/sg-*.md
 .claude/hooks/
@@ -19,6 +20,8 @@ __pycache__/
 !.agents/skills/strict-goal/
 !.agents/skills/goal/
 !.agents/skills/spec-doc/
+!.agents/skills/session-tokens/
+!.agents/skills/codex-session-tokens/
 .agents/mcp_config.json
 .mcp.json
 .cursor/mcp.json
