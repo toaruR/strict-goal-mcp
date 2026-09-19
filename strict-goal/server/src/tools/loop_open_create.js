@@ -20,7 +20,7 @@ import { generateSessionId, generateChainId } from '../id/ulid.js';
 import { buildEnvelope } from '../mcp/envelope.js';
 import { ARTIFACT_KIND_BY_MODE } from '../config/defaults.js';
 import { createChain, appendMember } from '../chain/store.js';
-import { validatePin } from '../chain/pin.js';
+import { validatePin, resolveUpstreamPin } from '../chain/pin.js';
 import { assertRoundBudget } from '../chain/budget.js';
 import { assertArtifactKind } from '../artifact/kind.js';
 import { VERSION } from '../version.js';
@@ -61,9 +61,6 @@ export function loopOpenCreate({ input, pluginRoot, pluginRootSource, persistenc
   const loopMode = input.loop_mode ?? 'design';
   if (loopMode === 'design' && input.upstream) {
     fail('E_UPSTREAM_NOT_ALLOWED', 'design mode must not specify upstream');
-  }
-  if (loopMode !== 'design' && !input.upstream) {
-    fail('E_UPSTREAM_REQUIRED', `loop_mode:${loopMode} requires upstream`, { loop_mode: loopMode });
   }
 
   const ephemeralResult = enforceEphemeralPolicy(persistence.mode, input.allow_ephemeral);
@@ -112,7 +109,7 @@ export function loopOpenCreate({ input, pluginRoot, pluginRootSource, persistenc
       chainId = generateChainId();
       createChain(dataDir, chainId);
     } else {
-      resolvedUpstream = validatePin(dataDir, loopMode, input.upstream);
+      resolvedUpstream = resolveUpstreamPin(dataDir, loopMode, input.upstream);
       chainId = resolvedUpstream.chain_id;
       assertRoundBudget(dataDir, chainId);
     }

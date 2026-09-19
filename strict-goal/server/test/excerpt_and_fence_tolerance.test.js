@@ -400,4 +400,176 @@ test('scoreSubmitSkeleton expands active rubric criteria with auto/manual eviden
   assert.equal(skeleton.scores[1].evidence[1].kind, 'locator');
 });
 
+test('loopOpenCreate auto-resolves upstream session and digest from index.json when omitted in implement mode', async () => {
+  const { loopOpenCreate } = await import('../src/tools/loop_open_create.js');
+  const { artifactCommit } = await import('../src/tools/artifact_commit.js');
+  const { scoreSubmit } = await import('../src/tools/score_submit.js');
+  const { readSession } = await import('../src/store/session_store.js');
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rl-test-autoupstream-'));
+  const persistence = { mode: 'durable', dir: tmpDir };
+
+  const criteria = [
+    {
+      id: 'c1',
+      statement: 'Criterion 1 statement >= 10 chars',
+      weight: 1,
+      verification: 'manual',
+      anchors: { 1: 'poor condition', 5: 'fair condition', 9: 'good condition' },
+    },
+  ];
+
+  // 1. Design セッション作成 & FINAL 化
+  const design = loopOpenCreate({
+    input: {
+      mode: 'create',
+      loop_mode: 'design',
+      submission_id: 'sub_open_d',
+      task: 'Design task description with at least twenty characters',
+      artifact_kind: 'markdown',
+      rubric: { criteria, policy: { pass_score: 9 } },
+    },
+    persistence,
+  });
+
+  const dCommit = artifactCommit({
+    input: {
+      session_id: design.session_id,
+      submission_id: 'sub_d_c1',
+      expected_round: 1,
+      change_note: 'Initial design document with at least twenty characters',
+      content: '# Design Specification\n## §1.1 Overview\nLine 2',
+    },
+    persistence,
+  });
+
+  scoreSubmit({
+    input: {
+      session_id: design.session_id,
+      submission_id: 'sub_d_s1',
+      expected_round: 1,
+      artifact_digest: dCommit.artifact.digest,
+      scores: [
+        {
+          criterion_id: 'c1',
+          score: 10,
+          rationale: 'Score 10 rationale tied to evidence >= 40 characters long',
+          weakness: 'none',
+          evidence: [{ kind: 'locator', locator: '§1', excerpt: 'Design Specification' }],
+        },
+      ],
+    },
+    persistence,
+  });
+
+  const dSession = readSession(tmpDir, design.session_id);
+  assert.equal(dSession.state, 'FINAL');
+
+  // 2. Plan セッション作成: upstream.artifact_digest を省略（自動補完）
+  const plan = loopOpenCreate({
+    input: {
+      mode: 'create',
+      loop_mode: 'plan',
+      submission_id: 'sub_open_p',
+      task: 'Plan task description with at least twenty characters',
+      rubric: { criteria, policy: { pass_score: 9 } },
+      upstream: { session_id: design.session_id },
+    },
+    persistence,
+  });
+
+  // 自動的に design セッションが upstream として解決されていること
+  assert.equal(plan.upstream.session_id, design.session_id);
+  assert.equal(plan.upstream.artifact_digest, dCommit.artifact.digest);
+
+  const validPlan = {
+    plan_version: 1,
+    summary: 'A valid plan summary with at least 40 characters for the plan schema.',
+    tasks: [
+      {
+        id: 'T001',
+        title: 'Task 1 title',
+        intent: 'Task 1 intent description with at least 20 chars',
+        design_refs: ['§1.1 Overview'],
+        depends_on: [],
+        changes: [{ path: 'src/main.js', kind: 'modify' }],
+        acceptance: ['Acceptance criterion with >= 10 chars'],
+        verify: [{ command: 'npm test', expect_exit_code: 0 }],
+      },
+    ],
+  };
+  const planContent = JSON.stringify(validPlan, null, 2);
+
+  const pCommit = artifactCommit({
+    input: {
+      session_id: plan.session_id,
+      submission_id: 'sub_p_c1',
+      expected_round: 1,
+      change_note: 'Initial plan document with at least twenty characters',
+      content: planContent,
+    },
+    persistence,
+  });
+
+  scoreSubmit({
+    input: {
+      session_id: plan.session_id,
+      submission_id: 'sub_p_s1',
+      expected_round: 1,
+      artifact_digest: pCommit.artifact.digest,
+      scores: [
+        {
+          criterion_id: 'c1',
+          score: 10,
+          rationale: 'Score 10 rationale tied to evidence >= 40 characters long',
+          weakness: 'none',
+          evidence: [{ kind: 'locator', locator: '§1', excerpt: 'Task 1 intent description' }],
+        },
+      ],
+    },
+    persistence,
+  });
+
+  const pSession = readSession(tmpDir, plan.session_id);
+  assert.equal(pSession.state, 'FINAL');
+
+  // 3. Implement セッション作成: upstream を完全省略！
+  const implement = loopOpenCreate({
+    input: {
+      mode: 'create',
+      loop_mode: 'implement',
+      submission_id: 'sub_open_i',
+      task: 'Implement task description with at least twenty characters',
+      rubric: { criteria, policy: { pass_score: 9 } },
+    },
+    persistence,
+  });
+
+  // 自動的に plan セッションが upstream として解決されていること！
+  assert.equal(implement.upstream.session_id, plan.session_id);
+  assert.equal(implement.upstream.artifact_digest, pCommit.artifact.digest);
+
+  // 4. Implement セッション作成: upstream.session_id のみ指定（artifact_digest 省略）
+  const implementWithSidOnly = loopOpenCreate({
+    input: {
+      mode: 'create',
+      loop_mode: 'implement',
+      submission_id: 'sub_open_i2',
+      task: 'Implement task description 2 with at least twenty characters',
+      rubric: { criteria, policy: { pass_score: 9 } },
+      upstream: { session_id: plan.session_id },
+    },
+    persistence,
+  });
+
+  assert.equal(implementWithSidOnly.upstream.session_id, plan.session_id);
+  assert.equal(implementWithSidOnly.upstream.artifact_digest, pCommit.artifact.digest);
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+
 
