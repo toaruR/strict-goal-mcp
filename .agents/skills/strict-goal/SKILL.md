@@ -25,6 +25,19 @@ Users can invoke either the full chain or a single targeted phase using English 
 | `strict-goal implement <plan_doc_path> [instruction]`<br>`strict-goal 実装 <計画書パス> [指示]` | `implement` only | Reads the given plan. Before touching code, calls `loop_open` first (auto-resolving upstream plan from `.strict-goal/index.json`'s latest session where server returned FINAL) to enter DRAFTING, then implements code & tests, runs verification, and iterates until server returns FINAL. |
 | `strict-goal <goal>`<br>`/strict-goal <goal>` | `design` → `plan` → `implement` | Default: Executes the entire sequential pipeline until the final implement phase's server returns FINAL. |
 
+### LLM-Driven Rubric Scope Decision (LLMによる設計スコープの自律判定)
+
+`strict-goal design` を実行する際、エージェントはキーワードの単純一致ではなく、**要求プロンプトの意味的責務境界（スコープ）を自律判定**して適切な `rubric_preset` を選択して `loop_open` を呼び出すこと：
+
+- **サブセット（汎用 `design` / 8基準: scope_adherence, numeric_roundtrip, interface_completeness 等）**:
+  - **適用対象**: 単一クラス、アルゴリズム、データ構造、APIエンドポイント、ユーティリティ、業務ロジック等の通常のソフトウェア設計。
+  - **判定根拠**: 要求がインメモリや局所コンポーネントのロジック・仕様であり、「耐不正性（anti-gaming）」「自律実行ループ状態機械」「合否判定権の外部化」といったエージェント自律基盤のメタ要件を含まない場合。
+  - **指定方法**: `loop_open` に `rubric_preset: "design"` を指定（汎用設計のデフォルト）。
+- **フルセット（ハーネス用 `design.harness` / 17基準: packaging, self_hosting, anti_gaming, verdict_ownership 等）**:
+  - **適用対象**: 自律エージェントループ、MCPサーバー、FSM状態機械、反復検証ハーネス、プロトコル基盤の設計。
+  - **判定根拠**: エージェント基盤そのもののメタ要件（配布パッケージ仕様、第三者監査ログ、自己適用レビュー手順、モデル不正採点防止等）が必須となる場合。
+  - **指定方法**: `loop_open` に `rubric_preset: "design.harness"` を指定。
+
 ### Pipeline Overview
 
 | Task | loop_mode | Upstream | Output |
@@ -37,7 +50,20 @@ If you don't know the upstream digest, call `loop_state` on the upstream session
 For `implement`, if upstream session ID is omitted, auto-resolve it from the latest session in `.strict-goal/index.json` where server returns FINAL.
 Never guess it (the server rejects a wrong guess with `E_UPSTREAM_DIGEST_MISMATCH`).
 
-## Subagent Delegation for Implementation (実装のサブエージェント委譲)
+## Subagent Delegation for Implementation (実装および全ライフサイクルのサブエージェント委譲・SKILL.state)
+
+トークン爆発（$\mathcal{O}(T^2)$）および自己評価バイアスを防ぐため、**`implement` だけでなく `design` / `plan` を含む全フェーズで使い捨てサブエージェント（Ephemeral Workers）へ作業を委譲**し、親オーケストレーターのコンテキストを保護すること：
+
+- **オーケストレーター（親エージェント）の厳格原則**:
+  1. 親エージェントは FSM ライフサイクル管理（`loop_open`, `loop_state`）とワーカーへのディスパッチのみを行う。
+  2. **親コンテキストでの自己採点・証拠抽出・ハッシュ計算・スクリプト試行錯誤は厳禁**。直接行うと 80+ steps / 1.4M+ tokens のコンテキスト爆発を招く。
+  3. 成果物の初稿執筆・修正は `sg-worker`、客観的検証・根拠収集・`score_submit` は必ず `sg-verifier` に委譲する。
+  4. 状態復帰は過去の会話履歴を辿らず、サーバーから返される Canonical State $\Sigma_t$（`loop_state(projection: "skill_state")` の有界三つ組 $(P, \Sigma_t, O_t)$）のみを参照する。
+
+- **フェーズ別の委譲運用**:
+  - **`design`**: 親が LLM スコープ判定に基づき `design` または `design.harness` を選んで `loop_open`。初稿執筆および `must_fix` 修正を `sg-worker` に委譲。ドラフト完了後、採点・根拠抽出・`score_submit` は必ず `sg-verifier` に委譲する。
+  - **`plan`**: 上流設計書をインプットに、タスク分解と DAG 作成を `sg-worker` に委譲。検証・採点は `sg-verifier` に委譲する。
+  - **`implement`**: 以下のとおり階層委譲を実行する。
 
 In chained runs (`design` → `plan` → `implement`) or complex projects, **delegating the `implement` phase to a subagent (`sg-implementer` / `sg-coder` / `self`) is strongly recommended** to protect the main orchestrator's context from token exhaustion and test output noise:
 
