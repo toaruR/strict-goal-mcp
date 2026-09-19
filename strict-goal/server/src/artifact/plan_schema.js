@@ -41,11 +41,24 @@ export function validatePlanSchema(plan) {
   return true;
 }
 
+// LLM が ```json ... ``` で成果物を囲んで送信した場合にコードブロックを自動除去する。
+export function stripMarkdownCodeFences(text) {
+  if (typeof text !== 'string') return text;
+  const trimmed = text.trim();
+  const match = trimmed.match(/^```(?:json)?\s*\n([\s\S]*?)\n```$/i);
+  if (match) {
+    return match[1].trim();
+  }
+  return trimmed;
+}
+
 // content は JSON 文字列として渡ってくる。構文自体が不正な場合も E_PLAN_SCHEMA。
+// Markdown のコードフェンス（```json ... ```）は自動アンラップして受理する。
 export function parsePlanContent(content) {
   let plan;
+  const raw = stripMarkdownCodeFences(content);
   try {
-    plan = JSON.parse(content);
+    plan = JSON.parse(raw);
   } catch {
     const err = new Error('content is not valid JSON');
     err.code = 'E_PLAN_SCHEMA';

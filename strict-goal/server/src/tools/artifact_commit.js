@@ -42,11 +42,8 @@ function fail(code, message, detail = {}) {
   throw err;
 }
 
-// data_dir が <workspace>/.strict-goal ならその親、それ以外（--data-dir 直指定）は data_dir 自身をワークスペース根とみなす
-export function workspaceRootFromDataDir(dataDir) {
-  const resolved = path.resolve(dataDir);
-  return path.basename(resolved) === '.strict-goal' ? path.dirname(resolved) : resolved;
-}
+import { workspaceRootFromDataDir } from '../paths/workspace_root.js';
+export { workspaceRootFromDataDir };
 
 // source_path をワークスペース根配下に限定して解決し、本文を読む。
 // 成果物全文をモデル出力（content）で往復させずに済ませるための経路（§6.4 source_path）。

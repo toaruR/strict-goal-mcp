@@ -1,4 +1,7 @@
-import { normalizeForMatch } from '../hash/digest.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { normalizeForMatch, matchesExcerpt } from '../hash/digest.js';
+import { workspaceRootFromDataDir } from '../paths/workspace_root.js';
 
 function fail(code, message, detail = {}) {
   const err = new Error(message);
@@ -25,16 +28,44 @@ export function assertEvidenceKindForAuto(criterionId, verification, evidence) {
   }
 }
 
-// locator 根拠の excerpt が、登録済み成果物本文に正規化後の部分一致で実在するか。
-export function verifyLocatorEvidence(criterionId, evidence, artifactBody) {
-  const normalizedBody = normalizeForMatch(artifactBody);
-  const normalizedExcerpt = normalizeForMatch(evidence.excerpt);
-  if (!normalizedBody.includes(normalizedExcerpt)) {
-    fail('E_EVIDENCE_NOT_FOUND', 'locator excerpt not found in artifact body', {
-      criterion_id: criterionId,
-      excerpt: evidence.excerpt.slice(0, 80),
-    });
+// locator 根拠の excerpt が、登録済み成果物本文に実在するか。
+// 1. 単純な行内一致に加えて、改行跨ぎや空白の揺れも matchesExcerpt で自動吸収する。
+// 2. fileset モードの場合、マニフェスト文字列に一致しなくても、マニフェスト内の個別ファイル本文に
+//    一致すれば合格とする（モデルがソースコード行を直接引用できる救済機構）。
+export function verifyLocatorEvidence(criterionId, evidence, artifactBody, options = {}) {
+  if (matchesExcerpt(artifactBody, evidence.excerpt)) {
+    return;
   }
+
+  if (options.dataDir && typeof artifactBody === 'string' && artifactBody.trim().startsWith('{')) {
+    try {
+      const manifest = JSON.parse(artifactBody);
+      if (Array.isArray(manifest.files) && manifest.files.length > 0) {
+        const root = workspaceRootFromDataDir(options.dataDir);
+        for (const fileEntry of manifest.files) {
+          if (!fileEntry.path) continue;
+          const fullPath = path.resolve(root, fileEntry.path);
+          try {
+            if (fs.existsSync(fullPath)) {
+              const fileContent = fs.readFileSync(fullPath, 'utf8');
+              if (matchesExcerpt(fileContent, evidence.excerpt)) {
+                return;
+              }
+            }
+          } catch {
+            // 個別ファイルの読み込みエラーはスキップ
+          }
+        }
+      }
+    } catch {
+      // JSON パース失敗時は通常エラーへ
+    }
+  }
+
+  fail('E_EVIDENCE_NOT_FOUND', 'locator excerpt not found in artifact body', {
+    criterion_id: criterionId,
+    excerpt: evidence.excerpt.slice(0, 80),
+  });
 }
 
 // upstream 根拠は design モードでは使用禁止。それ以外ではピンした上流本文に対して照合する。
@@ -44,9 +75,7 @@ export function verifyUpstreamEvidence(criterionId, evidence, loopMode, upstream
       criterion_id: criterionId,
     });
   }
-  const normalizedBody = normalizeForMatch(upstreamBody);
-  const normalizedExcerpt = normalizeForMatch(evidence.excerpt);
-  if (!normalizedBody.includes(normalizedExcerpt)) {
+  if (!matchesExcerpt(upstreamBody, evidence.excerpt)) {
     fail('E_EVIDENCE_NOT_FOUND', 'upstream excerpt not found in pinned upstream body', {
       criterion_id: criterionId,
       excerpt: evidence.excerpt.slice(0, 80),

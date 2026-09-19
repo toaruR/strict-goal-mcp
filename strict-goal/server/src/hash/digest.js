@@ -12,10 +12,27 @@ export function sha256Hex(text) {
   return crypto.createHash('sha256').update(normalize(text), 'utf8').digest('hex');
 }
 
-// normalize() は「末尾改行を1つに揃える」までやるが、こちらは本文中の任意の位置での
-// 部分一致（design_refs / evidence の excerpt 照合）を見たいだけなので、末尾改行は強制しない。
 export function normalizeForMatch(text) {
   return text.normalize('NFC').replace(/\r\n/g, '\n').replace(/[ \t]+$/gm, '');
+}
+
+// 本文中に excerpt が実在するかを照合する。
+// 単純な部分一致に加えて、LLM が改行跨ぎで引用したり改行を空白に置換した揺れも
+// 連続空白・改行の畳み込み（collapse whitespace）により自動吸収する。
+export function matchesExcerpt(body, excerpt) {
+  if (typeof body !== 'string' || typeof excerpt !== 'string') return false;
+  const normalizedBody = normalizeForMatch(body);
+  const normalizedExcerpt = normalizeForMatch(excerpt);
+  if (normalizedBody.includes(normalizedExcerpt)) return true;
+
+  const collapseWs = (s) => s.replace(/\s+/gu, ' ').trim();
+  const collapsedBody = collapseWs(normalizedBody);
+  const collapsedExcerpt = collapseWs(normalizedExcerpt);
+  if (collapsedExcerpt.length > 0 && collapsedBody.includes(collapsedExcerpt)) {
+    return true;
+  }
+
+  return false;
 }
 
 // キー昇順の正規化 JSON 文字列化（オブジェクトの再帰、配列の順序は保持）。

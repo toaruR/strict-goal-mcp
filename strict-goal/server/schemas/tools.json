@@ -4,30 +4,93 @@
       "input": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["mode", "submission_id"],
+        "required": [
+          "mode",
+          "submission_id"
+        ],
         "properties": {
-          "mode": { "type": "string", "enum": ["create", "resume", "create_or_resume"] },
-          "workspace_dir": { "type": "string", "minLength": 1, "maxLength": 4096 },
-          "submission_id": { "type": "string", "minLength": 8, "maxLength": 128 },
-          "session_id": { "type": "string", "pattern": "^rl_[0-9A-HJKMNP-TV-Z]{26}$" },
-          "label": { "type": "string", "minLength": 1, "maxLength": 120 },
-          "loop_mode": { "type": "string", "enum": ["design", "plan", "implement"] },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "create",
+              "resume",
+              "create_or_resume"
+            ]
+          },
+          "workspace_dir": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "submission_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          },
+          "session_id": {
+            "type": "string",
+            "pattern": "^rl_[0-9A-HJKMNP-TV-Z]{26}$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "loop_mode": {
+            "type": "string",
+            "enum": [
+              "design",
+              "plan",
+              "implement"
+            ]
+          },
           "upstream": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["session_id", "artifact_digest"],
+            "required": [
+              "session_id",
+              "artifact_digest"
+            ],
             "properties": {
-              "session_id": { "type": "string", "pattern": "^rl_[0-9A-HJKMNP-TV-Z]{26}$" },
-              "artifact_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+              "session_id": {
+                "type": "string",
+                "pattern": "^rl_[0-9A-HJKMNP-TV-Z]{26}$"
+              },
+              "artifact_digest": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              }
             }
           },
-          "task": { "type": "string", "minLength": 20, "maxLength": 20000 },
-          "artifact_kind": { "type": "string", "enum": ["markdown", "text", "plan", "fileset"] },
-          "rubric_preset": { "type": "string", "enum": ["design", "plan", "implement", "design.harness"] },
+          "task": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 20000
+          },
+          "artifact_kind": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "text",
+              "plan",
+              "fileset"
+            ]
+          },
+          "rubric_preset": {
+            "type": "string",
+            "enum": [
+              "design",
+              "plan",
+              "implement",
+              "design.harness"
+            ]
+          },
           "rubric": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["criteria"],
+            "required": [
+              "criteria"
+            ],
             "properties": {
               "criteria": {
                 "type": "array",
@@ -35,21 +98,64 @@
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["id", "statement", "weight", "anchors", "verification"],
+                  "required": [
+                    "id",
+                    "statement",
+                    "weight",
+                    "anchors",
+                    "verification"
+                  ],
                   "properties": {
-                    "id": { "type": "string", "pattern": "^[a-z0-9_]{1,40}$" },
-                    "statement": { "type": "string", "minLength": 10, "maxLength": 2000 },
-                    "weight": { "type": "number", "minimum": 0, "maximum": 10 },
-                    "priority": { "type": "integer", "minimum": 0, "maximum": 3 },
-                    "verification": { "type": "string", "enum": ["auto", "manual"] },
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9_]{1,40}$"
+                    },
+                    "statement": {
+                      "type": "string",
+                      "minLength": 10,
+                      "maxLength": 2000
+                    },
+                    "weight": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 10
+                    },
+                    "priority": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 3
+                    },
+                    "verification": {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "manual"
+                      ]
+                    },
                     "anchors": {
                       "type": "object",
                       "additionalProperties": false,
-                      "required": ["1", "5", "9"],
+                      "required": [
+                        "1",
+                        "5",
+                        "9"
+                      ],
                       "properties": {
-                        "1": { "type": "string", "minLength": 5, "maxLength": 1000 },
-                        "5": { "type": "string", "minLength": 5, "maxLength": 1000 },
-                        "9": { "type": "string", "minLength": 5, "maxLength": 1000 }
+                        "1": {
+                          "type": "string",
+                          "minLength": 5,
+                          "maxLength": 1000
+                        },
+                        "5": {
+                          "type": "string",
+                          "minLength": 5,
+                          "maxLength": 1000
+                        },
+                        "9": {
+                          "type": "string",
+                          "minLength": 5,
+                          "maxLength": 1000
+                        }
                       }
                     }
                   }
@@ -59,76 +165,217 @@
                 "type": "object",
                 "additionalProperties": false,
                 "properties": {
-                  "pass_score": { "type": "integer", "minimum": 1, "maximum": 10 },
-                  "pass_weighted_mean": { "type": "number", "minimum": 1, "maximum": 10 },
-                  "max_rounds": { "type": "integer", "minimum": 1, "maximum": 50 },
-                  "stall_window": { "type": "integer", "minimum": 2, "maximum": 10 },
-                  "stall_epsilon": { "type": "number", "minimum": 0, "maximum": 5 },
-                  "max_score_jump": { "type": "integer", "minimum": 1, "maximum": 9 },
+                  "pass_score": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10
+                  },
+                  "pass_weighted_mean": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 10
+                  },
+                  "max_rounds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 50
+                  },
+                  "stall_window": {
+                    "type": "integer",
+                    "minimum": 2,
+                    "maximum": 10
+                  },
+                  "stall_epsilon": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 5
+                  },
+                  "max_score_jump": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9
+                  },
                   "require_command_evidence_for": {
                     "type": "array",
                     "uniqueItems": true,
-                    "items": { "type": "string", "enum": ["auto", "manual"] }
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "manual"
+                      ]
+                    }
                   },
-                  "chain_max_rounds": { "type": "integer", "minimum": 1, "maximum": 200 },
-                  "min_rounds": { "type": "integer", "minimum": 1, "maximum": 10 },
-                  "first_round_ceiling": { "type": "integer", "minimum": 1, "maximum": 10 },
-                  "min_first_round_must_fix": { "type": "integer", "minimum": 0, "maximum": 5 },
+                  "chain_max_rounds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 200
+                  },
+                  "min_rounds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10
+                  },
+                  "first_round_ceiling": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10
+                  },
+                  "min_first_round_must_fix": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5
+                  },
                   "scope_guard_terms": {
                     "type": "array",
-                    "items": { "type": "string" }
+                    "items": {
+                      "type": "string"
+                    }
                   },
-                  "artifact_budget_bytes": { "type": "integer", "minimum": 1 }
+                  "artifact_budget_bytes": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
                 }
               }
             }
           },
-          "allow_ephemeral": { "type": "boolean" }
+          "allow_ephemeral": {
+            "type": "boolean"
+          }
         }
       },
       "output": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["ok", "session_id", "state", "round", "rubric_version", "persistence", "rubric", "next_action", "warnings"],
+        "required": [
+          "ok",
+          "session_id",
+          "state",
+          "round",
+          "rubric_version",
+          "persistence",
+          "rubric",
+          "next_action",
+          "warnings"
+        ],
         "properties": {
-          "ok": { "type": "boolean" },
-          "session_id": { "type": "string" },
-          "state": { "type": "string", "enum": ["DRAFTING", "SCORING", "STALLED", "ESCALATED", "FINAL", "ABORTED"] },
-          "round": { "type": "integer", "minimum": 1 },
-          "rubric_version": { "type": "integer", "minimum": 1 },
-          "persistence": { "type": "string", "enum": ["durable", "ephemeral"] },
-          "resumed": { "type": "boolean" },
-          "label": { "type": "string" },
-          "handle_minted": { "type": "boolean" },
-          "state_dir": { "type": "string" },
-          "rubric": { "type": "object" },
-          "task": { "type": "string" },
+          "ok": {
+            "type": "boolean"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "DRAFTING",
+              "SCORING",
+              "STALLED",
+              "ESCALATED",
+              "FINAL",
+              "ABORTED"
+            ]
+          },
+          "round": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "rubric_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "persistence": {
+            "type": "string",
+            "enum": [
+              "durable",
+              "ephemeral"
+            ]
+          },
+          "resumed": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          },
+          "handle_minted": {
+            "type": "boolean"
+          },
+          "state_dir": {
+            "type": "string"
+          },
+          "rubric": {
+            "type": "object"
+          },
+          "task": {
+            "type": "string"
+          },
           "history": {
             "type": "array",
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["round", "artifact_digest", "weighted_mean", "min_score", "verdict"],
+              "required": [
+                "round",
+                "artifact_digest",
+                "weighted_mean",
+                "min_score",
+                "verdict"
+              ],
               "properties": {
-                "round": { "type": "integer" },
-                "artifact_digest": { "type": "string" },
-                "weighted_mean": { "type": "number" },
-                "min_score": { "type": "integer" },
-                "verdict": { "type": "string", "enum": ["ITERATING", "FINAL", "FINAL_WITH_RELAXATION", "STALLED", "ESCALATED"] }
+                "round": {
+                  "type": "integer"
+                },
+                "artifact_digest": {
+                  "type": "string"
+                },
+                "weighted_mean": {
+                  "type": "number"
+                },
+                "min_score": {
+                  "type": "integer"
+                },
+                "verdict": {
+                  "type": "string",
+                  "enum": [
+                    "ITERATING",
+                    "FINAL",
+                    "FINAL_WITH_RELAXATION",
+                    "STALLED",
+                    "ESCALATED"
+                  ]
+                }
               }
             }
           },
           "next_action": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["tool", "why"],
+            "required": [
+              "tool",
+              "why"
+            ],
             "properties": {
-              "tool": { "type": "string" },
-              "why": { "type": "string" },
-              "required_criteria": { "type": "array", "items": { "type": "string" } }
+              "tool": {
+                "type": "string"
+              },
+              "why": {
+                "type": "string"
+              },
+              "required_criteria": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
             }
           },
-          "warnings": { "type": "array", "items": { "type": "string" } }
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -136,51 +383,139 @@
       "input": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["session_id"],
+        "required": [
+          "session_id"
+        ],
         "properties": {
-          "session_id": { "type": "string", "pattern": "^rl_[0-9A-HJKMNP-TV-Z]{26}$" },
+          "session_id": {
+            "type": "string",
+            "pattern": "^rl_[0-9A-HJKMNP-TV-Z]{26}$"
+          },
           "include": {
             "type": "array",
             "uniqueItems": true,
-            "items": { "type": "string", "enum": ["rubric", "history", "last_scores", "artifact_head", "must_fix", "upstream", "chain"] }
+            "items": {
+              "type": "string",
+              "enum": [
+                "rubric",
+                "history",
+                "last_scores",
+                "artifact_head",
+                "must_fix",
+                "upstream",
+                "chain"
+              ]
+            }
           },
-          "artifact_head_bytes": { "type": "integer", "minimum": 0, "maximum": 20000 },
-          "upstream_head_bytes": { "type": "integer", "minimum": 0, "maximum": 200000 },
+          "artifact_head_bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "upstream_head_bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200000
+          },
           "projection": {
             "type": "string",
-            "enum": ["standard", "skill_state"]
+            "enum": [
+              "standard",
+              "skill_state"
+            ]
           }
         }
       },
       "output": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["ok", "session_id", "state", "round", "rubric_version", "persistence", "next_action", "warnings"],
+        "required": [
+          "ok",
+          "session_id",
+          "state",
+          "round",
+          "rubric_version",
+          "persistence",
+          "next_action",
+          "warnings"
+        ],
         "properties": {
-          "ok": { "type": "boolean" },
-          "session_id": { "type": "string" },
+          "ok": {
+            "type": "boolean"
+          },
+          "session_id": {
+            "type": "string"
+          },
           "state": {
             "type": "string",
-            "enum": ["DRAFTING", "SCORING", "STALLED", "ESCALATED", "FINAL", "FINAL_WITH_RELAXATION", "SUPERSEDED", "FROZEN", "ABORTED"]
+            "enum": [
+              "DRAFTING",
+              "SCORING",
+              "STALLED",
+              "ESCALATED",
+              "FINAL",
+              "FINAL_WITH_RELAXATION",
+              "SUPERSEDED",
+              "FROZEN",
+              "ABORTED"
+            ]
           },
-          "round": { "type": "integer" },
-          "rubric_version": { "type": "integer" },
-          "persistence": { "type": "string", "enum": ["durable", "ephemeral"] },
-          "loop_mode": { "type": "string", "enum": ["design", "plan", "implement"] },
-          "task": { "type": "string" },
-          "rubric": { "type": "object" },
-          "history": { "type": "array", "items": { "type": "object" } },
+          "round": {
+            "type": "integer"
+          },
+          "rubric_version": {
+            "type": "integer"
+          },
+          "persistence": {
+            "type": "string",
+            "enum": [
+              "durable",
+              "ephemeral"
+            ]
+          },
+          "loop_mode": {
+            "type": "string",
+            "enum": [
+              "design",
+              "plan",
+              "implement"
+            ]
+          },
+          "task": {
+            "type": "string"
+          },
+          "rubric": {
+            "type": "object"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
           "last_scores": {
             "type": "array",
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["criterion_id", "score", "passed"],
+              "required": [
+                "criterion_id",
+                "score",
+                "passed"
+              ],
               "properties": {
-                "criterion_id": { "type": "string" },
-                "score": { "type": "integer" },
-                "passed": { "type": "boolean" },
-                "rationale": { "type": "string" }
+                "criterion_id": {
+                  "type": "string"
+                },
+                "score": {
+                  "type": "integer"
+                },
+                "passed": {
+                  "type": "boolean"
+                },
+                "rationale": {
+                  "type": "string"
+                }
               }
             }
           },
@@ -189,111 +524,270 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["criterion_id", "score", "gap", "anchor_9", "verify_hint"],
+              "required": [
+                "criterion_id",
+                "score",
+                "gap",
+                "anchor_9",
+                "verify_hint"
+              ],
               "properties": {
-                "criterion_id": { "type": "string" },
-                "score": { "type": "integer" },
-                "gap": { "type": "integer" },
-                "anchor_9": { "type": "string" },
-                "verify_hint": { "type": "string" },
-                "last_weakness_note": { "type": "string" }
+                "criterion_id": {
+                  "type": "string"
+                },
+                "score": {
+                  "type": "integer"
+                },
+                "gap": {
+                  "type": "integer"
+                },
+                "anchor_9": {
+                  "type": "string"
+                },
+                "verify_hint": {
+                  "type": "string"
+                },
+                "last_weakness_note": {
+                  "type": "string"
+                }
               }
             }
           },
           "current_artifact": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["digest", "bytes", "committed_at"],
+            "required": [
+              "digest",
+              "bytes",
+              "committed_at"
+            ],
             "properties": {
-              "digest": { "type": "string" },
-              "bytes": { "type": "integer" },
-              "committed_at": { "type": "string" },
-              "head": { "type": "string" }
+              "digest": {
+                "type": "string"
+              },
+              "bytes": {
+                "type": "integer"
+              },
+              "committed_at": {
+                "type": "string"
+              },
+              "head": {
+                "type": "string"
+              }
             }
           },
           "upstream_artifact": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["session_id", "loop_mode", "state", "pinned_digest", "current_digest", "drifted"],
+            "required": [
+              "session_id",
+              "loop_mode",
+              "state",
+              "pinned_digest",
+              "current_digest",
+              "drifted"
+            ],
             "properties": {
-              "session_id": { "type": "string" },
-              "loop_mode": { "type": "string", "enum": ["design", "plan"] },
-              "state": { "type": "string" },
-              "pinned_digest": { "type": "string" },
-              "current_digest": { "type": "string" },
-              "drifted": { "type": "boolean" },
-              "head": { "type": "string" }
+              "session_id": {
+                "type": "string"
+              },
+              "loop_mode": {
+                "type": "string",
+                "enum": [
+                  "design",
+                  "plan"
+                ]
+              },
+              "state": {
+                "type": "string"
+              },
+              "pinned_digest": {
+                "type": "string"
+              },
+              "current_digest": {
+                "type": "string"
+              },
+              "drifted": {
+                "type": "boolean"
+              },
+              "head": {
+                "type": "string"
+              }
             }
           },
           "chain": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["chain_id", "links", "chain_rounds", "chain_max_rounds", "kickbacks"],
+            "required": [
+              "chain_id",
+              "links",
+              "chain_rounds",
+              "chain_max_rounds",
+              "kickbacks"
+            ],
             "properties": {
-              "chain_id": { "type": "string", "pattern": "^ch_[0-9A-HJKMNP-TV-Z]{26}$" },
+              "chain_id": {
+                "type": "string",
+                "pattern": "^ch_[0-9A-HJKMNP-TV-Z]{26}$"
+              },
               "links": {
                 "type": "array",
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["session_id", "loop_mode", "state", "rounds"],
+                  "required": [
+                    "session_id",
+                    "loop_mode",
+                    "state",
+                    "rounds"
+                  ],
                   "properties": {
-                    "session_id": { "type": "string" },
-                    "loop_mode": { "type": "string", "enum": ["design", "plan", "implement"] },
-                    "state": { "type": "string" },
-                    "rounds": { "type": "integer" }
+                    "session_id": {
+                      "type": "string"
+                    },
+                    "loop_mode": {
+                      "type": "string",
+                      "enum": [
+                        "design",
+                        "plan",
+                        "implement"
+                      ]
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "rounds": {
+                      "type": "integer"
+                    }
                   }
                 }
               },
-              "chain_rounds": { "type": "integer" },
-              "chain_max_rounds": { "type": "integer" },
-              "kickbacks": { "type": "integer" }
+              "chain_rounds": {
+                "type": "integer"
+              },
+              "chain_max_rounds": {
+                "type": "integer"
+              },
+              "kickbacks": {
+                "type": "integer"
+              }
             }
           },
           "skill_state": {
             "type": "object",
-            "required": ["immutable_spec", "canonical_state", "recent_observation"],
+            "required": [
+              "immutable_spec",
+              "canonical_state",
+              "recent_observation"
+            ],
             "properties": {
               "immutable_spec": {
                 "type": "object",
-                "required": ["task", "loop_mode", "criteria_summary", "allowed_tools"],
+                "required": [
+                  "task",
+                  "loop_mode",
+                  "criteria_summary",
+                  "allowed_tools"
+                ],
                 "properties": {
-                  "task": { "type": "string" },
-                  "loop_mode": { "type": "string" },
-                  "criteria_summary": { "type": "array", "items": { "type": "string" } },
-                  "allowed_tools": { "type": "array", "items": { "type": "string" } }
+                  "task": {
+                    "type": "string"
+                  },
+                  "loop_mode": {
+                    "type": "string"
+                  },
+                  "criteria_summary": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "allowed_tools": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
                 }
               },
               "canonical_state": {
                 "type": "object",
-                "required": ["session_id", "round", "state", "must_fix", "trial_history"],
+                "required": [
+                  "session_id",
+                  "round",
+                  "state",
+                  "must_fix",
+                  "trial_history"
+                ],
                 "properties": {
-                  "session_id": { "type": "string" },
-                  "round": { "type": "integer" },
-                  "state": { "type": "string" },
-                  "must_fix": { "type": "array", "items": { "type": "string" } },
+                  "session_id": {
+                    "type": "string"
+                  },
+                  "round": {
+                    "type": "integer"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "must_fix": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
                   "trial_history": {
                     "type": "object",
                     "properties": {
-                      "visited_files": { "type": "array", "items": { "type": "string" } },
-                      "failed_hypotheses": { "type": "array", "items": { "type": "string" } }
+                      "visited_files": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "failed_hypotheses": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
                     }
                   }
                 }
               },
               "recent_observation": {
                 "type": "object",
-                "required": ["type", "summary"],
+                "required": [
+                  "type",
+                  "summary"
+                ],
                 "properties": {
-                  "type": { "type": "string", "enum": ["commit_ack", "eval_verdict", "sanitized_test"] },
-                  "summary": { "type": "string" },
-                  "details": { "type": "object" }
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "commit_ack",
+                      "eval_verdict",
+                      "sanitized_test"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string"
+                  },
+                  "details": {
+                    "type": "object"
+                  }
                 }
               }
             }
           },
-          "next_action": { "type": "object" },
-          "warnings": { "type": "array", "items": { "type": "string" } }
+          "next_action": {
+            "type": "object"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -301,46 +795,131 @@
       "input": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["session_id", "submission_id", "expected_round", "change_note"],
+        "required": [
+          "session_id",
+          "submission_id",
+          "expected_round",
+          "change_note"
+        ],
         "properties": {
-          "session_id": { "type": "string", "pattern": "^rl_[0-9A-HJKMNP-TV-Z]{26}$" },
-          "submission_id": { "type": "string", "minLength": 8, "maxLength": 128 },
-          "expected_round": { "type": "integer", "minimum": 1 },
-          "content": { "type": "string", "minLength": 1, "maxLength": 1000000 },
+          "session_id": {
+            "type": "string",
+            "pattern": "^rl_[0-9A-HJKMNP-TV-Z]{26}$"
+          },
+          "submission_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          },
+          "expected_round": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000000
+          },
           "files": {
             "type": "array",
             "minItems": 1,
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["path", "sha256", "bytes", "role"],
+              "required": [
+                "path",
+                "sha256",
+                "bytes",
+                "role"
+              ],
               "properties": {
-                "path": { "type": "string", "minLength": 1, "maxLength": 1024 },
-                "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-                "bytes": { "type": "integer", "minimum": 0, "maximum": 1073741824 },
-                "role": { "type": "string", "enum": ["source", "test", "config", "doc", "generated"] }
+                "path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1073741824
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "source",
+                    "test",
+                    "config",
+                    "doc",
+                    "generated"
+                  ]
+                }
               }
             }
           },
-          "manifest_command": { "type": "string", "minLength": 3, "maxLength": 1000 },
-          "manifest_output_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "manifest_command": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000
+          },
+          "manifest_output_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
           "test_inventory": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["source_command", "source_exit_code", "source_output_sha256", "counts", "tests"],
+            "required": [
+              "source_command",
+              "source_exit_code",
+              "source_output_sha256",
+              "counts",
+              "tests"
+            ],
             "properties": {
-              "source_command": { "type": "string", "minLength": 3, "maxLength": 1000 },
-              "source_exit_code": { "type": "integer", "minimum": -256, "maximum": 255 },
-              "source_output_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "source_command": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 1000
+              },
+              "source_exit_code": {
+                "type": "integer",
+                "minimum": -256,
+                "maximum": 255
+              },
+              "source_output_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
               "counts": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["total", "passed", "failed", "skipped"],
+                "required": [
+                  "total",
+                  "passed",
+                  "failed",
+                  "skipped"
+                ],
                 "properties": {
-                  "total": { "type": "integer", "minimum": 0 },
-                  "passed": { "type": "integer", "minimum": 0 },
-                  "failed": { "type": "integer", "minimum": 0 },
-                  "skipped": { "type": "integer", "minimum": 0 }
+                  "total": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "passed": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "failed": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "skipped": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
                 }
               },
               "tests": {
@@ -349,11 +928,30 @@
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["id", "file", "status"],
+                  "required": [
+                    "id",
+                    "file",
+                    "status"
+                  ],
                   "properties": {
-                    "id": { "type": "string", "minLength": 1, "maxLength": 500 },
-                    "file": { "type": "string", "minLength": 1, "maxLength": 1024 },
-                    "status": { "type": "string", "enum": ["passed", "failed", "skipped"] }
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "file": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1024
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "passed",
+                        "failed",
+                        "skipped"
+                      ]
+                    }
                   }
                 }
               },
@@ -362,10 +960,21 @@
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["id", "reason"],
+                  "required": [
+                    "id",
+                    "reason"
+                  ],
                   "properties": {
-                    "id": { "type": "string", "minLength": 1, "maxLength": 500 },
-                    "reason": { "type": "string", "minLength": 20, "maxLength": 1000 }
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "reason": {
+                      "type": "string",
+                      "minLength": 20,
+                      "maxLength": 1000
+                    }
                   }
                 }
               },
@@ -374,63 +983,164 @@
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["file", "command", "output_excerpt", "output_sha256"],
+                  "required": [
+                    "file",
+                    "command",
+                    "output_excerpt",
+                    "output_sha256"
+                  ],
                   "properties": {
-                    "file": { "type": "string", "maxLength": 1024 },
-                    "command": { "type": "string", "maxLength": 1000 },
-                    "output_excerpt": { "type": "string", "minLength": 1, "maxLength": 20000 },
-                    "output_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                    "file": {
+                      "type": "string",
+                      "maxLength": 1024
+                    },
+                    "command": {
+                      "type": "string",
+                      "maxLength": 1000
+                    },
+                    "output_excerpt": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20000
+                    },
+                    "output_sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
                   }
                 }
               }
             }
           },
-          "change_note": { "type": "string", "minLength": 10, "maxLength": 4000 },
+          "change_note": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 4000
+          },
           "addresses": {
             "type": "array",
             "uniqueItems": true,
-            "items": { "type": "string", "pattern": "^[a-z0-9_]{1,40}$" }
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9_]{1,40}$"
+            }
           },
-          "source_path": { "type": "string", "minLength": 1, "maxLength": 4096, "description": "Alternative to content: path (relative to the workspace root, or absolute inside it) of the artifact file. The server reads it, so the full text does not round-trip through the model. Exactly one of content / source_path / files." }
+          "source_path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "description": "Alternative to content: path (relative to the workspace root, or absolute inside it) of the artifact file. The server reads it, so the full text does not round-trip through the model. Exactly one of content / source_path / files."
+          }
         }
       },
       "output": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["ok", "session_id", "state", "round", "rubric_version", "persistence", "artifact", "next_action", "warnings"],
+        "required": [
+          "ok",
+          "session_id",
+          "state",
+          "round",
+          "rubric_version",
+          "persistence",
+          "artifact",
+          "next_action",
+          "warnings"
+        ],
         "properties": {
-          "ok": { "type": "boolean" },
-          "session_id": { "type": "string" },
-          "state": { "type": "string", "enum": ["SCORING"] },
-          "round": { "type": "integer" },
-          "rubric_version": { "type": "integer" },
-          "persistence": { "type": "string", "enum": ["durable", "ephemeral"] },
+          "ok": {
+            "type": "boolean"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "SCORING"
+            ]
+          },
+          "round": {
+            "type": "integer"
+          },
+          "rubric_version": {
+            "type": "integer"
+          },
+          "persistence": {
+            "type": "string",
+            "enum": [
+              "durable",
+              "ephemeral"
+            ]
+          },
           "artifact": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["digest", "bytes", "unchanged", "previous_digest"],
+            "required": [
+              "digest",
+              "bytes",
+              "unchanged",
+              "previous_digest"
+            ],
             "properties": {
-              "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-              "bytes": { "type": "integer" },
-              "unchanged": { "type": "boolean" },
-              "previous_digest": { "type": ["string", "null"] },
+              "digest": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "bytes": {
+                "type": "integer"
+              },
+              "unchanged": {
+                "type": "boolean"
+              },
+              "previous_digest": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "diff": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["added_lines", "removed_lines", "changed_ratio"],
+                "required": [
+                  "added_lines",
+                  "removed_lines",
+                  "changed_ratio"
+                ],
                 "properties": {
-                  "added_lines": { "type": "integer" },
-                  "removed_lines": { "type": "integer" },
-                  "added_files": { "type": "integer" },
-                  "removed_files": { "type": "integer" },
-                  "changed_files": { "type": "integer" },
-                  "changed_ratio": { "type": "number", "minimum": 0, "maximum": 1 }
+                  "added_lines": {
+                    "type": "integer"
+                  },
+                  "removed_lines": {
+                    "type": "integer"
+                  },
+                  "added_files": {
+                    "type": "integer"
+                  },
+                  "removed_files": {
+                    "type": "integer"
+                  },
+                  "changed_files": {
+                    "type": "integer"
+                  },
+                  "changed_ratio": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
                 }
               }
             }
           },
-          "next_action": { "type": "object" },
-          "warnings": { "type": "array", "items": { "type": "string" } }
+          "next_action": {
+            "type": "object"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -438,24 +1148,64 @@
       "input": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["session_id", "submission_id", "expected_round", "artifact_digest", "scores"],
+        "required": [
+          "session_id",
+          "submission_id",
+          "expected_round",
+          "artifact_digest",
+          "scores"
+        ],
         "properties": {
-          "session_id": { "type": "string", "pattern": "^rl_[0-9A-HJKMNP-TV-Z]{26}$" },
-          "submission_id": { "type": "string", "pattern": "^[A-Za-z0-9._-]{8,64}$" },
-          "expected_round": { "type": "integer", "minimum": 1 },
-          "artifact_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+          "session_id": {
+            "type": "string",
+            "pattern": "^rl_[0-9A-HJKMNP-TV-Z]{26}$"
+          },
+          "submission_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]{8,64}$"
+          },
+          "expected_round": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "artifact_digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
           "scores": {
             "type": "array",
             "minItems": 1,
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["criterion_id", "score", "rationale", "weakness", "evidence"],
+              "required": [
+                "criterion_id",
+                "score",
+                "rationale",
+                "weakness",
+                "evidence"
+              ],
               "properties": {
-                "criterion_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{1,63}$" },
-                "score": { "type": "integer", "minimum": 1, "maximum": 10 },
-                "rationale": { "type": "string", "minLength": 40, "maxLength": 2000, "description": "At least 40 chars; tie the score to the cited evidence." },
-                "weakness": { "type": "string", "maxLength": 2000, "description": "Concrete shortcoming, at least 10 chars; the literal \"none\" is allowed only when score is 10. Evasive wording (e.g. \"not evaluated\") is rejected." },
+                "criterion_id": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9][a-z0-9_-]{1,63}$"
+                },
+                "score": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10
+                },
+                "rationale": {
+                  "type": "string",
+                  "minLength": 40,
+                  "maxLength": 2000,
+                  "description": "At least 40 chars; tie the score to the cited evidence."
+                },
+                "weakness": {
+                  "type": "string",
+                  "maxLength": 2000,
+                  "description": "Concrete shortcoming, at least 10 chars; the literal \"none\" is allowed only when score is 10. Evasive wording (e.g. \"not evaluated\") is rejected."
+                },
                 "evidence": {
                   "type": "array",
                   "minItems": 1,
@@ -468,49 +1218,145 @@
               }
             }
           },
-          "self_verdict_note": { "type": "string", "maxLength": 1000 }
+          "self_verdict_note": {
+            "type": "string",
+            "maxLength": 1000
+          }
         }
       },
       "output": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["ok", "session_id", "state", "round", "rubric_version", "persistence", "verdict", "evaluation", "next_action", "warnings"],
+        "required": [
+          "ok",
+          "session_id",
+          "state",
+          "round",
+          "rubric_version",
+          "persistence",
+          "verdict",
+          "evaluation",
+          "next_action",
+          "warnings"
+        ],
         "properties": {
-          "ok": { "type": "boolean" },
-          "session_id": { "type": "string" },
-          "state": { "type": "string", "enum": ["DRAFTING", "SCORING", "FINAL", "STALLED", "ESCALATED"] },
-          "round": { "type": "integer" },
-          "rubric_version": { "type": "integer" },
-          "persistence": { "type": "string", "enum": ["durable", "ephemeral"] },
-          "verdict": { "type": "string", "enum": ["ITERATING", "FINAL", "FINAL_WITH_RELAXATION", "STALLED", "ESCALATED"] },
+          "ok": {
+            "type": "boolean"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "DRAFTING",
+              "SCORING",
+              "FINAL",
+              "STALLED",
+              "ESCALATED"
+            ]
+          },
+          "round": {
+            "type": "integer"
+          },
+          "rubric_version": {
+            "type": "integer"
+          },
+          "persistence": {
+            "type": "string",
+            "enum": [
+              "durable",
+              "ephemeral"
+            ]
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "ITERATING",
+              "FINAL",
+              "FINAL_WITH_RELAXATION",
+              "STALLED",
+              "ESCALATED"
+            ]
+          },
           "verdict_reason": {
             "type": "string",
-            "enum": ["below_pass_score", "below_weighted_mean", "all_criteria_passed", "max_rounds_reached", "no_improvement", "relaxation_pending_approval"]
+            "enum": [
+              "below_pass_score",
+              "below_weighted_mean",
+              "all_criteria_passed",
+              "max_rounds_reached",
+              "no_improvement",
+              "relaxation_pending_approval"
+            ]
           },
           "evaluation": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["scored_round", "artifact_digest", "weighted_mean", "min_score", "passed_count", "total_count", "per_criterion"],
+            "required": [
+              "scored_round",
+              "artifact_digest",
+              "weighted_mean",
+              "min_score",
+              "passed_count",
+              "total_count",
+              "per_criterion"
+            ],
             "properties": {
-              "scored_round": { "type": "integer" },
-              "artifact_digest": { "type": "string" },
-              "weighted_mean": { "type": "number" },
-              "min_score": { "type": "integer" },
-              "passed_count": { "type": "integer" },
-              "total_count": { "type": "integer" },
-              "improvement": { "type": "number" },
+              "scored_round": {
+                "type": "integer"
+              },
+              "artifact_digest": {
+                "type": "string"
+              },
+              "weighted_mean": {
+                "type": "number"
+              },
+              "min_score": {
+                "type": "integer"
+              },
+              "passed_count": {
+                "type": "integer"
+              },
+              "total_count": {
+                "type": "integer"
+              },
+              "improvement": {
+                "type": "number"
+              },
               "per_criterion": {
                 "type": "array",
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["criterion_id", "score", "previous_score", "passed"],
+                  "required": [
+                    "criterion_id",
+                    "score",
+                    "previous_score",
+                    "passed"
+                  ],
                   "properties": {
-                    "criterion_id": { "type": "string" },
-                    "score": { "type": "integer" },
-                    "previous_score": { "type": ["integer", "null"] },
-                    "passed": { "type": "boolean" },
-                    "evidence_digests": { "type": "array", "items": { "type": "string" } }
+                    "criterion_id": {
+                      "type": "string"
+                    },
+                    "score": {
+                      "type": "integer"
+                    },
+                    "previous_score": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "passed": {
+                      "type": "boolean"
+                    },
+                    "evidence_digests": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
                   }
                 }
               }
@@ -521,29 +1367,65 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["criterion_id", "score", "gap", "anchor_9", "verify_hint", "weakness"],
+              "required": [
+                "criterion_id",
+                "score",
+                "gap",
+                "anchor_9",
+                "verify_hint",
+                "weakness"
+              ],
               "properties": {
-                "criterion_id": { "type": "string" },
-                "score": { "type": "integer" },
-                "gap": { "type": "integer" },
-                "anchor_9": { "type": "string" },
-                "verify_hint": { "type": "string" },
-                "weakness": { "type": "string" }
+                "criterion_id": {
+                  "type": "string"
+                },
+                "score": {
+                  "type": "integer"
+                },
+                "gap": {
+                  "type": "integer"
+                },
+                "anchor_9": {
+                  "type": "string"
+                },
+                "verify_hint": {
+                  "type": "string"
+                },
+                "weakness": {
+                  "type": "string"
+                }
               }
             }
           },
           "stall": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["rounds_without_improvement", "stall_window", "rounds_remaining"],
+            "required": [
+              "rounds_without_improvement",
+              "stall_window",
+              "rounds_remaining"
+            ],
             "properties": {
-              "rounds_without_improvement": { "type": "integer" },
-              "stall_window": { "type": "integer" },
-              "rounds_remaining": { "type": "integer" }
+              "rounds_without_improvement": {
+                "type": "integer"
+              },
+              "stall_window": {
+                "type": "integer"
+              },
+              "rounds_remaining": {
+                "type": "integer"
+              }
             }
           },
-          "next_action": { "type": "object" },
-          "warnings": { "type": "array", "items": { "type": "string" } }
+          "next_action": {
+            "type": "object"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -551,45 +1433,136 @@
       "input": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["session_id", "submission_id", "expected_round", "criteria", "reason"],
+        "required": [
+          "session_id",
+          "submission_id",
+          "expected_round",
+          "criteria",
+          "reason"
+        ],
         "properties": {
-          "session_id": { "type": "string", "pattern": "^rl_[0-9A-HJKMNP-TV-Z]{26}$" },
-          "submission_id": { "type": "string", "pattern": "^[A-Za-z0-9._-]{8,128}$" },
-          "expected_round": { "type": "integer", "minimum": 1 },
-          "criteria": { "type": "array", "minItems": 1, "items": { "type": "object" } },
-          "reason": { "type": "string", "minLength": 40, "maxLength": 2000 },
-          "acknowledge_relaxation": { "type": "boolean" }
+          "session_id": {
+            "type": "string",
+            "pattern": "^rl_[0-9A-HJKMNP-TV-Z]{26}$"
+          },
+          "submission_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]{8,128}$"
+          },
+          "expected_round": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "criteria": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object"
+            }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 40,
+            "maxLength": 2000
+          },
+          "acknowledge_relaxation": {
+            "type": "boolean"
+          }
         }
       },
       "output": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["ok", "session_id", "state", "round", "rubric_version", "persistence", "classification", "diff", "final_reachable", "next_action", "warnings"],
+        "required": [
+          "ok",
+          "session_id",
+          "state",
+          "round",
+          "rubric_version",
+          "persistence",
+          "classification",
+          "diff",
+          "final_reachable",
+          "next_action",
+          "warnings"
+        ],
         "properties": {
-          "ok": { "type": "boolean" },
-          "session_id": { "type": "string" },
-          "state": { "type": "string", "enum": ["DRAFTING"] },
-          "round": { "type": "integer" },
-          "rubric_version": { "type": "integer" },
-          "persistence": { "type": "string", "enum": ["durable", "ephemeral"] },
-          "classification": { "type": "string", "enum": ["addition", "clarification", "relaxation", "mixed"] },
+          "ok": {
+            "type": "boolean"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "DRAFTING"
+            ]
+          },
+          "round": {
+            "type": "integer"
+          },
+          "rubric_version": {
+            "type": "integer"
+          },
+          "persistence": {
+            "type": "string",
+            "enum": [
+              "durable",
+              "ephemeral"
+            ]
+          },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "addition",
+              "clarification",
+              "relaxation",
+              "mixed"
+            ]
+          },
           "diff": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["added", "removed", "weight_changes", "anchor_changes"],
+            "required": [
+              "added",
+              "removed",
+              "weight_changes",
+              "anchor_changes"
+            ],
             "properties": {
-              "added": { "type": "array", "items": { "type": "string" } },
-              "removed": { "type": "array", "items": { "type": "string" } },
+              "added": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "removed": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "weight_changes": {
                 "type": "array",
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["criterion_id", "from", "to"],
+                  "required": [
+                    "criterion_id",
+                    "from",
+                    "to"
+                  ],
                   "properties": {
-                    "criterion_id": { "type": "string" },
-                    "from": { "type": "integer" },
-                    "to": { "type": "integer" }
+                    "criterion_id": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "integer"
+                    },
+                    "to": {
+                      "type": "integer"
+                    }
                   }
                 }
               },
@@ -598,20 +1571,51 @@
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["criterion_id", "anchor", "direction"],
+                  "required": [
+                    "criterion_id",
+                    "anchor",
+                    "direction"
+                  ],
                   "properties": {
-                    "criterion_id": { "type": "string" },
-                    "anchor": { "type": "string", "enum": ["1", "5", "9"] },
-                    "direction": { "type": "string", "enum": ["stricter", "looser", "reworded"] }
+                    "criterion_id": {
+                      "type": "string"
+                    },
+                    "anchor": {
+                      "type": "string",
+                      "enum": [
+                        "1",
+                        "5",
+                        "9"
+                      ]
+                    },
+                    "direction": {
+                      "type": "string",
+                      "enum": [
+                        "stricter",
+                        "looser",
+                        "reworded"
+                      ]
+                    }
                   }
                 }
               }
             }
           },
-          "relaxation_count": { "type": "integer" },
-          "final_reachable": { "type": "boolean" },
-          "next_action": { "type": "object" },
-          "warnings": { "type": "array", "items": { "type": "string" } }
+          "relaxation_count": {
+            "type": "integer"
+          },
+          "final_reachable": {
+            "type": "boolean"
+          },
+          "next_action": {
+            "type": "object"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -619,58 +1623,174 @@
       "input": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["session_id", "submission_id", "action", "note"],
+        "required": [
+          "session_id",
+          "submission_id",
+          "action",
+          "note"
+        ],
         "properties": {
-          "session_id": { "type": "string", "pattern": "^rl_[0-9A-HJKMNP-TV-Z]{26}$" },
-          "submission_id": { "type": "string", "minLength": 8, "maxLength": 128 },
-          "action": { "type": "string", "enum": ["request_human", "resolve", "abort", "reopen", "rebase", "kickback"] },
-          "note": { "type": "string", "minLength": 40, "maxLength": 4000 },
-          "resolution": { "type": "string", "enum": ["continue", "accept_as_is", "relax_rubric", "abort"] },
-          "human_token": { "type": "string", "minLength": 16, "maxLength": 256 },
-          "upstream_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-          "upstream_content": { "type": "string", "maxLength": 1000000 },
+          "session_id": {
+            "type": "string",
+            "pattern": "^rl_[0-9A-HJKMNP-TV-Z]{26}$"
+          },
+          "submission_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "request_human",
+              "resolve",
+              "abort",
+              "reopen",
+              "rebase",
+              "kickback"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "minLength": 40,
+            "maxLength": 4000
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "continue",
+              "accept_as_is",
+              "relax_rubric",
+              "abort"
+            ]
+          },
+          "human_token": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 256
+          },
+          "upstream_digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "upstream_content": {
+            "type": "string",
+            "maxLength": 1000000
+          },
           "target_criteria": {
             "type": "array",
             "minItems": 1,
             "uniqueItems": true,
-            "items": { "type": "string", "pattern": "^[a-z0-9_]{1,40}$" }
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9_]{1,40}$"
+            }
           }
         }
       },
       "output": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["ok", "session_id", "state", "round", "rubric_version", "persistence", "escalation", "next_action", "warnings"],
+        "required": [
+          "ok",
+          "session_id",
+          "state",
+          "round",
+          "rubric_version",
+          "persistence",
+          "escalation",
+          "next_action",
+          "warnings"
+        ],
         "properties": {
-          "ok": { "type": "boolean" },
-          "session_id": { "type": "string" },
-          "state": { "type": "string", "enum": ["ESCALATED", "DRAFTING", "FINAL_WITH_RELAXATION", "ABORTED", "FINAL"] },
-          "round": { "type": "integer" },
-          "rubric_version": { "type": "integer" },
-          "persistence": { "type": "string", "enum": ["durable", "ephemeral"] },
+          "ok": {
+            "type": "boolean"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ESCALATED",
+              "DRAFTING",
+              "FINAL_WITH_RELAXATION",
+              "ABORTED",
+              "FINAL"
+            ]
+          },
+          "round": {
+            "type": "integer"
+          },
+          "rubric_version": {
+            "type": "integer"
+          },
+          "persistence": {
+            "type": "string",
+            "enum": [
+              "durable",
+              "ephemeral"
+            ]
+          },
           "escalation": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["escalation_id", "created_at", "token_path", "reason"],
+            "required": [
+              "escalation_id",
+              "created_at",
+              "token_path",
+              "reason"
+            ],
             "properties": {
-              "escalation_id": { "type": "string" },
-              "created_at": { "type": "string" },
-              "token_path": { "type": "string" },
-              "reason": { "type": "string" },
+              "escalation_id": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "token_path": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
               "summary_for_human": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["rounds", "weighted_mean_trend", "blocking_criteria"],
+                "required": [
+                  "rounds",
+                  "weighted_mean_trend",
+                  "blocking_criteria"
+                ],
                 "properties": {
-                  "rounds": { "type": "integer" },
-                  "weighted_mean_trend": { "type": "array", "items": { "type": "number" } },
-                  "blocking_criteria": { "type": "array", "items": { "type": "string" } }
+                  "rounds": {
+                    "type": "integer"
+                  },
+                  "weighted_mean_trend": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    }
+                  },
+                  "blocking_criteria": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
           },
-          "next_action": { "type": "object" },
-          "warnings": { "type": "array", "items": { "type": "string" } }
+          "next_action": {
+            "type": "object"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -678,51 +1798,132 @@
       "input": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["session_id"],
+        "required": [
+          "session_id"
+        ],
         "properties": {
-          "session_id": { "type": "string", "pattern": "^rl_[0-9A-HJKMNP-TV-Z]{26}$" },
-          "include_artifacts": { "type": "boolean" },
-          "include_rejected": { "type": "boolean" },
-          "include_diffs": { "type": "boolean" },
-          "scope": { "type": "string", "enum": ["session", "chain"] }
+          "session_id": {
+            "type": "string",
+            "pattern": "^rl_[0-9A-HJKMNP-TV-Z]{26}$"
+          },
+          "include_artifacts": {
+            "type": "boolean"
+          },
+          "include_rejected": {
+            "type": "boolean"
+          },
+          "include_diffs": {
+            "type": "boolean"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "session",
+              "chain"
+            ]
+          }
         }
       },
       "output": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["ok", "session_id", "state", "round", "rubric_version", "persistence", "export", "next_action", "warnings"],
+        "required": [
+          "ok",
+          "session_id",
+          "state",
+          "round",
+          "rubric_version",
+          "persistence",
+          "export",
+          "next_action",
+          "warnings"
+        ],
         "properties": {
-          "ok": { "type": "boolean" },
-          "session_id": { "type": "string" },
-          "state": { "type": "string" },
-          "round": { "type": "integer" },
-          "rubric_version": { "type": "integer" },
-          "persistence": { "type": "string", "enum": ["durable", "ephemeral"] },
+          "ok": {
+            "type": "boolean"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "round": {
+            "type": "integer"
+          },
+          "rubric_version": {
+            "type": "integer"
+          },
+          "persistence": {
+            "type": "string",
+            "enum": [
+              "durable",
+              "ephemeral"
+            ]
+          },
           "export": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["path", "bytes", "sha256", "schema", "summary"],
+            "required": [
+              "path",
+              "bytes",
+              "sha256",
+              "schema",
+              "summary"
+            ],
             "properties": {
-              "path": { "type": "string" },
-              "bytes": { "type": "integer" },
-              "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-              "schema": { "type": "string" },
+              "path": {
+                "type": "string"
+              },
+              "bytes": {
+                "type": "integer"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "schema": {
+                "type": "string"
+              },
               "summary": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["rounds", "final_verdict", "rubric_versions", "relaxations", "rejected_submissions"],
+                "required": [
+                  "rounds",
+                  "final_verdict",
+                  "rubric_versions",
+                  "relaxations",
+                  "rejected_submissions"
+                ],
                 "properties": {
-                  "rounds": { "type": "integer" },
-                  "final_verdict": { "type": "string" },
-                  "rubric_versions": { "type": "integer" },
-                  "relaxations": { "type": "integer" },
-                  "rejected_submissions": { "type": "integer" }
+                  "rounds": {
+                    "type": "integer"
+                  },
+                  "final_verdict": {
+                    "type": "string"
+                  },
+                  "rubric_versions": {
+                    "type": "integer"
+                  },
+                  "relaxations": {
+                    "type": "integer"
+                  },
+                  "rejected_submissions": {
+                    "type": "integer"
+                  }
                 }
               }
             }
           },
-          "next_action": { "type": "object" },
-          "warnings": { "type": "array", "items": { "type": "string" } }
+          "next_action": {
+            "type": "object"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -730,32 +1931,85 @@
       "input": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["prompt"],
+        "required": [
+          "prompt"
+        ],
         "properties": {
-          "agent_type": { "type": "string", "maxLength": 64 },
-          "prompt": { "type": "string", "minLength": 5, "maxLength": 50000 },
-          "runner": { "type": "string", "enum": ["auto", "agy", "claude", "codex"] },
-          "workspace_dir": { "type": "string", "minLength": 1, "maxLength": 4096 },
-          "timeout_sec": { "type": "integer", "minimum": 5, "maximum": 3600 }
+          "agent_type": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 50000
+          },
+          "runner": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "agy",
+              "claude",
+              "codex"
+            ]
+          },
+          "workspace_dir": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "timeout_sec": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 3600
+          }
         }
       },
       "output": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["ok", "agent_type", "runner", "output", "exit_code", "duration_ms"],
+        "required": [
+          "ok",
+          "agent_type",
+          "runner",
+          "output",
+          "exit_code",
+          "duration_ms"
+        ],
         "properties": {
-          "ok": { "type": "boolean" },
-          "agent_type": { "type": "string" },
-          "runner": { "type": "string" },
-          "output": { "type": "string" },
-          "exit_code": { "type": "integer" },
-          "duration_ms": { "type": "integer" },
-          "subagent_session_id": { "type": ["string", "null"] },
+          "ok": {
+            "type": "boolean"
+          },
+          "agent_type": {
+            "type": "string"
+          },
+          "runner": {
+            "type": "string"
+          },
+          "output": {
+            "type": "string"
+          },
+          "exit_code": {
+            "type": "integer"
+          },
+          "duration_ms": {
+            "type": "integer"
+          },
+          "subagent_session_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "error": {
             "type": "object",
             "properties": {
-              "code": { "type": "string" },
-              "message": { "type": "string" }
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
             }
           }
         }
@@ -763,4 +2017,3 @@
     }
   }
 }
-

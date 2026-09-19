@@ -182,7 +182,7 @@ export function scoreSubmit({ input, persistence }) {
 
         for (const ev of score.evidence) {
           if (ev.kind === 'locator') {
-            verifyLocatorEvidence(score.criterion_id, ev, artifactBody);
+            verifyLocatorEvidence(score.criterion_id, ev, artifactBody, { dataDir });
           } else if (ev.kind === 'upstream') {
             verifyUpstreamEvidence(score.criterion_id, ev, session.loop_mode, upstreamBody);
           } else if (ev.kind === 'command') {

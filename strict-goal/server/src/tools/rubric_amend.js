@@ -73,6 +73,10 @@ export function rubricAmend({ input, persistence }) {
       session.counters.relaxation_count += 1;
       session.counters.relaxation_approved = false;
     }
+    if (session.last_evaluation?.must_fix) {
+      const activeIds = new Set(nextRubric.criteria.map((c) => c.id));
+      session.last_evaluation.must_fix = session.last_evaluation.must_fix.filter((item) => activeIds.has(item.criterion_id));
+    }
     session.updated_at = new Date().toISOString();
     persistSession(dataDir, session);
 
