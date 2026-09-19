@@ -40,9 +40,15 @@ export const EVASIVE_WEAKNESS_PATTERNS = [
   /(?:特になし|問題なし|満たしている|完璧である|十分である)/u,
 ];
 
-// weakness は score==10 のときのみ "none" を許す。それ以外は最低文字数の本文が必須
-// （スキーマの minLength は "none" を通すため外してあり、ここで手動検査する）。
 function assertWeaknessValid(score, index) {
+  if (typeof score.weakness === 'string') {
+    const trimmed = score.weakness.trim();
+    const lower = trimmed.toLowerCase();
+    if (lower === 'none' || lower === 'none.' || lower === 'n/a' || lower === 'na' || trimmed === '') {
+      score.weakness = WEAKNESS_NONE_VALUE;
+    }
+  }
+
   if (score.weakness === WEAKNESS_NONE_VALUE) {
     if (score.score !== WEAKNESS_REQUIRED_BELOW_SCORE) {
       fail('E_WEAKNESS_REQUIRED', 'weakness:"none" is only allowed when score is 10', {

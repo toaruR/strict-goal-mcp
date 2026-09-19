@@ -7,7 +7,7 @@ const EVIDENCE_SKELETON = {
   locator: {
     kind: 'locator',
     locator: '<section id, e.g. "§2.3" or heading text>',
-    excerpt: '<>=20 chars copied verbatim from ONE line of the committed artifact (no joins across lines)>',
+    excerpt: '<>=20 chars copied verbatim from the committed artifact>',
   },
   command: {
     kind: 'command',
@@ -24,25 +24,42 @@ const EVIDENCE_SKELETON = {
   },
 };
 
-export function scoreSubmitSkeleton(sessionId, round, artifactDigest) {
+export function scoreSubmitSkeleton(sessionId, round, artifactDigest, rubric) {
+  let scoresSkeleton = [
+    {
+      criterion_id: '<every criterion id from rubric.criteria, one entry each>',
+      score: '<integer 1-10>',
+      rationale: '<>=40 chars: why this score, tied to the evidence>',
+      weakness: '<>=10 chars concrete shortcoming; "none" only when score is 10>',
+      evidence: [EVIDENCE_SKELETON.locator],
+    },
+  ];
+
+  if (rubric && Array.isArray(rubric.criteria) && rubric.criteria.length > 0) {
+    scoresSkeleton = rubric.criteria.map((c) => {
+      const isAuto = c.verification === 'auto';
+      return {
+        criterion_id: c.id,
+        score: '<integer 1-10>',
+        rationale: '<>=40 chars: why this score, tied to the evidence>',
+        weakness: '<>=10 chars concrete shortcoming; "none" only when score is 10>',
+        evidence: isAuto
+          ? [EVIDENCE_SKELETON.command, EVIDENCE_SKELETON.locator]
+          : [EVIDENCE_SKELETON.locator],
+      };
+    });
+  }
+
   return {
     session_id: sessionId ?? '<session_id>',
     submission_id: '<unique 8-64 chars [A-Za-z0-9._-]>',
     expected_round: round ?? 1,
     artifact_digest: artifactDigest ?? '<sha256:... returned by artifact_commit>',
-    scores: [
-      {
-        criterion_id: '<every criterion id from rubric.criteria, one entry each>',
-        score: '<integer 1-10>',
-        rationale: '<>=40 chars: why this score, tied to the evidence>',
-        weakness: '<>=10 chars concrete shortcoming; "none" only when score is 10>',
-        evidence: [EVIDENCE_SKELETON.locator],
-      },
-    ],
+    scores: scoresSkeleton,
     evidence_kinds: EVIDENCE_SKELETON,
     notes: [
       'verification:"auto" criteria need at least one kind:"command" evidence',
-      'fileset sessions: locator excerpt must match the manifest JSON, not file contents',
+      'fileset sessions: locator excerpt can match either source file contents or the manifest JSON',
       'do not read the server source to discover formats; this skeleton is authoritative',
     ],
   };
@@ -65,12 +82,12 @@ export function artifactCommitSkeleton(sessionId, round, requiredAddress, budget
 }
 
 function defaultNextAction(state, ctx = {}) {
-  const { sessionId, round, artifactDigest, requiredAddress, budgetBytes } = ctx;
+  const { sessionId, round, artifactDigest, requiredAddress, budgetBytes, rubric } = ctx;
   if (state && TERMINAL_STATES.has(state)) {
     return { tool: 'audit_export', input_skeleton: { session_id: sessionId ?? '<session_id>', scope: 'session' } };
   }
   if (state === 'SCORING') {
-    return { tool: 'score_submit', input_skeleton: scoreSubmitSkeleton(sessionId, round, artifactDigest) };
+    return { tool: 'score_submit', input_skeleton: scoreSubmitSkeleton(sessionId, round, artifactDigest, rubric) };
   }
   if (state === 'DRAFTING') {
     return { tool: 'artifact_commit', input_skeleton: artifactCommitSkeleton(sessionId, round, requiredAddress, budgetBytes) };
@@ -133,6 +150,7 @@ export function buildEnvelope({
       artifactDigest: artifact?.digest ?? currentArtifact?.digest,
       requiredAddress: Array.isArray(mustFix) && mustFix.length > 0 ? mustFix[0]?.criterion_id : undefined,
       budgetBytes: rubric?.policy?.artifact_budget_bytes,
+      rubric,
     }),
     warnings,
   };

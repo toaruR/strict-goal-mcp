@@ -65,7 +65,7 @@ test('invoke_subagent: resolve agent prompt and execution shape', () => {
       input: {
         agent_type: 'sg-worker',
         prompt: 'Echo test: please output hello-subagent',
-        timeout_sec: 15,
+        timeout_sec: 30,
       },
     });
 

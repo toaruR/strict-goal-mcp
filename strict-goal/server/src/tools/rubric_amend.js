@@ -22,6 +22,13 @@ function fail(code, message, detail = {}) {
 // classification:"relaxation"|"mixed" として rubric_diff に記録する。policy は入力に存在せず
 // (additionalProperties:false で送信自体が E_VALIDATION になる)、常に前版から引き継ぐ。
 export function rubricAmend({ input, persistence }) {
+  if (input && typeof input === 'object') {
+    if (input.reason === undefined && typeof input.change_note === 'string') {
+      input.reason = input.change_note;
+      delete input.change_note;
+    }
+  }
+
   validate(TOOL_SCHEMAS.rubric_amend.input, input);
 
   const seenIds = new Set();

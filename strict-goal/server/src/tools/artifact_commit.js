@@ -180,6 +180,7 @@ export function artifactCommit({ input, persistence }) {
     let bytes;
     let artifact;
     let currentArtifactState;
+    const rubric = loadRubric(sDir, session.rubric_version);
 
     if (hasFiles) {
       const previousFiles = previousArtifact?.files ?? [];
@@ -237,7 +238,6 @@ export function artifactCommit({ input, persistence }) {
         }
       }
       if (unchanged) warnings.push('artifact_unchanged');
-      const rubric = loadRubric(sDir, session.rubric_version);
       if (rubric?.policy?.artifact_budget_bytes && bytes > rubric.policy.artifact_budget_bytes) {
         warnings.push('over_budget');
         artifact.budget_bytes = rubric.policy.artifact_budget_bytes;
@@ -301,6 +301,7 @@ export function artifactCommit({ input, persistence }) {
       warnings,
       artifact,
       warningHints: buildWarningHints(warnings, artifact),
+      rubric,
     });
   });
 }

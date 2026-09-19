@@ -262,3 +262,142 @@ test('verifyLocatorEvidence in fileset mode matches individual source file conte
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
+test('scoreSubmit accepts weakness variations ("None", "none.", "N/A") when score is 10', async () => {
+  const { loopOpenCreate } = await import('../src/tools/loop_open_create.js');
+  const { scoreSubmit } = await import('../src/tools/score_submit.js');
+  const { artifactCommit } = await import('../src/tools/artifact_commit.js');
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rl-test-weakness-'));
+  const persistence = { mode: 'durable', dir: tmpDir };
+
+  const criteria = [
+    {
+      id: 'c1',
+      statement: 'Criterion 1 statement >= 10 chars',
+      weight: 1,
+      verification: 'manual',
+      anchors: { 1: 'poor condition', 5: 'fair condition', 9: 'good condition' },
+    },
+  ];
+
+  const opened = loopOpenCreate({
+    input: {
+      mode: 'create',
+      submission_id: 'sub_open_w',
+      task: 'Task description with at least twenty characters',
+      artifact_kind: 'markdown',
+      rubric: { criteria, policy: { pass_score: 9 } },
+    },
+    persistence,
+  });
+
+  const commit = artifactCommit({
+    input: {
+      session_id: opened.session_id,
+      submission_id: 'sub_commit_w',
+      expected_round: 1,
+      change_note: 'Initial commit for round 1 >= 20 chars',
+      content: '# Document body line 1\nLine 2',
+    },
+    persistence,
+  });
+
+  // score=10 で weakness: "None." や "N/A" を渡しても正規化されて受理される
+  assert.doesNotThrow(() => {
+    scoreSubmit({
+      input: {
+        session_id: opened.session_id,
+        submission_id: 'sub_score_w1',
+        expected_round: 1,
+        artifact_digest: commit.artifact.digest,
+        scores: [
+          {
+            criterion_id: 'c1',
+            score: 10,
+            rationale: 'Score 10 rationale tied to evidence >= 40 characters long',
+            weakness: 'None.', // ← 大文字・ピリオド付き
+            evidence: [{ kind: 'locator', locator: '§1', excerpt: 'Document body line 1' }],
+          },
+        ],
+      },
+      persistence,
+    });
+  });
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+test('rubricAmend accepts change_note when reason is omitted', async () => {
+  const { loopOpenCreate } = await import('../src/tools/loop_open_create.js');
+  const { rubricAmend } = await import('../src/tools/rubric_amend.js');
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rl-test-amend-cn-'));
+  const persistence = { mode: 'durable', dir: tmpDir };
+
+  const criteria = [
+    {
+      id: 'c1',
+      statement: 'Criterion 1 statement >= 10 chars',
+      weight: 1,
+      verification: 'manual',
+      anchors: { 1: 'poor condition', 5: 'fair condition', 9: 'good condition' },
+    },
+  ];
+
+  const opened = loopOpenCreate({
+    input: {
+      mode: 'create',
+      submission_id: 'sub_open_acn',
+      task: 'Task description with at least twenty characters',
+      artifact_kind: 'markdown',
+      rubric: { criteria, policy: { pass_score: 9 } },
+    },
+    persistence,
+  });
+
+  assert.doesNotThrow(() => {
+    rubricAmend({
+      input: {
+        session_id: opened.session_id,
+        submission_id: 'sub_amend_cn_1',
+        expected_round: 1,
+        change_note: 'Updating criteria note using change_note instead of reason >= 40 chars',
+        acknowledge_relaxation: true,
+        criteria,
+      },
+      persistence,
+    });
+  });
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+test('scoreSubmitSkeleton expands active rubric criteria with auto/manual evidence shapes', async () => {
+  const { scoreSubmitSkeleton } = await import('../src/mcp/envelope.js');
+
+  const rubric = {
+    criteria: [
+      { id: 'crit_manual', verification: 'manual' },
+      { id: 'crit_auto', verification: 'auto' },
+    ],
+  };
+
+  const skeleton = scoreSubmitSkeleton('rl_test123', 1, 'sha256:abc', rubric);
+  assert.equal(skeleton.scores.length, 2);
+  assert.equal(skeleton.scores[0].criterion_id, 'crit_manual');
+  assert.equal(skeleton.scores[0].evidence.length, 1);
+  assert.equal(skeleton.scores[0].evidence[0].kind, 'locator');
+
+  assert.equal(skeleton.scores[1].criterion_id, 'crit_auto');
+  assert.equal(skeleton.scores[1].evidence.length, 2);
+  assert.equal(skeleton.scores[1].evidence[0].kind, 'command');
+  assert.equal(skeleton.scores[1].evidence[1].kind, 'locator');
+});
+
+

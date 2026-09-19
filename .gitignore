@@ -22,6 +22,8 @@ __pycache__/
 !.agents/skills/spec-doc/
 !.agents/skills/session-tokens/
 !.agents/skills/codex-session-tokens/
+.agents/agents/*
+!.agents/agents/sg-*.md
 .agents/mcp_config.json
 .mcp.json
 .cursor/mcp.json
