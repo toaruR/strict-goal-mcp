@@ -1,225 +1,299 @@
-#!/usr/bin/env python3
-"""Claude Code セッションの消費トークンを集計する（親 + Agent ツール起動のサブエージェント）。
-
-データ源: ~/.claude/projects/<project-dir>/<session_id>.jsonl
-        ~/.claude/projects/<project-dir>/<session_id>/subagents/agent-*.jsonl
-
-注意: jsonl は content ブロックごとに 1 行で同一 usage を複写するため、
-message.id で重複排除しないと 2〜3 倍に過大計上される。
-"""
-import argparse
-import glob
-import json
 import os
-import re
 import sys
+import glob
+import sqlite3
+import json
+import argparse
+from datetime import datetime, timezone
 
-USAGE_KEYS = (
-    "input_tokens",
-    "cache_creation_input_tokens",
-    "cache_read_input_tokens",
-    "output_tokens",
-)
+def decode_protobuf(data):
+    """Simple zero-dependency protobuf wire decoder."""
+    idx = 0
+    res = []
+    length_data = len(data)
+    while idx < length_data:
+        key = 0
+        shift = 0
+        while True:
+            if idx >= length_data:
+                return res
+            b = data[idx]
+            idx += 1
+            key |= (b & 0x7F) << shift
+            if not (b & 0x80):
+                break
+            shift += 7
+        field_num = key >> 3
+        wire_type = key & 0x07
+        if wire_type == 0:  # varint
+            val = 0
+            shift = 0
+            while True:
+                if idx >= length_data:
+                    break
+                b = data[idx]
+                idx += 1
+                val |= (b & 0x7F) << shift
+                if not (b & 0x80):
+                    break
+                shift += 7
+            res.append((field_num, 'varint', val))
+        elif wire_type == 2:  # length-delimited
+            val_len = 0
+            shift = 0
+            while True:
+                if idx >= length_data:
+                    break
+                b = data[idx]
+                idx += 1
+                val_len |= (b & 0x7F) << shift
+                if not (b & 0x80):
+                    break
+                shift += 7
+            val = data[idx:idx + val_len]
+            idx += val_len
+            res.append((field_num, 'bytes', val))
+        else:
+            # Unsupported wire type, skip or abort
+            break
+    return res
 
+def parse_session_db(db_path):
+    if not os.path.exists(db_path):
+        return None
 
-def empty_model():
-    m = {k: 0 for k in USAGE_KEYS}
-    m["turns"] = 0
-    m["thinking_tokens"] = 0
-    return m
+    try:
+        conn = sqlite3.connect(f"file:{os.path.abspath(db_path)}?mode=ro", uri=True)
+    except Exception:
+        try:
+            conn = sqlite3.connect(db_path)
+        except Exception:
+            return None
 
+    total_uncached = 0
+    total_output = 0
+    total_cached = 0
+    steps_count = 0
+    model_name = "Unknown"
 
-def empty_acc():
-    acc = empty_model()
-    acc["by_model"] = {}
-    return acc
+    try:
+        import re
+        for row in conn.execute("SELECT data FROM gen_metadata WHERE data IS NOT NULL"):
+            matches = re.findall(rb'(?:gemini|claude|gpt)-[a-zA-Z0-9\.\-]+', row[0])
+            if matches:
+                model_name = matches[-1].decode('latin1')
+                break
+    except Exception:
+        pass
 
+    try:
+        query = "SELECT idx, metadata FROM steps WHERE metadata IS NOT NULL ORDER BY idx"
+        for row in conn.execute(query):
+            raw_meta = row[1]
+            fields = decode_protobuf(raw_meta)
+            for f in fields:
+                if f[0] == 9 and f[1] == 'bytes':
+                    sub = decode_protobuf(f[2])
+                    d = {s[0]: s[2] for s in sub if s[1] == 'varint'}
+                    # field 2: input uncached, field 3: output, field 5: cached
+                    f2 = d.get(2, 0)
+                    f3 = d.get(3, 0)
+                    f5 = d.get(5, 0)
+                    if f2 > 0 or f3 > 0 or f5 > 0:
+                        total_uncached += f2
+                        total_output += f3
+                        total_cached += f5
+                        steps_count += 1
+    except Exception as e:
+        sys.stderr.write(f"Error reading steps: {e}\n")
+    finally:
+        conn.close()
 
-def add_usage(acc, model, u):
-    acc["turns"] += 1
-    m = acc["by_model"].setdefault(model, empty_model())
-    m["turns"] += 1
-    for k in USAGE_KEYS:
-        v = u.get(k) or 0
-        acc[k] += v
-        m[k] += v
-    th = (u.get("output_tokens_details") or {}).get("thinking_tokens") or 0
-    acc["thinking_tokens"] += th
-    m["thinking_tokens"] += th
+    total_billed = total_uncached + total_output
+    total_prompt = total_uncached + total_cached
 
-
-def sum_jsonl(path):
-    """message.id で重複排除しつつ usage を合算。"""
-    acc = empty_acc()
-    seen = {}
-    with open(path, "r", encoding="utf-8", errors="replace") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                o = json.loads(line)
-            except Exception:
-                continue
-            msg = o.get("message")
-            if not isinstance(msg, dict):
-                continue
-            u = msg.get("usage")
-            if not isinstance(u, dict):
-                continue
-            key = msg.get("id") or o.get("uuid") or str(len(seen))
-            # 同一 message.id は最後に出た usage を採用（値は同一のはず）
-            seen[key] = (msg.get("model") or "unknown", u)
-    for model, u in seen.values():
-        add_usage(acc, model, u)
-    return acc
-
-
-def merge(dst, src):
-    for k in ("turns", "thinking_tokens", *USAGE_KEYS):
-        dst[k] += src[k]
-    for model, m in src["by_model"].items():
-        d = dst["by_model"].setdefault(model, empty_model())
-        for k in m:
-            d[k] += m[k]
-
-
-def project_dir_name(cwd):
-    # Claude Code は cwd の英数字以外を '-' に置換してプロジェクトディレクトリ名にする
-    return re.sub(r"[^A-Za-z0-9]", "-", os.path.abspath(cwd))
-
-
-def find_session_file(session_id, projects_root, cwd):
-    if cwd:
-        p = os.path.join(projects_root, project_dir_name(cwd), f"{session_id}.jsonl")
-        if os.path.exists(p):
-            return p
-    cands = glob.glob(os.path.join(projects_root, "*", f"{session_id}.jsonl"))
-    return cands[0] if cands else None
-
-
-def find_latest_session(projects_root, cwd):
-    dirs = [os.path.join(projects_root, project_dir_name(cwd))] if cwd else []
-    if not dirs or not os.path.isdir(dirs[0]):
-        dirs = glob.glob(os.path.join(projects_root, "*"))
-    best = None
-    for d in dirs:
-        for f in glob.glob(os.path.join(d, "*.jsonl")):
-            try:
-                mt = os.path.getmtime(f)
-            except OSError:
-                continue
-            if best is None or mt > best[0]:
-                best = (mt, f)
-    return best[1] if best else None
-
-
-def derived(a):
-    uncached = a["input_tokens"] + a["cache_creation_input_tokens"]
-    cached = a["cache_read_input_tokens"]
     return {
-        "turns": a["turns"],
-        "cached_tokens": cached,
-        "uncached_input_tokens": uncached,
-        "prompt_tokens": cached + uncached,
-        "output_tokens": a["output_tokens"],
-        "thinking_tokens": a["thinking_tokens"],
-        "total_billed_tokens": uncached + a["output_tokens"],
-        "total_tokens": cached + uncached + a["output_tokens"],
+        "db_path": db_path,
+        "model": model_name,
+        "steps_count": steps_count,
+        "cached_tokens": total_cached,
+        "uncached_input_tokens": total_uncached,
+        "prompt_tokens": total_prompt,
+        "output_tokens": total_output,
+        "total_billed_tokens": total_billed,
     }
 
+def find_latest_db(base_dirs):
+    candidates = []
+    for b in base_dirs:
+        conv_dir = os.path.join(b, "conversations")
+        if os.path.isdir(conv_dir):
+            for f in glob.glob(os.path.join(conv_dir, "*.db")):
+                try:
+                    mtime = os.path.getmtime(f)
+                    candidates.append((mtime, f))
+                except Exception:
+                    pass
+    if not candidates:
+        return None
+    candidates.sort(reverse=True)
+    return candidates[0][1]
 
-def fmt(n):
-    return f"{n:,}"
+def find_session_db(conversation_id, base_dirs):
+    for b in base_dirs:
+        p = os.path.join(b, "conversations", f"{conversation_id}.db")
+        if os.path.exists(p):
+            return p
+    return None
 
+def find_subagents_for_session(conversation_id, base_dirs):
+    """Scan transcript and correlate time-window for any invoke_subagent conversation IDs."""
+    subagent_ids = []
+    min_time = None
+    max_time = None
+
+    # Step 1: Scan transcript for explicit mentions and record session time bounds
+    for b in base_dirs:
+        transcript_path = os.path.join(b, "brain", conversation_id, ".system_generated", "logs", "transcript.jsonl")
+        if os.path.exists(transcript_path):
+            try:
+                with open(transcript_path, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        try:
+                            obj = json.loads(line)
+                            ts = obj.get("created_at")
+                            if ts:
+                                clean = ts.rstrip("Z").split(".")[0]
+                                dt = datetime.strptime(clean, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+                                t_val = dt.timestamp()
+                                if min_time is None or t_val < min_time:
+                                    min_time = t_val
+                                if max_time is None or t_val > max_time:
+                                    max_time = t_val
+                        except Exception:
+                            pass
+
+                        if any(k in line for k in ("conversationId", "conversation_id", "subagent_session_id", "invoke_subagent")):
+                            import re
+                            uuids = re.findall(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', line, re.IGNORECASE)
+                            for u in uuids:
+                                u_lower = u.lower()
+                                if u_lower != conversation_id.lower() and u_lower not in subagent_ids:
+                                    subagent_ids.append(u_lower)
+            except Exception:
+                pass
+
+    # Step 2: Time-window based discovery in CLI conversations directory
+    if min_time is not None and max_time is not None:
+        for b in base_dirs:
+            cli_conv_dir = os.path.join(b, "conversations")
+            if os.path.isdir(cli_conv_dir) and "cli" in b:
+                for db_file in glob.glob(os.path.join(cli_conv_dir, "*.db")):
+                    cid = os.path.splitext(os.path.basename(db_file))[0].lower()
+                    if cid == conversation_id.lower() or cid in subagent_ids:
+                        continue
+                    try:
+                        mtime = os.path.getmtime(db_file)
+                        # buffer 30s before min_time and 30s after max_time
+                        if (min_time - 30) <= mtime <= (max_time + 30):
+                            subagent_ids.append(cid)
+                    except Exception:
+                        pass
+
+    return subagent_ids
 
 def main():
-    for s in (sys.stdout, sys.stderr):
-        if hasattr(s, "reconfigure"):
-            s.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-    ap = argparse.ArgumentParser(description="Claude Code セッションの消費トークンを集計する")
-    ap.add_argument("--session-id", "-s", help="対象セッション ID。省略時は $CLAUDE_CODE_SESSION_ID → 最新 jsonl の順で解決")
-    ap.add_argument("--cwd", default=os.getcwd(), help="プロジェクトディレクトリ解決に使う作業ディレクトリ")
-    ap.add_argument("--projects-root", default=os.path.join(os.path.expanduser("~"), ".claude", "projects"))
-    ap.add_argument("--json", action="store_true", help="JSON で出力")
-    args = ap.parse_args()
+    parser = argparse.ArgumentParser(description="Calculate token usage for an Antigravity (AGY) session.")
+    parser.add_argument("--conversation-id", "-c", help="Conversation ID to inspect. If omitted, uses the latest active session.")
+    parser.add_argument("--json", action="store_true", help="Output in JSON format.")
+    args = parser.parse_args()
 
-    sid = args.session_id or os.environ.get("CLAUDE_CODE_SESSION_ID") or os.environ.get("CLAUDE_SESSION_ID")
-    if sid:
-        path = find_session_file(sid, args.projects_root, args.cwd)
-        if not path:
-            sys.stderr.write(f"session jsonl not found: {sid}\n")
+    home = os.path.expanduser("~")
+    base_dirs = [
+        os.path.join(home, ".gemini", "antigravity-ide"),
+        os.path.join(home, ".gemini", "antigravity-cli"),
+    ]
+
+    target_id = args.conversation_id
+    if target_id:
+        target_db = find_session_db(target_id, base_dirs)
+        if not target_db:
+            sys.stderr.write(f"Could not find conversation DB for ID: {target_id}\n")
             sys.exit(1)
     else:
-        path = find_latest_session(args.projects_root, args.cwd)
-        if not path:
-            sys.stderr.write("no Claude Code session jsonl found\n")
+        target_db = find_latest_db(base_dirs)
+        if not target_db:
+            sys.stderr.write("No Antigravity conversation databases found.\n")
             sys.exit(1)
-        sid = os.path.splitext(os.path.basename(path))[0]
+        target_id = os.path.splitext(os.path.basename(target_db))[0]
 
-    parent = sum_jsonl(path)
-    sub_dir = os.path.join(os.path.dirname(path), sid, "subagents")
-    subagents = []
-    for f in sorted(glob.glob(os.path.join(sub_dir, "agent-*.jsonl"))):
-        s = sum_jsonl(f)
-        if s["turns"] == 0:
-            continue
-        s["agent_id"] = os.path.splitext(os.path.basename(f))[0]
-        subagents.append(s)
+    parent_stats = parse_session_db(target_db)
+    if not parent_stats:
+        sys.stderr.write(f"Failed to parse database: {target_db}\n")
+        sys.exit(1)
 
-    total = empty_acc()
-    merge(total, parent)
-    for s in subagents:
-        merge(total, s)
+    # Subagents
+    subagent_ids = find_subagents_for_session(target_id, base_dirs)
+    subagent_stats = []
+    for sid in subagent_ids:
+        sdb = find_session_db(sid, base_dirs)
+        if sdb:
+            s_parsed = parse_session_db(sdb)
+            if s_parsed and s_parsed["steps_count"] > 0:
+                s_parsed["conversation_id"] = sid
+                subagent_stats.append(s_parsed)
+
+    combined_cached = parent_stats["cached_tokens"] + sum(s["cached_tokens"] for s in subagent_stats)
+    combined_uncached = parent_stats["uncached_input_tokens"] + sum(s["uncached_input_tokens"] for s in subagent_stats)
+    combined_output = parent_stats["output_tokens"] + sum(s["output_tokens"] for s in subagent_stats)
+    combined_billed = combined_uncached + combined_output
+    total_steps = parent_stats["steps_count"] + sum(s["steps_count"] for s in subagent_stats)
 
     report = {
-        "session_id": sid,
-        "session_file": path,
-        "total_turns": total["turns"],
-        "summary": derived(total),
-        "by_model": {m: derived(v) for m, v in total["by_model"].items()},
-        "parent_session": derived(parent),
-        "subagents": [dict(derived(s), agent_id=s["agent_id"]) for s in subagents],
+        "conversation_id": target_id,
+        "model": parent_stats["model"],
+        "total_steps": total_steps,
+        "summary": {
+            "cached_tokens": combined_cached,
+            "uncached_input_tokens": combined_uncached,
+            "output_tokens": combined_output,
+            "total_billed_tokens": combined_billed,
+        },
+        "parent_session": parent_stats,
+        "subagents": subagent_stats,
     }
 
     if args.json:
-        print(json.dumps(report, indent=2, ensure_ascii=False))
+        print(json.dumps(report, indent=2))
         return
 
-    S = report["summary"]
-    sub_turns = sum(s["turns"] for s in subagents)
-    print("# Claude Code Session Token Report")
-    print(f"- **Session ID**: `{sid}`")
-    print(f"- **Session File**: `{path}`")
-    print(f"- **Models**: {', '.join(f'`{m}`' for m in report['by_model']) or '-'}")
-    print(f"- **API Turns**: `{total['turns']}` (Parent: {parent['turns']}, Subagents: {len(subagents)} files / {sub_turns} turns)")
+    # Formatted Markdown report
+    print(f"# AGY Session Token Report")
+    print(f"- **Conversation ID**: `{target_id}`")
+    print(f"- **Detected Model**: `{parent_stats['model']}`")
+    print(f"- **Total LLM Steps**: `{total_steps}` (Parent: {parent_stats['steps_count']}, Subagents: {len(subagent_stats)})")
     print()
-    print("## Token Usage Summary (総計)")
-    print("| Metric | Tokens | 備考 |")
+    print("## 📊 Token Usage Summary (総計)")
+    print("| Metric (指標) | Tokens | 備考 |")
     print("|---|---|---|")
-    print(f"| **Prompt Cached Tokens** | **{fmt(S['cached_tokens'])}** | cache_read_input_tokens |")
-    print(f"| **Prompt Uncached Tokens** | **{fmt(S['uncached_input_tokens'])}** | input_tokens + cache_creation_input_tokens |")
-    print(f"| **Output Tokens** | **{fmt(S['output_tokens'])}** | 生成トークン (うち thinking {fmt(S['thinking_tokens'])}) |")
-    print(f"| **Total Billed Tokens** | **{fmt(S['total_billed_tokens'])}** | Uncached + Output |")
-    print(f"| **Total Tokens** | **{fmt(S['total_tokens'])}** | Cached + Uncached + Output |")
+    print(f"| **Prompt Cached Tokens** | **{combined_cached:,}** | プロンプトキャッシュ読込 |")
+    print(f"| **Prompt Uncached Tokens** | **{combined_uncached:,}** | 新規入力トークン |")
+    print(f"| **Output Tokens** | **{combined_output:,}** | 生成（Thinking含む）トークン |")
+    print(f"| **Total Billed Tokens** | **{combined_billed:,}** | 実課金対象合計 (Uncached + Output) |")
     print()
-    if len(report["by_model"]) > 1:
-        print("## By Model")
-        print("| Model | Turns | Cached | Uncached | Output | Billed |")
-        print("|---|---|---|---|---|---|")
-        for m, v in report["by_model"].items():
-            print(f"| `{m}` | {v['turns']} | {fmt(v['cached_tokens'])} | {fmt(v['uncached_input_tokens'])} | {fmt(v['output_tokens'])} | **{fmt(v['total_billed_tokens'])}** |")
-        print()
-    if subagents:
-        P = report["parent_session"]
-        print("## Session Hierarchy Breakdown (内訳)")
-        print("| Session | Role | Turns | Cached | Uncached | Output | Billed |")
-        print("|---|---|---|---|---|---|---|")
-        print(f"| `{sid[:8]}...` | **Parent** | {P['turns']} | {fmt(P['cached_tokens'])} | {fmt(P['uncached_input_tokens'])} | {fmt(P['output_tokens'])} | **{fmt(P['total_billed_tokens'])}** |")
-        for s in report["subagents"]:
-            print(f"| `{s['agent_id']}` | Subagent | {s['turns']} | {fmt(s['cached_tokens'])} | {fmt(s['uncached_input_tokens'])} | {fmt(s['output_tokens'])} | **{fmt(s['total_billed_tokens'])}** |")
 
+    if subagent_stats:
+        print("## 🤖 Session Hierarchy Breakdown (内訳)")
+        print("| Session | Role | Steps | Cached Input | Uncached Input | Output | Billed Total |")
+        print("|---|---|---|---|---|---|---|")
+        print(f"| `{target_id[:8]}...` | **Parent (親)** | {parent_stats['steps_count']} | {parent_stats['cached_tokens']:,} | {parent_stats['uncached_input_tokens']:,} | {parent_stats['output_tokens']:,} | **{parent_stats['total_billed_tokens']:,}** |")
+        for s in subagent_stats:
+            print(f"| `{s['conversation_id'][:8]}...` | Subagent | {s['steps_count']} | {s['cached_tokens']:,} | {s['uncached_input_tokens']:,} | {s['output_tokens']:,} | **{s['total_billed_tokens']:,}** |")
 
 if __name__ == "__main__":
     main()

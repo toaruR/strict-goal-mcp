@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs';
+import fs, { mkdtempSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { validate } from '../schema/validate.js';
@@ -84,7 +84,16 @@ export function loopOpenCreate({ input, pluginRoot, pluginRootSource, persistenc
     }
     if (!sourceRubric) {
       const presetName = input.rubric_preset ?? loopMode;
-      const preset = loadPreset(pluginRoot, presetName);
+      let effectivePluginRoot = pluginRoot;
+      if (input.workspace_dir) {
+        const wsStrictGoal = path.join(input.workspace_dir, 'strict-goal');
+        if (fs.existsSync(path.join(wsStrictGoal, 'presets'))) {
+          effectivePluginRoot = wsStrictGoal;
+        } else if (fs.existsSync(path.join(input.workspace_dir, 'presets'))) {
+          effectivePluginRoot = input.workspace_dir;
+        }
+      }
+      const preset = loadPreset(effectivePluginRoot, presetName);
       if (!preset) {
         fail('E_VALIDATION', 'rubric or rubric_preset is required', {
           path: '$.rubric',

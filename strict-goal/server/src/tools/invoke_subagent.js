@@ -94,9 +94,8 @@ export function invokeSubagent({ input }) {
   let args = [];
 
   if (selectedRunner === 'agy') {
-    args = ['--dangerously-skip-permissions', '-p', combinedPrompt, '--effort', 'low', '--output-format', 'text'];
+    args = ['--dangerously-skip-permissions', '-p', combinedPrompt, '--effort', 'low', '--output-format', 'json'];
   } else if (selectedRunner === 'claude') {
-
     args = ['-p', combinedPrompt, '--dangerously-skip-permissions'];
   } else if (selectedRunner === 'codex') {
     args = ['exec', combinedPrompt];
@@ -117,29 +116,50 @@ export function invokeSubagent({ input }) {
     shell: false,
   });
 
-
   const durationMs = Date.now() - startTime;
   const stdout = res.stdout || '';
   const stderr = res.stderr || '';
   const exitCode = res.status ?? (res.error ? 1 : 0);
 
-  // Extract session/conversation ID if present
+  let outputText = stdout.trim() || stderr.trim();
   let subagentSessionId = null;
-  const uuidMatch = (stdout + '\n' + stderr).match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-  if (uuidMatch) {
-    subagentSessionId = uuidMatch[0];
+  let usage = null;
+
+  if (selectedRunner === 'agy' && stdout.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(stdout.trim());
+      if (parsed.conversation_id) {
+        subagentSessionId = parsed.conversation_id;
+      }
+      if (parsed.response !== undefined) {
+        outputText = parsed.response.trim();
+      }
+      if (parsed.usage) {
+        usage = parsed.usage;
+      }
+    } catch {
+      // fallback to regex
+    }
   }
 
-  const outputText = stdout.trim() || stderr.trim();
+  // Fallback: extract session/conversation ID if present
+  if (!subagentSessionId) {
+    const uuidMatch = (stdout + '\n' + stderr).match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+    if (uuidMatch) {
+      subagentSessionId = uuidMatch[0];
+    }
+  }
 
   return {
     ok: exitCode === 0,
     agent_type,
     runner: selectedRunner,
+    conversation_id: subagentSessionId,
+    subagent_session_id: subagentSessionId,
     output: outputText,
     exit_code: exitCode,
     duration_ms: durationMs,
-    subagent_session_id: subagentSessionId,
+    ...(usage ? { usage } : {}),
     ...(res.error ? { error: { code: res.error.code || 'E_SUBAGENT_EXEC', message: res.error.message } } : {}),
   };
 }

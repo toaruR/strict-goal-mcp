@@ -4,7 +4,7 @@ import glob
 import sqlite3
 import json
 import argparse
-from datetime import datetime
+from datetime import datetime, timezone
 
 def decode_protobuf(data):
     """Simple zero-dependency protobuf wire decoder."""
@@ -147,23 +147,59 @@ def find_session_db(conversation_id, base_dirs):
     return None
 
 def find_subagents_for_session(conversation_id, base_dirs):
-    """Scan transcript for any invoke_subagent conversation IDs."""
+    """Scan transcript and correlate time-window for any invoke_subagent conversation IDs."""
     subagent_ids = []
+    min_time = None
+    max_time = None
+
+    # Step 1: Scan transcript for explicit mentions and record session time bounds
     for b in base_dirs:
         transcript_path = os.path.join(b, "brain", conversation_id, ".system_generated", "logs", "transcript.jsonl")
         if os.path.exists(transcript_path):
             try:
                 with open(transcript_path, "r", encoding="utf-8", errors="ignore") as f:
                     for line in f:
-                        if "conversationId" in line or "conversation_id" in line:
+                        try:
+                            obj = json.loads(line)
+                            ts = obj.get("created_at")
+                            if ts:
+                                clean = ts.rstrip("Z").split(".")[0]
+                                dt = datetime.strptime(clean, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+                                t_val = dt.timestamp()
+                                if min_time is None or t_val < min_time:
+                                    min_time = t_val
+                                if max_time is None or t_val > max_time:
+                                    max_time = t_val
+                        except Exception:
+                            pass
+
+                        if any(k in line for k in ("conversationId", "conversation_id", "subagent_session_id", "invoke_subagent")):
                             import re
-                            # match uuid
-                            uuids = re.findall(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', line)
+                            uuids = re.findall(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', line, re.IGNORECASE)
                             for u in uuids:
-                                if u != conversation_id and u not in subagent_ids:
-                                    subagent_ids.append(u)
+                                u_lower = u.lower()
+                                if u_lower != conversation_id.lower() and u_lower not in subagent_ids:
+                                    subagent_ids.append(u_lower)
             except Exception:
                 pass
+
+    # Step 2: Time-window based discovery in CLI conversations directory
+    if min_time is not None and max_time is not None:
+        for b in base_dirs:
+            cli_conv_dir = os.path.join(b, "conversations")
+            if os.path.isdir(cli_conv_dir) and "cli" in b:
+                for db_file in glob.glob(os.path.join(cli_conv_dir, "*.db")):
+                    cid = os.path.splitext(os.path.basename(db_file))[0].lower()
+                    if cid == conversation_id.lower() or cid in subagent_ids:
+                        continue
+                    try:
+                        mtime = os.path.getmtime(db_file)
+                        # buffer 30s before min_time and 30s after max_time
+                        if (min_time - 30) <= mtime <= (max_time + 30):
+                            subagent_ids.append(cid)
+                    except Exception:
+                        pass
+
     return subagent_ids
 
 def main():
