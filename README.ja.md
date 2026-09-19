@@ -260,7 +260,7 @@ node strict-goal/server/verify_audit.js ./path/to/audit.json
 
 ### バージョンの確認
 
-strict-goal のバージョン（`1.0.0`）は以下のコマンドで確認できます:
+strict-goal のバージョン（`2.0.0`）は以下のコマンドで確認できます:
 
 ```bash
 # サーバー CLI

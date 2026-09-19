@@ -10,7 +10,7 @@ import { handleDiscover } from '../src/mcp/discover.js';
 import { loopOpenCreate } from '../src/tools/loop_open_create.js';
 
 test('VERSION と NAME が正しく定義されている', () => {
-  assert.equal(VERSION, '1.1.0');
+  assert.equal(VERSION, '2.0.0');
   assert.equal(NAME, 'strict-goal');
 });
 
