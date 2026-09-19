@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { VERSION, NAME } from './src/version.js';
 import { executeAndSanitize } from './src/implement/sanitize_test.js';
+import { invokeSubagent } from './src/tools/invoke_subagent.js';
 
 function sha256Hex(data) {
   return createHash('sha256').update(data).digest('hex');
@@ -336,10 +337,45 @@ Usage:
     } else {
       process.exit(0);
     }
+  } else if (command === 'subagent') {
+    const agentType = args[1] || 'general';
+    const prompt = args[2];
+    if (!prompt) {
+      console.error('Usage: helper.js subagent <agent_type> "<prompt>" [--runner auto|agy|claude|codex] [--timeout <sec>]');
+      process.exit(1);
+    }
+
+    let runner = 'auto';
+    let timeoutSec = 300;
+    for (let i = 3; i < args.length; i++) {
+      if (args[i] === '--runner' && args[i + 1]) {
+        runner = args[++i];
+      } else if (args[i] === '--timeout' && args[i + 1]) {
+        timeoutSec = parseInt(args[++i], 10) || 300;
+      }
+    }
+
+    try {
+      const res = invokeSubagent({
+        input: {
+          agent_type: agentType,
+          prompt,
+          runner,
+          timeout_sec: timeoutSec,
+          workspace_dir: process.cwd(),
+        },
+      });
+      console.log(JSON.stringify(res, null, 2));
+      process.exit(res.ok ? 0 : 1);
+    } catch (err) {
+      console.error(`Subagent invocation error: ${err.message}`);
+      process.exit(1);
+    }
   } else {
     console.error(`Unknown command: ${command}`);
     process.exit(1);
   }
+
 }
 
 main();

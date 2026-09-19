@@ -725,6 +725,42 @@
           "warnings": { "type": "array", "items": { "type": "string" } }
         }
       }
+    },
+    "invoke_subagent": {
+      "input": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["prompt"],
+        "properties": {
+          "agent_type": { "type": "string", "maxLength": 64 },
+          "prompt": { "type": "string", "minLength": 5, "maxLength": 50000 },
+          "runner": { "type": "string", "enum": ["auto", "agy", "claude", "codex"] },
+          "workspace_dir": { "type": "string", "minLength": 1, "maxLength": 4096 },
+          "timeout_sec": { "type": "integer", "minimum": 5, "maximum": 3600 }
+        }
+      },
+      "output": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ok", "agent_type", "runner", "output", "exit_code", "duration_ms"],
+        "properties": {
+          "ok": { "type": "boolean" },
+          "agent_type": { "type": "string" },
+          "runner": { "type": "string" },
+          "output": { "type": "string" },
+          "exit_code": { "type": "integer" },
+          "duration_ms": { "type": "integer" },
+          "subagent_session_id": { "type": ["string", "null"] },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string" },
+              "message": { "type": "string" }
+            }
+          }
+        }
+      }
     }
   }
 }
+

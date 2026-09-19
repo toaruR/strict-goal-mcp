@@ -6,6 +6,7 @@ import { scoreSubmit } from '../tools/score_submit.js';
 import { rubricAmend } from '../tools/rubric_amend.js';
 import { escalate } from '../tools/escalate.js';
 import { auditExport } from '../tools/audit_export.js';
+import { invokeSubagent } from '../tools/invoke_subagent.js';
 import {
   resolveActivePersistence,
   registerSessionDataDir,
@@ -45,6 +46,10 @@ export function handleToolsCall(params, { pluginRoot, pluginRootSource, persiste
       case 'audit_export':
         result = auditExport({ input, persistence: activePersistence });
         break;
+      case 'invoke_subagent':
+        result = invokeSubagent({ input });
+        break;
+
       default: {
         const err = new Error(`Tool not found: ${name}`);
         err.rpcCode = -32601;

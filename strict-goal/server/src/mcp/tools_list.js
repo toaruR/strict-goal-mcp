@@ -9,6 +9,7 @@ const TOOL_ORDER = [
   'rubric_amend',
   'escalate',
   'audit_export',
+  'invoke_subagent',
 ];
 
 // MCP tools/list はクライアントが tool を登録するために description と
@@ -21,7 +22,9 @@ const TOOL_DESCRIPTIONS = {
   rubric_amend: 'Amend the rubric of a session (add/modify/remove criteria) with a justification.',
   escalate: 'Request human review, rebase onto a changed upstream, kick back a flawed upstream, or resolve/abort/reopen a session.',
   audit_export: 'Export the audit trail for a session or its whole chain.',
+  invoke_subagent: 'Invoke an ephemeral subagent in an isolated child session to perform a specific task and return its result, preventing parent context pollution.',
 };
+
 
 export function handleToolsList() {
   return {
