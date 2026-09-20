@@ -100,7 +100,7 @@ test('SKILL.md にサブエージェント委譲および階層型タスク委�
 test('CLAUDE.md と AGENTS.md にそれぞれ適切な Agents / Subagents 記述が存在する', () => {
   assert.ok(existsSync(claudeMdFile), 'CLAUDE.md does not exist');
   const claudeContent = readFileSync(claudeMdFile, 'utf8');
-  assert.match(claudeContent, /## Agents \/ Subagents/);
+  assert.match(claudeContent, /## (Strict-Goal & Subagents Protocol|Agents \/ Subagents)/);
   assert.match(claudeContent, /\.claude\/agents\//);
   assert.match(claudeContent, /Agent\(subagent_type=/);
   assert.match(claudeContent, /sg-implementer/);
@@ -109,7 +109,7 @@ test('CLAUDE.md と AGENTS.md にそれぞれ適切な Agents / Subagents 記述
 
   assert.ok(existsSync(agentsMdFile), 'AGENTS.md does not exist');
   const agentsContent = readFileSync(agentsMdFile, 'utf8');
-  assert.match(agentsContent, /## Agents \/ Subagents/);
+  assert.match(agentsContent, /## (Strict-Goal & Subagents Protocol|Agents \/ Subagents)/);
   assert.match(agentsContent, /\.agents\/agents\//);
   assert.match(agentsContent, /sg-implementer/);
   assert.match(agentsContent, /sg-worker/);

@@ -19,7 +19,7 @@ planモードで作成したマークダウンファイルは、<プロジェク
 ## Strict-Goal & Subagents Protocol
 The following protocol applies **ONLY during `strict-goal` workflows** (e.g., requests matching `strict-goal [design|plan|implement]` or within an active rubric loop). For standard non-strict-goal requests, execute directly as usual.
 - **Parent Role (Zero Direct Work)**: In strict-goal sessions, the parent agent acts strictly as a lightweight dispatcher. MUST NOT perform drafting, testing, hash calculation, scoring, or exploratory scripts directly to prevent $\mathcal{O}(T^2)$ token explosion.
-- **Subagent Delegation Matrix** (launch via `Agent(subagent_type="<name>", prompt=...)`):
+- **Subagent Delegation Matrix** (subagents defined under `.claude/agents/`, launch via `Agent(subagent_type="<name>", prompt=...)`):
   - `sg-worker`: Draft & modify code/docs across all phases (`design`, `plan`, `implement`).
   - `sg-verifier`: Ephemeral verification, test execution, evidence extraction, and score submission.
   - `sg-scout`: Ephemeral codebase exploration (stateless inspection without context pollution).
