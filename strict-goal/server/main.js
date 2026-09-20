@@ -7,15 +7,24 @@ import { handleToolsList } from './src/mcp/tools_list.js';
 import { handleToolsCall } from './src/mcp/tools_call.js';
 import { handleInitialize } from './src/mcp/initialize.js';
 import { startStdioServer } from './src/mcp/transport_stdio.js';
+import { startHttpServer } from './src/mcp/transport_http.js';
 import { VERSION, NAME } from './src/version.js';
 
 export function parseArgs(argv) {
-  const args = { dataDir: undefined, showVersion: false };
+  const args = { dataDir: undefined, showVersion: false, http: false, port: 8971, host: '127.0.0.1' };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--version' || argv[i] === '-v') {
       args.showVersion = true;
     } else if (argv[i] === '--data-dir') {
       args.dataDir = argv[i + 1];
+      i += 1;
+    } else if (argv[i] === '--http') {
+      args.http = true;
+    } else if (argv[i] === '--port') {
+      args.port = parseInt(argv[i + 1], 10);
+      i += 1;
+    } else if (argv[i] === '--host') {
+      args.host = argv[i + 1];
       i += 1;
     }
   }
@@ -49,7 +58,18 @@ function main() {
     process.exit(0);
   }
   const { router } = buildRouter({ dataDir: args.dataDir });
-  startStdioServer({ onRequest: (request) => router.dispatch(request) });
+  if (args.http) {
+    startHttpServer({
+      onRequest: (request) => router.dispatch(request),
+      port: args.port,
+      host: args.host,
+      onListening: () => {
+        console.error(`${NAME} HTTP server listening on http://${args.host}:${args.port}/mcp`);
+      },
+    });
+  } else {
+    startStdioServer({ onRequest: (request) => router.dispatch(request) });
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

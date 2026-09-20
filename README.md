@@ -82,7 +82,7 @@ Every round records artifact snapshots, diffs, self-scores, rationale, evidence 
 
 ## MCP Tools Reference
 
-`strict-goal` exposes 7 orthogonal tools:
+`strict-goal` exposes 8 orthogonal tools:
 
 | Tool | Purpose | Key Inputs |
 |---|---|---|
@@ -93,6 +93,7 @@ Every round records artifact snapshots, diffs, self-scores, rationale, evidence 
 | `rubric_amend` | Amend rubric criteria or pass thresholds under strict policy | `session_id`, `reason` (>=40 chars), `amendments` |
 | `escalate` | Request human guidance, upstream rebase, or kickback | `session_id`, `action` (`request_human` / `rebase` / `kickback`), `human_token` |
 | `audit_export` | Export cryptographic audit JSON for compliance and verification | `session_id`, `scope` (`session` / `chain`), `include_artifacts` |
+| `invoke_subagent` | Execute an ephemeral subagent in an isolated child session and retrieve results | `prompt`, `agent_type`, `runner` (`"auto"` / `"agy"` / `"claude"` / `"codex"`), `workspace_dir`, `timeout_sec` |
 
 ---
 

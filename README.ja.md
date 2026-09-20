@@ -79,9 +79,9 @@ LLMエージェントがプロンプト内の自己反省（「段階的に考�
 
 ---
 
-## 提供ツール (7 MCP Tools)
+## 提供ツール (8 MCP Tools)
 
-直交性に配慮した最小限の7つのツールを提供します:
+直交性に配慮した8つのツールを提供します:
 
 | ツール名 | 役割・機能 | 主な入力引数 |
 |---|---|---|
@@ -92,6 +92,7 @@ LLMエージェントがプロンプト内の自己反省（「段階的に考�
 | `rubric_amend` | 厳格なポリシーと40文字以上の理由ログを伴う基準・閾値の変更 | `session_id`, `reason` (40文字以上), `amendments` |
 | `escalate` | 人間への支援要請、上流リベース、上流への差し戻し（キックバック） | `session_id`, `action` (`request_human` / `rebase` / `kickback`), `human_token` |
 | `audit_export` | 検証用監査JSON（セッション単位またはチェーン全体）の出力 | `session_id`, `scope` (`session` / `chain`), `include_artifacts` |
+| `invoke_subagent` | 孤立した子セッションでエフェメラルなサブエージェントを実行し結果を取得 | `prompt`, `agent_type`, `runner` (`"auto"` / `"agy"` / `"claude"` / `"codex"`), `workspace_dir`, `timeout_sec` |
 
 ---
 

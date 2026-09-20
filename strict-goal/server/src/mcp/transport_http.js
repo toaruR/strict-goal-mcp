@@ -27,7 +27,7 @@ export function createHttpHandler({ onRequest }) {
   };
 }
 
-export function startHttpServer({ onRequest, port = 8971, host = '127.0.0.1' }) {
+export function startHttpServer({ onRequest, port = 8971, host = '127.0.0.1', onListening }) {
   const server = http.createServer((req, res) => {
     if (req.method !== 'POST' || req.url !== '/mcp') {
       res.writeHead(404);
@@ -36,6 +36,6 @@ export function startHttpServer({ onRequest, port = 8971, host = '127.0.0.1' }) 
     }
     createHttpHandler({ onRequest })(req, res);
   });
-  server.listen(port, host);
+  server.listen(port, host, onListening);
   return server;
 }
