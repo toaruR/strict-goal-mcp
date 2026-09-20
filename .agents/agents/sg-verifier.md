@@ -21,6 +21,13 @@ Your sole responsibility is to run the test suite, generate fileset/test evidenc
    Run `node strict-goal/server/helper.js test-run "<test command>"` (or local equivalent) to verify tests and obtain structured test inventory and command evidence.
 2. **Commit Artifact**
    For fileset mode, calculate manifest via `node strict-goal/server/helper.js fileset <paths...>` and call `artifact_commit`.
+2.5. **Counterexample Search Probes (悪魔の代弁者3プローブ)**
+   score_submit 実行前の必須手順として以下の3つの反例探索プローブを実施する：
+   - `time_state_trace`: 境界条件を跨ぐ時間・状態遷移トレース（待機後のスライディングウィンドウ按分計算まで含めてシミュレーションされているか確認）。
+   - `policy_trace`: 上限到達時など複数方針の分岐順序・相互排他性の追跡（上限到達時の拒否とFIFO削除の分岐順序・相互排他性等）。
+   - `complexity_trace`: データ構造の実操作から導出した最悪計算量の裏取り（最悪ケースで表記通りの計算量オーダーを達成できるか）。
+   型定義や自己完結契約テストの機械検証には `node strict-goal/server/helper.js design-check "<check command>"` を実行し、結果を internal_consistency や numeric_roundtrip の rationale / evidence に反映する。全プローブpassも許可する。
+   また、ラウンド2以降で `.strict-goal/evidence/<session>/<round>/impact.json` が存在する場合はその内容を読み込み、記載された `checks` を `node strict-goal/server/helper.js design-check "<check command>"` 経由で検証する（impact.json が存在しない場合は本検証をスキップする）。
 3. **Score & Submit**
    Score all criteria with required rationales, weaknesses, and evidence, and call `score_submit`.
    - **Use the server's skeleton, never the server's source.** `loop_state` / `artifact_commit` return `next_action.input_skeleton` with the exact `score_submit` shape and an `evidence_kinds` example for every kind. Fill it in. Do not grep `strict-goal/server/src`, `schemas/` or `test/` to discover formats.

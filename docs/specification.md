@@ -184,6 +184,7 @@ AIエージェントおよび人間の開発者が自律的かつ自然言語で
 - `node strict-goal/server/helper.js sanitize-test "<command>"`: テストを実行し、詳細ログを `sessions/<id>/logs/` に保存した上で、エラー長を制限したサニタイズ出力を返出（コンテキスト溢れ防止）。
 - `node strict-goal/server/helper.js verify-doc <docPath>`: Markdown 設計書を静的解析し、見出し構造、文字数、プレースホルダ（TODO/WIP等）の有無を客観検証。
 - `node strict-goal/server/helper.js digest <file>`: ファイルの SHA-256 ダイジェストを出力。
+- `node strict-goal/server/helper.js design-check "<check-command...>"`: 契約テストや型検査コマンドを実行し、`design_check_evidence`（kind: command, exit_code, output_sha256, output_excerpt, target_digest）を出力して終了コードを伝播。
 - `node strict-goal/server/helper.js subagent <agent_type> "<prompt>"`: 各エージェントCLI（agy, claude, codex）を直接起動・実行。
 
 ### 5.4 Round 1 即時終了防止・反復推敲強制メカニズム (Anti-Round-1 Finalization)

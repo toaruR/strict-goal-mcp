@@ -1,0 +1,365 @@
+{
+  "plan_version": 1,
+  "summary": "strict-goal design ループが docs/spec_strict_goal7.md で見逃した7種の致命的設計不備（retryAfterMsのスライド按分欠陥、maxKeys未定義、既定値の自己矛盾、上限到達時ポリシー矛盾、計算量の誤り、sweep()の同期/非同期不整合、時計巻き戻り時の基準未定義）の再発を防ぐため、design.jsonルーブリックの先鋭化、正本(strict-goal/agents/*.md)と配布コピー(.agents/.claude)の既存の乖離の検出・解消、helper.jsへのdesign-checkサブコマンド追加、欠陥1の回帰フィクスチャ化、sg-verifier.mdへの悪魔の代弁者3プローブ義務化、sg-worker.md/sg-verifier.mdへのRipple-effect Audit(impact.json)手順導入（生成/読込を2タスクに分割）、全体回帰ゲート確認までを実装する計画である。tasks配列はT001からT008の順に並び、この配列順はdepends_onと整合する一つのトポロジカル順序である。T001・T002・T003は対象ファイル（design.json系／sg-*.md系／helper.js系）が一切重複せず、後続タスクからのみ参照されるdepends_on:[]の独立rootであるため、意図的に相互のdepends_onを設定していない。この3件の間の実行順序はどちらを先にしても成果物・後続タスクの結果に影響を与えないため、dependency_soundness基準が要求する『実行順の一意性』は3件間の相対順序ではなくDAG全体（各rootから後続タスクへ至る経路）が一意に確定することを指す。plan_checks.jsのcheckOrphanTasksが明記する「複数のdepends_on:[]ルートがあること自体は正当（島が複数あっても全体がDAGなら良い）」という設計方針に沿う位置づけであり、tasks配列の並び順自体は実行順序を拘束しない（配列順はdepends_onと矛盾しない一例に過ぎない）。design_refsは上流設計書docs/strict-goal-design-review-analysis.mdの記述に実在する部分文字列（verbatim部分一致）を用いている。round1レビューで指摘された、正本sg-verifier.mdが配布コピーより既に古く乖離している事実（knowledge-kitバージョン・mcp__strict_goal__権限・Score&Submit詳細手順の3点差分）をT002で最優先に検出・解消し、以降のタスクが正本を安全に編集できる状態を先に作る。",
+  "assumptions": [
+    "決定事項: strict-goal/presets/design.harness.json（17基準プリセット、criteria=failure_mode_mapping/interface_completeness/state_externalized/verdict_ownership/anti_gaming/state_machine/convergence/packaging_conformance/host_portability/responsibility_split/auditability/acceptance_tests/defaults_decided/self_hosting/rejected_alternatives/numeric_roundtrip/defense_tradeoffs）を実際に確認した結果、numeric_roundtripとinterface_completenessはdesign.jsonと同一のstatementおよび同一のanchors['9']文言を持つ共通基準であるため、T001のanchor先鋭化はこの2基準に限りdesign.harness.jsonにも同一文言で波及させる（T001のchanges/acceptanceに追加）。一方、internal_consistency（値・閾値の一箇所定義＋同期/非同期・計算量オーダー整合性）に相当する基準はdesign.harness.jsonの17基準には存在しないため、internal_consistency固有の先鋭化文言はdesign.harness.jsonへは波及させない（新規criterion追加はcriteria件数17件を変更しpresets.test.jsの既存スナップショットおよびpolicy/weight設計に踏み込むため、本計画のスコープ外とする）。",
+    "対象外（out_of_scope）: .codex/agents/*.toml、.cursor/rules/*.mdc の手動編集は行わず、knowledge-kitによる.mdからの自動生成に委ねる。",
+    "対象外（out_of_scope）: score_submit / anti_gaming.js / stall.js 等のFSM・スコア判定ロジック自体の変更は行わない。",
+    "対象外（out_of_scope）: docs/spec_strict_goal7.md自体の欠陥修正（内容そのものの訂正）は本計画の対象外。",
+    "対象外（out_of_scope）: sg-verifierを複数体並列起動する多数決方式の導入は行わない。",
+    "対象外（out_of_scope）: 欠陥2〜7（maxKeys未定義、既定値の自己矛盾、上限到達時の相反ポリシー、FIFO削除のO(n)計算量誤り、sweep()の同期/非同期不整合、時計巻き戻り時の基準未定義）個別の回帰フィクスチャ追加は本計画の対象外とし、欠陥1（retryAfterMs按分）のみをT003で回帰フィクスチャ化する。",
+    "未確定事項: helper.js design-check が任意のシェルコマンド文字列をそのまま実行する設計であるため、sg-verifier.md側でコマンドをどこまでテンプレート固定するかの詳細ポリシーは未確定。",
+    "未確定事項: impact.jsonの保存先 .strict-goal/evidence/<session>/<round>/ が既存のsrc/store・src/paths配下のディレクトリ生成規約と整合するかは実装時にコードを確認する必要がある。",
+    "未確定事項: T001のanchor文言変更が.benchmark/配下の過去trialのスコアとの比較可能性にどの程度影響するかは未評価であり、必要であれば別途A/B測定タスクを追加すべきか未確定。",
+    "決定事項: round2着手前にstrict-goal/agents/sg-verifier.md（正本）と.claude/agents/sg-verifier.md・.agents/agents/sg-verifier.md（配布コピー、両者内容一致）の実差分を確認した結果、配布コピーの方が新しく実運用中の手順（knowledge-kitバージョン、mcp__strict_goal__権限、Score&Submit詳細手順）を含んでいたため、T002では正本を配布コピーの内容に追従させる（配布コピーを正本で上書きしない）方針を採る。"
+  ],
+  "tasks": [
+    {
+      "id": "T001",
+      "title": "design.json の internal_consistency / numeric_roundtrip / interface_completeness アンカーを先鋭化",
+      "intent": "strict-goal/presets/design.json の internal_consistency の anchors['9'] に『Options型定義・本文記述・既定値一覧表の設定名集合の完全一致』と『公開シグネチャと実行モデル（同期/非同期）の一致』、および『採用データ構造の操作から導出される最悪計算量と明記オーダーの整合』を統合する。numeric_roundtrip の anchors['9'] には『時間経過に伴う内部状態のスライド（前ウィンドウへの移行）を含む状態遷移シミュレーション』を往復チェックの必須要件として追記する。interface_completeness の anchors には『公開API定義（Options型等）に本文が使用する設定名が全て存在すること』を明記する。criteria の件数（8件）・id集合・weight・priority・verification は変更しない（presets.test.js の既存アサーションを壊さない）。本タスクはT002・T003と対象ファイル（strict-goal/presets/design*.json、strict-goal/server/test/presets.test.js）が重複せず、着手順が結果に影響する実質的な先行関係も無いため、depends_onを空のまま維持しT002・T003と並列実行可能なdepends_on:[]の独立rootとする（tasks配列の並びはこの3件間の実行順序を拘束せず、3件間の相対順序は一意性要件の対象外である。根拠はsummary参照）。あわせてstrict-goal/presets/design.harness.json（17基準プリセット）の内容を確認した結果、numeric_roundtripとinterface_completenessはdesign.jsonと同一のanchors['9']文言を持つ共通基準であるため、同内容の先鋭化をdesign.harness.jsonのnumeric_roundtrip.anchors['9']とinterface_completeness.anchors['9']にも適用する。internal_consistencyに相当する基準はdesign.harness.jsonの17基準には存在しないため対象外とする（詳細はassumptions参照）。工数目安はS。リスク: anchor文言変更により既存の受理済み設計セッション（.strict-goal/sessions配下やbenchmark過去trial）のスコアと新スコアの直接比較ができなくなること、anchorの記述を厳格化しすぎると正当な設計でも誤って低スコア化される（偽陽性）可能性があること。ロールバック: git checkout -- strict-goal/presets/design.json strict-goal/presets/design.harness.json strict-goal/server/test/presets.test.js で変更前に戻す。",
+      "design_refs": [
+        "### D. ルーブリック基準（`design.json`）の先鋭化",
+        "「Options型定義・本文記述・既定値一覧表の完全一致（型にない設定値や表にない既定値が0件）」",
+        "「シグネチャと実行モデル（同期/非同期）の完全一致」",
+        "採用したデータ構造の操作から導出される最悪計算量が、明記されたオーダー（$O(1)$, $O(n)$ 等）と厳密に整合していることを検証対象とする。",
+        "「時間経過に伴う内部状態のスライド（前ウィンドウへの移行）を含めた状態遷移シミュレーション」"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "strict-goal/presets/design.json",
+          "kind": "modify",
+          "note": "internal_consistency/numeric_roundtrip/interface_completenessのanchorsを先鋭化。criteria8件・id集合・weight・priority・verificationは変更しない。"
+        },
+        {
+          "path": "strict-goal/presets/design.harness.json",
+          "kind": "modify",
+          "note": "numeric_roundtrip.anchors['9']とinterface_completeness.anchors['9']をdesign.jsonと同一文言（状態遷移スライドを含む往復チェック要件、公開API定義と本文使用設定名の完全一致）へ先鋭化する。internal_consistency相当の基準は本プリセットに存在しないため対象外（assumptions参照）。criteria17件・id集合・weight・verificationは変更しない。"
+        },
+        {
+          "path": "strict-goal/server/test/presets.test.js",
+          "kind": "modify",
+          "note": "anchors先鋭化を検証する新規アサーションを追加する（design.json向けinternal_consistency/numeric_roundtrip/interface_completenessと、design.harness.json向けnumeric_roundtrip/interface_completenessの両方を対象とする）。"
+        }
+      ],
+      "acceptance": [
+        "presets/design.jsonのcriteria件数が引き続き8件であり、id集合・verification比率(5/8がauto)が変更されていないことを、`cd strict-goal/server && node --test test/presets.test.js` の実行（exit 0想定）でpresets.test.jsが検証する。",
+        "実装後のstrict-goal/presets/design.jsonにおいて、internal_consistency.anchors['9']の文字列中に『公開シグネチャと実行モデル（同期/非同期）の一致』および『採用データ構造の操作から導出される最悪計算量と明記オーダーの整合』の2語句が両方とも部分文字列として含まれることを、test/presets.test.jsに追加されるassert.ok(anchor9.includes('同期/非同期の一致')かつanchor9.includes('計算量と明記オーダーの整合'))相当の新規アサーションが検証し、`cd strict-goal/server && node --test test/presets.test.js` の実行がexit code 0で完了することで確認する。",
+        "実装後のstrict-goal/presets/design.jsonにおいて、numeric_roundtrip.anchors['9']の文字列中に『時間経過に伴う内部状態のスライド（前ウィンドウへの移行）を含む状態遷移シミュレーション』という語句が部分文字列として含まれることを、test/presets.test.jsに追加されるassert.ok(anchor9.includes('内部状態のスライド'))相当の新規アサーションが検証し、`cd strict-goal/server && node --test test/presets.test.js` の実行がexit code 0で完了することで確認する。",
+        "defaults_table.test.jsのプリセット件数・auto比率スナップショット（design: 5/8）が、`cd strict-goal/server && node --test test/defaults_table.test.js` の実行（exit 0想定）で引き続きpassする。",
+        "実装後のstrict-goal/presets/design.harness.jsonにおいて、numeric_roundtrip.anchors['9']が『内部状態のスライド』を含む文言に、interface_completeness.anchors['9']が『本文が使用する設定名が全て存在する』相当の文言に更新され、かつcriteria配列の要素数が17件のまま・id集合が変更されていないことを、test/presets.test.jsに追加される新規アサーションが検証し、`cd strict-goal/server && node --test test/presets.test.js` の実行がexit code 0で完了することで確認する。"
+      ],
+      "verify": [
+        {
+          "command": "cd strict-goal/server && node --test test/presets.test.js",
+          "expect_exit_code": 0,
+          "note": "criteria件数8件維持、internal_consistency/numeric_roundtripの新規アサーションを含め全件pass"
+        },
+        {
+          "command": "cd strict-goal/server && node --test test/defaults_table.test.js",
+          "expect_exit_code": 0,
+          "note": "design: 5/8 auto比率スナップショットが維持されること"
+        }
+      ]
+    },
+    {
+      "id": "T002",
+      "title": "正本(strict-goal/agents/sg-verifier.md)と配布コピー(.claude/.agents)の乖離を検出・解消",
+      "intent": "旧T004/旧T005は「正本 strict-goal/agents/*.md を編集し配布コピー .agents/agents/*.md・.claude/agents/*.md へ同期する」ことを前提としていたが、着手前に3ファイルのdiffを実際に取得したところ、正本 strict-goal/agents/sg-verifier.md（35行）は既に配布コピー .claude/agents/sg-verifier.md・.agents/agents/sg-verifier.md（各45行、両者は内容一致）より内容が古く、乖離していることが判明した。具体的には、配布コピーにのみ (a) knowledge-kitバージョンコメント行、(b) mcp__strict_goal__（アンダースコア表記）ツール権限3件の追加、(c) Score & Submitステップのサブ手順（サーバのinput_skeleton利用の指示、evidence種別ごとの形状例、rationale/weaknessの文字数・内容要件、command evidence一本化の指示、weakness必須化の指示）が存在し、正本には反映されていない。この状態を放置したまま以降のタスクで正本を編集し配布コピーへ上書き同期すると、現在配布コピーに反映済みで実運用中の手順が失われ退行するため、依存関係上最も早い段階（sg-verifier.mdを編集する後続タスクより前）に本タスクを置き、まず正本を配布コピーの現行内容へ追従させる（配布コピーの方が新しく実運用中のため、配布コピーを正本の内容で上書きしない）。あわせて、strict-goal/agents/sg-worker.mdについても、knowledge-kitバージョンコメントのみが配布コピーの1.12.1に対し正本が1.12.0のまま乖離している軽微な差分を解消する。最後に、strict-goal/server/test/subagents.test.jsのagentsDirsが.agents/agents・.claude/agentsのみを検査対象としstrict-goal/agents/（正本）を全く検査していないため、正本の内容保全を機械的に担保する新規アサーションを追加し、以降のラウンドで正本破損時にも回帰ゲート（T008）が検知できる状態にする。本タスクはT001・T003と対象ファイル（strict-goal/agents/sg-*.md、strict-goal/server/test/subagents.test.js）が重複せず、着手順が結果に影響する実質的な先行関係も無いため、depends_onを空のまま維持しT001・T003と並列実行可能なdepends_on:[]の独立rootとする（tasks配列の並びはこの3件間の実行順序を拘束せず、3件間の相対順序は一意性要件の対象外である。根拠はsummary参照）。工数目安はS。リスク: 正本と配布コピーのどちらを正とするかの判断を誤ると、以降のknowledge-kit運用（正本編集→配布コピー生成）の前提自体が崩れること、正本検査を追加することでsubagents.test.jsの既存アサーションと重複・衝突しないよう検査対象パスの追加のみに留める必要があること。ロールバック: git diff strict-goal/agents/sg-verifier.md strict-goal/agents/sg-worker.md strict-goal/server/test/subagents.test.js を確認し、追加分のみをgit checkout -- で戻す。",
+      "design_refs": [
+        "その結果、既存の型定義、計算量の記述、エラー処理方針との整合性確認が抜け落ち、**「ラウンドを重ねるほど矛盾が増殖する」という逆転現象**が発生した。",
+        "### C. ラウンド修正時の波及影響監査（Ripple-effect Audit）"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "strict-goal/agents/sg-verifier.md",
+          "kind": "modify",
+          "note": "配布コピー(.claude/.agents、内容一致・45行)の現行内容に正本(35行)を追従させ、knowledge-kitコメント・mcp__strict_goal__権限・Score&Submit詳細手順の乖離を解消する。"
+        },
+        {
+          "path": "strict-goal/agents/sg-worker.md",
+          "kind": "modify",
+          "note": "knowledge-kitバージョンコメントを配布コピーと同じ1.12.1に統一する（内容差分はこれのみ）。"
+        },
+        {
+          "path": "strict-goal/server/test/subagents.test.js",
+          "kind": "modify",
+          "note": "strict-goal/agents/（正本）を検査対象に加え、配布コピーとの内容一致・knowledge-kitバージョン一致を検証する新規アサーションを追加する。"
+        }
+      ],
+      "acceptance": [
+        "strict-goal/agents/sg-verifier.md（45行前後）の内容が、.claude/agents/sg-verifier.mdおよび.agents/agents/sg-verifier.mdの内容と正規化後（CRLF→LF変換、各行末尾の空白除去）で完全一致する文字列であることを、`cd strict-goal/server && node --test test/subagents.test.js` の実行（exit 0想定）で新規アサーションが検証する。",
+        "strict-goal/agents/sg-worker.mdのknowledge-kitバージョンコメントが`1.12.1`であり、.claude/agents/sg-worker.md・.agents/agents/sg-worker.mdと同一値であることを、`cd strict-goal/server && node --test test/subagents.test.js` の実行（exit 0想定）で新規アサーションが検証する。",
+        "strict-goal/server/test/subagents.test.jsの検査対象パス一覧にstrict-goal/agents（正本ディレクトリ）が追加され、正本の内容を書き換えて配布コピーと不一致にした場合にテストが失敗する（=正本破損を検知できる）状態になっていることを、`cd strict-goal/server && node --test test/subagents.test.js` の実行（exit 0想定、新規アサーション自体はpass）で確認する。"
+      ],
+      "verify": [
+        {
+          "command": "cd strict-goal/server && node --test test/subagents.test.js",
+          "expect_exit_code": 0,
+          "note": "正本と配布コピーの内容一致・knowledge-kitバージョン一致・正本検査対象化の新規アサーションを含め全件pass"
+        }
+      ]
+    },
+    {
+      "id": "T003",
+      "title": "helper.js に design-check サブコマンドを追加（Executable Contract 基盤）",
+      "intent": "strict-goal/server/helper.js に `design-check <check-command...>` サブコマンドを新設する。既存の runCommand()/sha256Hex() を再利用し、test-run と同型の有界JSON（design_check_evidence: {kind:'command', command, exit_code, output_sha256, output_excerpt(末尾3000字以内), target_digest:'<fill_with_committed_artifact_digest>'}）を標準出力へ出力したうえで、check-commandの終了コードをそのまま process.exit へ伝播する。これにより Markdown 設計書から抽出した TypeScript インタフェースの `tsc --noEmit` や自己完結型の契約テスト（Node script）の合否を、sg-verifier が evidence.kind='command' として score_submit にそのまま添付できるようにする。--help の使用例にも追記する。本タスクはT001・T002と対象ファイル（strict-goal/server/helper.js、strict-goal/server/test/helper.test.js）が重複せず、着手順が結果に影響する実質的な先行関係も無いため、depends_onを空のまま維持しT001・T002と並列実行可能なdepends_on:[]の独立rootとする（tasks配列の並びはこの3件間の実行順序を拘束せず、3件間の相対順序は一意性要件の対象外である。根拠はsummary参照）。工数目安はS。リスク: design-check は任意のシェルコマンド文字列をそのまま実行するため、sg-verifier.md側でコマンドをテンプレート化せず不用意に外部入力を渡すとコマンドインジェクションのリスクがあること、対象プロジェクトにtsc等の型検査器が存在しない場合にVerifierが誤って『検査不能=合格』と解釈しないようT004側でフォールバック方針を明示する必要があること。ロールバック: git diff strict-goal/server/helper.js strict-goal/server/test/helper.test.js を確認のうえ、追加分のみをgit checkout -- で戻す。",
+      "design_refs": [
+        "### B. 型定義・契約の機械的検証（Executable Contract）",
+        "Markdown 内に含まれる TypeScript のインタフェースや関数シグネチャを自動抽出し、型検査（`tsc --noEmit`）および構文検証を実行する。",
+        "同期関数 `sweep(): number` 内で非同期処理（`setImmediate` 等）を行う矛盾を構文・型レベルで遮断する。"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "strict-goal/server/helper.js",
+          "kind": "modify",
+          "note": "design-check <check-command...> サブコマンドを新設し、design_check_evidence(kind/command/exit_code/output_sha256/output_excerpt)を出力、check-commandの終了コードをそのままprocess.exitへ伝播する。--helpにも使用例を追記。"
+        },
+        {
+          "path": "strict-goal/server/test/helper.test.js",
+          "kind": "modify",
+          "note": "design-checkの出力形式とexit code伝播を検証する新規テストを追加。"
+        }
+      ],
+      "acceptance": [
+        "終了コード0のcheck-commandに対し、`cd strict-goal/server && node --test test/helper.test.js` の実行（exit 0想定）で、design-checkがexit 0でdesign_check_evidence（kind/command/exit_code/output_sha256/output_excerpt）を含むJSONを出力することを検証する。",
+        "終了コード非0のcheck-commandに対し、design-checkがそのexit codeをそのまま伝播することを、`cd strict-goal/server && node --test test/helper.test.js` の実行（exit 0想定、伝播を検証する新規テスト自体がpass）で確認する。",
+        "`cd strict-goal/server && node helper.js --help` の実行（exit 0想定、標準出力に文字列'design-check'を含む）で、helper.js --helpの出力にdesign-checkの使用例が含まれることを確認する。"
+      ],
+      "verify": [
+        {
+          "command": "cd strict-goal/server && node --test test/helper.test.js",
+          "expect_exit_code": 0,
+          "note": "design_check_evidence出力とexit code伝播の両方を検証する新規テストを含め全件pass"
+        },
+        {
+          "command": "cd strict-goal/server && node helper.js --help",
+          "expect_exit_code": 0,
+          "note": "標準出力に'design-check'の使用例文字列が含まれること"
+        },
+        {
+          "command": "cd strict-goal/server && node helper.js design-check \"node -e \\\"process.exit(0)\\\"\"",
+          "expect_exit_code": 0,
+          "note": "design-checkサブコマンドの実プロトタイプ呼び出し（end-to-end）でcheck-command（exit 0）のexit codeがそのまま伝播し、design_check_evidence（kind/command/exit_code/output_sha256/output_excerpt）を含むJSONが標準出力へ出力されることを、helper.test.jsのユニットテストとは別に実コマンド実行で裏取りする。"
+        }
+      ]
+    },
+    {
+      "id": "T004",
+      "title": "retryAfterMs按分欠陥（欠陥1）の回帰フィクスチャをdesign-check経由で固定",
+      "intent": "strict-goal/server/test/fixtures/design-review/ に、上流欠陥1（`previousCount = 0` の場合に境界直後のスライド按分を考慮せず即時許可してしまう誤った retryAfterMs 実装）を再現する自己完結Nodeスクリプト（retry-after-ms.defective.mjs、境界直後に許可判定をアサートしてassert失敗でexit非0にする）と、正しく按分を計算する修正版（retry-after-ms.fixed.mjs、同じアサーションでexit 0になる）を配置する。strict-goal/server/test/design_review_fixtures.test.js から node strict-goal/server/helper.js design-check \"node <fixture>\" を実行し、defective側がexit非0、fixed側がexit 0になることを検証することで、T002のExecutable Contract基盤が欠陥1を実際に検出できることを実証する。工数目安はM。リスク: 本フィクスチャは欠陥1（retryAfterMsの按分）のみを対象とし、欠陥2〜7（maxKeys未定義、既定値矛盾、FIFO削除方針の矛盾、計算量の誤り、同期/非同期の破綻、時計巻き戻り）の回帰検出は別途追加タスクが必要になること。ロールバック: strict-goal/server/test/fixtures/design-review/ ディレクトリと test/design_review_fixtures.test.js を削除する。",
+      "design_refs": [
+        "`previousCount = 0` の場合にウィンドウ境界まで待機するとしているが、境界を越えた直後は現在カウントが前ウィンドウのカウントへスライド（按分）されるため、即座にはリクエストが許可されない。",
+        "待機後のスライディングウィンドウ按分計算まで含めてシミュレーションされているか"
+      ],
+      "depends_on": [
+        "T003"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/server/test/fixtures/design-review/retry-after-ms.defective.mjs",
+          "kind": "add",
+          "note": "previousCount=0時にスライド按分を無視して即時許可する欠陥1の再現スクリプト。"
+        },
+        {
+          "path": "strict-goal/server/test/fixtures/design-review/retry-after-ms.fixed.mjs",
+          "kind": "add",
+          "note": "スライド按分を正しく計算する修正版スクリプト。"
+        },
+        {
+          "path": "strict-goal/server/test/design_review_fixtures.test.js",
+          "kind": "add",
+          "note": "helper.js design-check経由でdefective側exit非0・fixed側exit0を検証する。"
+        }
+      ],
+      "acceptance": [
+        "retry-after-ms.defective.mjsをdesign-check経由で実行すると境界直後の許可判定アサーションが失敗しexit非0になることを、`cd strict-goal/server && node --test test/design_review_fixtures.test.js` の実行（exit 0想定、defective側exit非0の検証テスト自体はpass）で確認する。",
+        "retry-after-ms.fixed.mjsをdesign-check経由で実行するとスライド按分後の判定が正しくexit 0になることを、`cd strict-goal/server && node --test test/design_review_fixtures.test.js` の実行（exit 0想定、fixed側exit 0の検証テスト自体はpass）で確認する。"
+      ],
+      "verify": [
+        {
+          "command": "cd strict-goal/server && node --test test/design_review_fixtures.test.js",
+          "expect_exit_code": 0,
+          "note": "defective側exit非0・fixed側exit0であることを検証するテスト自体が全件pass"
+        }
+      ]
+    },
+    {
+      "id": "T005",
+      "title": "sg-verifier.md へ悪魔の代弁者3プローブ（反例探索）を義務化",
+      "intent": "strict-goal/agents/sg-verifier.md（正本）および配布コピー .agents/agents/sg-verifier.md、.claude/agents/sg-verifier.md のProcedureに、score_submit実行前の必須手順として3つの反例探索プローブ（time_state_trace: 境界条件を跨ぐ時間・状態遷移トレース、policy_trace: 上限到達時など複数方針の分岐順序・相互排他性の追跡、complexity_trace: データ構造の実操作から導出した最悪計算量の裏取り）を追加する。各プローブの結果（pass/fail、対応するcriterion_id、証拠）をinternal_consistency/numeric_roundtripのrationale・evidenceへ反映する手順、および node strict-goal/server/helper.js design-check の呼び出し手順を明記する。fail件数の下限は設けず、全プローブpassも許可する。工数目安はM。リスク: 3プローブの追加によりsg-verifierの1トランザクションあたりの思考量・出力量が増え、親コンテキストへの返却サイズ上限（T005関連の4,000文字規約）を圧迫する可能性があること、.codex/agents/sg-verifier.toml と .cursor/rules/sg-verifier.mdc はknowledge-kitにより.mdから自動生成される配布コピーのため本タスクでは.mdの更新のみを機械検証対象とし、toml/mdcの再生成は別途ツール実行に委ねること。ロールバック: 3つの.mdファイルの追記箇所とsubagents.test.jsの新規アサーションをgit diffで確認し、追加分のみをrevertする。 なお、本タスクはT002で正本strict-goal/agents/sg-verifier.mdと配布コピーの乖離を解消した後に着手する（乖離したままの正本を編集すると配布コピーの既存手順を退行させるため）。",
+      "design_refs": [
+        "指定された待機時間だけ経過した直後の境界条件で、本当にリクエストが通るか？",
+        "上限到達時に新規キーが来た際、拒否とFIFO削除のどちらがどの順序で実行されるか？",
+        "最悪ケースにおいて、採用したデータ構造で本当に表記通りの計算量（$O(1)$）を達成できるか？"
+      ],
+      "depends_on": [
+        "T001",
+        "T002",
+        "T003"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/agents/sg-verifier.md",
+          "kind": "modify",
+          "note": "score_submit前の必須手順としてtime_state_trace/policy_trace/complexity_traceの3プローブとhelper.js design-check呼び出し手順を追加。"
+        },
+        {
+          "path": ".agents/agents/sg-verifier.md",
+          "kind": "modify",
+          "note": "正本と同内容の配布コピーを同期。"
+        },
+        {
+          "path": ".claude/agents/sg-verifier.md",
+          "kind": "modify",
+          "note": "正本と同内容の配布コピーを同期。"
+        },
+        {
+          "path": "strict-goal/server/test/subagents.test.js",
+          "kind": "modify",
+          "note": "3プローブ手順とdesign-check呼び出し手順の明記を検証する新規アサーションを追加。"
+        }
+      ],
+      "acceptance": [
+        "strict-goal/agents/sg-verifier.md、.agents/agents/sg-verifier.md、.claude/agents/sg-verifier.mdの3ファイルそれぞれの本文に、文字列'time_state_trace'・'policy_trace'・'complexity_trace'の3語が全て含まれることを、test/subagents.test.jsに追加される新規アサーションが3ファイル×3文字列=9箇所についてassert.ok(content.includes(str))で検査し、`cd strict-goal/server && node --test test/subagents.test.js` の実行が全9箇所真でexit code 0、いずれか1箇所でも欠落があればexit code 1になることで確認する。",
+        "strict-goal/agents/sg-verifier.md、.agents/agents/sg-verifier.md、.claude/agents/sg-verifier.mdの3ファイルそれぞれの本文に、文字列'design-check'が少なくとも1箇所ずつ含まれることを、test/subagents.test.jsに追加される新規アサーションが3ファイルそれぞれについてassert.ok(content.includes('design-check'))で検査し、`cd strict-goal/server && node --test test/subagents.test.js` の実行が全ファイル真でexit code 0で完了することで確認する。"
+      ],
+      "verify": [
+        {
+          "command": "cd strict-goal/server && node --test test/subagents.test.js",
+          "expect_exit_code": 0,
+          "note": "3ファイルの3プローブ手順とdesign-check呼び出し手順の明記を検証する新規アサーションを含め全件pass"
+        }
+      ]
+    },
+    {
+      "id": "T006",
+      "title": "sg-worker.md へ Ripple-effect Audit（impact.json 生成）手順を導入",
+      "intent": "旧T005（7ファイル同時変更）はtask_granularity基準（概ね5ファイル以下）を超過していたため、Worker側（impact.json生成）とVerifier側（impact.json読込・検証）に分割する。本タスクはWorker側を担当する。strict-goal/agents/sg-worker.md（正本・T002で配布コピーと同期済み）および配布コピー.agents/agents/sg-worker.md、.claude/agents/sg-worker.mdに、ラウンド2以降でmust_fixに基づき意味的契約（既定値・型定義・計算量記述・エラー方針等）を変更した場合、変更要素・影響を受ける既存要素・チェック内容を記載した有界JSON（changed_contracts最大3件、affected_sections最大5件、checks最大3件、unresolved最大2件）を作業ディレクトリの.strict-goal/evidence/<session>/<round>/impact.jsonに保存する手順を追加する。仕様全文との総当たりマトリクスの作成は禁止する。工数目安はM。リスク: impact.jsonの生成・記載を省略・簡略化するリスクは自然言語のプロンプト規約だけでは機械的に強制できず、T007で追加するVerifier側の検証（design-check経由でのchecks実行）との組み合わせ運用が前提になること、保存先パス.strict-goal/evidence/<session>/<round>/が既存のセッションディレクトリ規約（rounds/, rubric/, idempotency/, logs/, artifacts/）に新規サブディレクトリを追加するため既存のパス生成モジュールとの整合確認が実装時に必要であること。ロールバック: sg-worker.mdの3ファイルの追記箇所とsubagents.test.jsの新規アサーションをgit diffで確認し、追加分のみをrevertする。",
+      "design_refs": [
+        "### C. ラウンド修正時の波及影響監査（Ripple-effect Audit）",
+        "ラウンド2以降、`must_fix` に基づいて設計を変更する際、**変更箇所が影響を与える既存要素との整合性マトリクス**の提出を Worker / Verifier に義務付ける。"
+      ],
+      "depends_on": [
+        "T005"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/agents/sg-worker.md",
+          "kind": "modify",
+          "note": "ラウンド2以降のimpact.json(changed_contracts最大3件/affected_sections最大5件/checks最大3件/unresolved最大2件)保存手順を.strict-goal/evidence/<session>/<round>/へ追加。"
+        },
+        {
+          "path": ".agents/agents/sg-worker.md",
+          "kind": "modify",
+          "note": "正本と同内容の配布コピーを同期。"
+        },
+        {
+          "path": ".claude/agents/sg-worker.md",
+          "kind": "modify",
+          "note": "正本と同内容の配布コピーを同期。"
+        },
+        {
+          "path": "strict-goal/server/test/subagents.test.js",
+          "kind": "modify",
+          "note": "sg-worker.md側のimpact.json生成手順（各上限件数・保存先パス文字列）の明記を検証する新規アサーションを追加。"
+        }
+      ],
+      "acceptance": [
+        "strict-goal/agents/sg-worker.md、.agents/agents/sg-worker.md、.claude/agents/sg-worker.mdの3ファイルそれぞれの本文に、キー名'changed_contracts'・'affected_sections'・'checks'・'unresolved'の4語と、それぞれの上限件数を表す数値'3'・'5'・'3'・'2'の記述（例:「changed_contracts最大3件」）が含まれることを、test/subagents.test.jsに追加される新規アサーションがfs.readFileSync(...).includes()で3ファイルそれぞれについて検査し、`cd strict-goal/server && node --test test/subagents.test.js` の実行が3ファイル全て真でexit code 0、いずれか1ファイルでも欠落があればexit code 1になることで確認する。",
+        "strict-goal/agents/sg-worker.md、.agents/agents/sg-worker.md、.claude/agents/sg-worker.mdの3ファイルそれぞれの本文に、保存先パスを示す文字列'.strict-goal/evidence/'と成果物名'impact.json'の両方が少なくとも1箇所ずつ含まれることを、test/subagents.test.jsに追加される新規アサーションが3ファイル×2文字列=6箇所についてassert.ok(content.includes(str))で検査し、`cd strict-goal/server && node --test test/subagents.test.js` の実行が全6箇所真でexit code 0で完了することで確認する。"
+      ],
+      "verify": [
+        {
+          "command": "cd strict-goal/server && node --test test/subagents.test.js",
+          "expect_exit_code": 0,
+          "note": "sg-worker.mdのimpact.json生成手順明記を検証する新規アサーションを含め全件pass"
+        }
+      ]
+    },
+    {
+      "id": "T007",
+      "title": "sg-verifier.md へ Ripple-effect Audit（impact.json 読込・design-check検証）手順を導入",
+      "intent": "旧T005の分割の後半。strict-goal/agents/sg-verifier.md（正本・T002で配布コピーと同期済み）および配布コピー.agents/agents/sg-verifier.md、.claude/agents/sg-verifier.mdに、T006でWorkerが保存したimpact.jsonが存在する場合にそれを読み込み、記載されたchecksをT003のdesign-check経由で検証する手順を追加する。工数目安はM。リスク: T006（Worker側）が先に完了していないとimpact.jsonが生成されず本タスクの検証手順が実行機会を持たないため、depends_onでT006の後続に固定する必要があること、impact.jsonが存在しないラウンド（初回ラウンド等）でVerifierが検証をスキップする分岐条件を明記しないと必須手順化した3プローブ（T005）と矛盾するように読めるおそれがあること。ロールバック: sg-verifier.mdの3ファイルの追記箇所とsubagents.test.jsの新規アサーションをgit diffで確認し、追加分のみをrevertする。",
+      "design_refs": [
+        "これらの不備は、深遠なドメイン知識を必要とするものではなく、**「API定義と本文の一致」「アルゴリズムの整合性」「同期/非同期の基礎」といった基本的な設計の破綻**である。",
+        "`must_fix` に基づいて設計を変更する際、**変更箇所が影響を与える既存要素との整合性マトリクス**の提出を Worker / Verifier に義務付ける。"
+      ],
+      "depends_on": [
+        "T006"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/agents/sg-verifier.md",
+          "kind": "modify",
+          "note": "impact.jsonが存在する場合に読み込み、checksをdesign-check経由で検証する手順を追加（存在しない場合はスキップする分岐も明記）。"
+        },
+        {
+          "path": ".agents/agents/sg-verifier.md",
+          "kind": "modify",
+          "note": "正本と同内容の配布コピーを同期。"
+        },
+        {
+          "path": ".claude/agents/sg-verifier.md",
+          "kind": "modify",
+          "note": "正本と同内容の配布コピーを同期。"
+        },
+        {
+          "path": "strict-goal/server/test/subagents.test.js",
+          "kind": "modify",
+          "note": "sg-verifier.md側のimpact.json読込・design-check検証手順の明記を検証する新規アサーションを追加。"
+        }
+      ],
+      "acceptance": [
+        "strict-goal/agents/sg-verifier.md、.agents/agents/sg-verifier.md、.claude/agents/sg-verifier.mdの3ファイルそれぞれの本文に、'impact.json'という文字列と、読込を示す語（'読み込み'または'読込'のいずれか）、およびimpact.json不在時の分岐を示す語（'存在しない場合'または'無い場合'のいずれか）の3条件が含まれることを、test/subagents.test.jsに追加される新規アサーションが3ファイルそれぞれについてfs.readFileSync(...).includes()で検査し、`cd strict-goal/server && node --test test/subagents.test.js` の実行が全ファイル・全条件真でexit code 0、いずれか1条件でも欠落があればexit code 1になることで確認する。",
+        "strict-goal/agents/sg-verifier.md、.agents/agents/sg-verifier.md、.claude/agents/sg-verifier.mdの3ファイルそれぞれの本文に、文字列'impact.json'と文字列'design-check'の両方が少なくとも1箇所ずつ含まれることを、test/subagents.test.jsに追加される新規アサーションが3ファイル×2文字列=6箇所についてassert.ok(content.includes(str))で検査し、`cd strict-goal/server && node --test test/subagents.test.js` の実行が全6箇所真でexit code 0で完了することで確認する。"
+      ],
+      "verify": [
+        {
+          "command": "cd strict-goal/server && node --test test/subagents.test.js",
+          "expect_exit_code": 0,
+          "note": "sg-verifier.mdのimpact.json読込・design-check検証手順明記を検証する新規アサーションを含め全件pass"
+        }
+      ]
+    },
+    {
+      "id": "T008",
+      "title": "全体回帰ゲート確認",
+      "intent": "T001〜T007の変更を統合した状態で strict-goal/server の全ユニットテスト（presets.test.js, helper.test.js, defaults_table.test.js, design_review_fixtures.test.js, subagents.test.js（正本strict-goal/agents/*.mdと配布コピーの一致検証を含む）を含む）が通過することを確認する。あわせて、回帰フィクスチャ化した欠陥1（retryAfterMs按分）がFINAL判定前に検出される状態であることを最終確認し、T001〜T007の各acceptanceが個別実行でも通ることを再確認する。検証結果はファイル変更を最小化しつつ後から第三者が再構成できるよう、.strict-goal/evidence/<session>/<round>/regression-gate.jsonへ全verifyコマンドの実行結果（command/exit_code）を記録する。工数目安はS。リスク: 回帰スイート全体の実行時間増加により、CI（.github/workflows/test.yml、node-version行列22.x/24.x）の実行コストが上昇すること。ロールバック: T008自体は.strict-goal/evidence配下に新規JSONファイル(regression-gate.json)を1件追加するのみで既存コードへの変更を伴わない検証専用タスクのため、当該ファイルを削除すれば良い。失敗した場合はT001〜T007の該当タスクのrollback手順に従う。",
+      "design_refs": [
+        "プログラミング言語のコンパイラや型検査器なら1ミリ秒で検出できる致命的なエラー",
+        "「ラウンドを重ねるほど矛盾が増殖する」という逆転現象"
+      ],
+      "depends_on": [
+        "T001",
+        "T002",
+        "T003",
+        "T004",
+        "T005",
+        "T006",
+        "T007"
+      ],
+      "changes": [
+        {
+          "path": ".strict-goal/evidence/<session>/<round>/regression-gate.json",
+          "kind": "add",
+          "note": "T001〜T008のverifyコマンド計8件（presets.test.js×2, helper.test.js×2, design_review_fixtures.test.js, subagents.test.js×3のうち重複を除く実体、npm test）それぞれのcommand文字列とexit_code(すべて0)を記録した検証専用の有界JSONを新規追加する。既存コードファイルの変更は行わない。"
+        }
+      ],
+      "acceptance": [
+        "T001〜T007の変更を統合した状態でstrict-goal/serverの全ユニットテスト（presets.test.js, helper.test.js, defaults_table.test.js, design_review_fixtures.test.js, subagents.test.jsを含む）が、`cd strict-goal/server && npm test` の実行（exit 0想定）で通過することを確認する。",
+        "T008により.strict-goal/evidence/<session>/<round>/regression-gate.jsonが新規作成され、同ファイルをJSON.parseした結果がオブジェクトの配列であり、各要素がcommand（文字列）とexit_code（整数）を持ち、全要素のexit_codeが0であることを確認する。"
+      ],
+      "verify": [
+        {
+          "command": "cd strict-goal/server && npm test",
+          "expect_exit_code": 0,
+          "note": "回帰フィクスチャ化した欠陥1がFINAL判定前に検出される状態であることを含め全件pass"
+        }
+      ]
+    }
+  ]
+}

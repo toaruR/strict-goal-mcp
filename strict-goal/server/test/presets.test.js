@@ -61,3 +61,36 @@ test('presets/design.harness.json の self_hosting.anchors.9 が追記節の不�
   assert.ok(!selfHosting.anchors['9'].includes('番号つき'));
 });
 
+test('presets/design.json の internal_consistency.anchors.9 が実行モデル一致と計算量整合を要求していること', () => {
+  const preset = loadPreset(pluginRoot, 'design');
+  const anchor9 = preset.criteria.find((c) => c.id === 'internal_consistency').anchors['9'];
+  assert.ok(anchor9.includes('同期/非同期の一致'));
+  assert.ok(anchor9.includes('計算量と明記オーダーの整合'));
+});
+
+test('presets/design.json の numeric_roundtrip.anchors.9 が状態遷移シミュレーションを要求していること', () => {
+  const preset = loadPreset(pluginRoot, 'design');
+  const anchor9 = preset.criteria.find((c) => c.id === 'numeric_roundtrip').anchors['9'];
+  assert.ok(anchor9.includes('内部状態のスライド'));
+  assert.ok(anchor9.includes('状態遷移シミュレーション'));
+});
+
+test('presets/design.json の interface_completeness.anchors.9 が本文使用の設定名の網羅を要求していること', () => {
+  const preset = loadPreset(pluginRoot, 'design');
+  const anchor9 = preset.criteria.find((c) => c.id === 'interface_completeness').anchors['9'];
+  assert.ok(anchor9.includes('本文が使用する設定名が全て存在する'));
+});
+
+test('presets/design.harness.json の numeric_roundtrip / interface_completeness が design.json と同一文言であること', () => {
+  const design = loadPreset(pluginRoot, 'design');
+  const harness = loadPreset(pluginRoot, 'design.harness');
+  for (const id of ['numeric_roundtrip', 'interface_completeness']) {
+    const expected = design.criteria.find((c) => c.id === id).anchors['9'];
+    const actual = harness.criteria.find((c) => c.id === id).anchors['9'];
+    assert.equal(actual, expected);
+  }
+  assert.ok(harness.criteria.find((c) => c.id === 'numeric_roundtrip').anchors['9'].includes('内部状態のスライド'));
+  assert.ok(
+    harness.criteria.find((c) => c.id === 'interface_completeness').anchors['9'].includes('本文が使用する設定名が全て存在する')
+  );
+});

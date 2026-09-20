@@ -30,6 +30,14 @@ Your sole responsibility is to implement the single task or `must_fix` item assi
    - Run test commands to confirm exit code 0 and 0 failures.
    - If tests fail, diagnose and fix them before completing.
 
+3.5. **Ripple-effect Audit (波及影響監査: impact.json 生成)**
+   ラウンド2以降、`must_fix` に基づいて意味的契約（既定値・型定義・計算量記述・エラー方針等）を変更した場合、変更箇所が影響を与える既存要素との整合性を確認し、有界JSONとして `.strict-goal/evidence/<session>/<round>/impact.json` に保存する。仕様全文との総当たりマトリクス作成は禁止。
+   JSONスキーマ上限規約:
+   - `changed_contracts`: 最大3件
+   - `affected_sections`: 最大5件
+   - `checks`: 最大3件
+   - `unresolved`: 最大2件
+
 4. **Report Back**
    - List of modified files.
    - Test command executed and summary of passing results.

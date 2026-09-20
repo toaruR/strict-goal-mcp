@@ -66,3 +66,31 @@ test('helper.js verify-doc: 短いセクションやプレースホルダがあ�
   }
 });
 
+test('helper.js design-check: 終了コード 0 のコマンドに対して exit 0 と design_check_evidence を出力する', () => {
+  const res = runHelper(['design-check', 'node', '-e', '"process.exit(0)"']);
+  assert.equal(res.status, 0);
+  const parsed = JSON.parse(res.stdout);
+  assert.ok(parsed.design_check_evidence);
+  assert.equal(parsed.design_check_evidence.kind, 'command');
+  assert.equal(parsed.design_check_evidence.exit_code, 0);
+  assert.match(parsed.design_check_evidence.output_sha256, /^[0-9a-f]{64}$/);
+  assert.equal(parsed.design_check_evidence.target_digest, '<fill_with_committed_artifact_digest>');
+});
+
+test('helper.js design-check: 終了コード非0 のコマンドに対してその exit code をそのまま伝播する', () => {
+  const res = runHelper(['design-check', 'node', '-e', '"process.exit(42)"']);
+  assert.equal(res.status, 42);
+  const parsed = JSON.parse(res.stdout);
+  assert.ok(parsed.design_check_evidence);
+  assert.equal(parsed.design_check_evidence.kind, 'command');
+  assert.equal(parsed.design_check_evidence.exit_code, 42);
+});
+
+test('helper.js design-check: 3000文字を超える出力に対して末尾3000文字にクリッピングする', () => {
+  const res = runHelper(['design-check', 'node', '-e', '"console.log(\'a\'.repeat(5000))"']);
+  assert.equal(res.status, 0);
+  const parsed = JSON.parse(res.stdout);
+  assert.ok(parsed.design_check_evidence);
+  assert.equal(parsed.design_check_evidence.output_excerpt.length, 3000);
+});
+

@@ -137,6 +137,7 @@ function runCommand(commandStr) {
     encoding: 'utf8',
     maxBuffer: 10 * 1024 * 1024,
     env,
+    ...(isWin ? { windowsVerbatimArguments: true } : {}),
   });
 
   const stdout = res.stdout || '';
@@ -169,6 +170,9 @@ Usage:
 
   node strict-goal/server/helper.js digest <file>
     Computes sha256 of a file.
+
+  node strict-goal/server/helper.js design-check <check command...>
+    Runs check command and returns design_check_evidence JSON, propagating exit code.
 `);
     process.exit(0);
   }
@@ -371,6 +375,29 @@ Usage:
       console.error(`Subagent invocation error: ${err.message}`);
       process.exit(1);
     }
+  } else if (command === 'design-check') {
+    const checkArgs = args.slice(1);
+    if (checkArgs.length === 0) {
+      console.error('Usage: helper.js design-check <check-command...>');
+      process.exit(1);
+    }
+    const checkCmd = checkArgs.join(' ');
+    const res = runCommand(checkCmd);
+    const outputText = ((res.stdout || '') + (res.stderr || '')).trim();
+    const excerpt = outputText.length > 3000 ? outputText.slice(-3000) : outputText;
+    const outputSha = sha256Hex(outputText);
+    const evidence = {
+      design_check_evidence: {
+        kind: 'command',
+        command: checkCmd,
+        exit_code: res.exitCode,
+        output_sha256: outputSha,
+        output_excerpt: excerpt,
+        target_digest: '<fill_with_committed_artifact_digest>',
+      },
+    };
+    console.log(JSON.stringify(evidence, null, 2));
+    process.exit(res.exitCode);
   } else {
     console.error(`Unknown command: ${command}`);
     process.exit(1);
