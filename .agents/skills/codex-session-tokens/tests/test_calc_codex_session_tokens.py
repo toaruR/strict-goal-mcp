@@ -22,6 +22,15 @@ def write_rollout(path, identity, usage, child=None, parent=None):
     path.write_text("\n".join(json.dumps(event) for event in events), encoding="utf-8")
 
 
+def append_inherited_parent_meta(path, parent):
+    event = {
+        "type": "session_meta",
+        "payload": {"id": parent, "session_id": parent, "thread_source": "user"},
+    }
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write("\n" + json.dumps(event))
+
+
 class TokenTests(unittest.TestCase):
     def test_latest_cumulative_value_is_not_double_counted(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -47,6 +56,22 @@ class TokenTests(unittest.TestCase):
             self.assertEqual(total["uncached_input_tokens"], 60)
             self.assertEqual(total["output_tokens"], 15)
             self.assertEqual(total["billed_total_tokens"], 75)
+
+    def test_inherited_parent_meta_does_not_replace_child_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            parent, child = root / "rollout-parent.jsonl", root / "rollout-child.jsonl"
+            write_rollout(parent, "parent", {"input_tokens": 100, "cached_input_tokens": 70, "output_tokens": 10}, child="child")
+            write_rollout(child, "child", {"input_tokens": 50, "cached_input_tokens": 20, "output_tokens": 5}, parent="parent")
+            append_inherited_parent_meta(child, "parent")
+
+            parsed = TOKENS.parse_rollout(child)
+            sessions, warnings = TOKENS.collect_hierarchy(parent, root)
+
+            self.assertEqual(parsed["thread_id"], "child")
+            self.assertEqual(parsed["role"], "subagent")
+            self.assertEqual(warnings, [])
+            self.assertEqual([item["thread_id"] for item in sessions], ["parent", "child"])
 
 
 if __name__ == "__main__":

@@ -30,3 +30,5 @@ python -X utf8 .agents/skills/codex-session-tokens/scripts/calc_codex_session_to
 - **All Processed**: `Input + Output`。キャッシュ分を含む。
 
 rollout の `token_count.info.total_token_usage` は累積値なので、各セッションの最後の有効値だけを使う。イベントを合算しない。親子内訳と総計を併記し、読み取れない子があれば警告も報告する。
+
+fork された子 rollout に親履歴由来の `session_meta` が後続していても、ファイル先頭側の最初の `session_meta` をその rollout 自身の識別子として扱う。

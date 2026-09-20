@@ -82,7 +82,10 @@ def parse_rollout(path: Path) -> dict[str, Any]:
         payload = event.get("payload")
         if not isinstance(payload, dict):
             continue
-        if event.get("type") == "session_meta":
+        # Forked subagent rollouts may contain inherited parent history,
+        # including another session_meta event.  The first session_meta is the
+        # identity of the rollout file itself; later ones belong to history.
+        if event.get("type") == "session_meta" and not meta:
             meta = payload
         elif event.get("type") == "turn_context":
             model = payload.get("model")
