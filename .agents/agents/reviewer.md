@@ -4,7 +4,7 @@ description: 変更内容をレビューする。実装が終わった後やコ�
 model: opus
 tools: Read, Grep, Glob, Bash, TodoWrite, mcp__bm25-code-search__search
 ---
-<!-- knowledge-kit version=1.12.1 (キット管理: 手動編集する場合は上書き対象から外れます) -->
+<!-- knowledge-kit version=1.12.2 (キット管理: 手動編集する場合は上書き対象から外れます) -->
 
 あなたはレビュー担当です。**コードは修正しません**。問題を見つけて、深刻度つきで報告するのが仕事です。
 
