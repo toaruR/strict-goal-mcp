@@ -48,10 +48,20 @@ test('未知の rubric_preset 名は E_VALIDATION になる', () => {
   assert.throws(() => loadPreset(pluginRoot, 'unknown'), { code: 'E_VALIDATION' });
 });
 
-test('presets/design.harness.json の criteria が17件であること', () => {
+test('presets/design.harness.json の criteria が18件であること', () => {
   const preset = loadPreset(pluginRoot, 'design.harness');
-  assert.equal(preset.criteria.length, 17);
-  assert.equal(autoRatio(preset), 4 / 17);
+  assert.equal(preset.criteria.length, 18);
+  assert.equal(autoRatio(preset), 5 / 18);
+});
+
+test('presets/design.harness.json の dependency_conformance が外部依存の実測照合を要求していること', () => {
+  const preset = loadPreset(pluginRoot, 'design.harness');
+  const criterion = preset.criteria.find((c) => c.id === 'dependency_conformance');
+  assert.ok(criterion, 'dependency_conformance criterion should exist');
+  assert.equal(criterion.verification, 'auto');
+  assert.ok(criterion.anchors['9'].includes('実測値'));
+  assert.ok(criterion.anchors['9'].includes('引用箇所'));
+  assert.ok(criterion.anchors['1'].includes('実在しない'));
 });
 
 test('presets/design.harness.json の self_hosting.anchors.9 が追記節の不在を要求していること', () => {

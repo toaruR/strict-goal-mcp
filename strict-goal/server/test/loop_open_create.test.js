@@ -63,12 +63,12 @@ test('rubric 未指定のとき loop_mode に対応する presets が採用さ�
   assert.equal(rubric.criteria.length, 8);
 });
 
-test('rubric_preset:"design.harness" で作成したセッションの rubric が17基準を返す', () => {
+test('rubric_preset:"design.harness" で作成したセッションの rubric が18基準を返す', () => {
   const persistence = durablePersistence();
   const result = loopOpenCreate({ input: baseInput({ loop_mode: 'design', rubric_preset: 'design.harness' }), pluginRoot, persistence });
   const sDir = sessionDir(persistence.dir, result.session_id);
   const rubric = loadRubric(sDir, 1);
-  assert.equal(rubric.criteria.length, 17);
+  assert.equal(rubric.criteria.length, 18);
 });
 
 test('loop_mode 未指定のとき "design" が採用される', () => {

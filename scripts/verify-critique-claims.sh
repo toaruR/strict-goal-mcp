@@ -16,8 +16,8 @@ chk() { # chk <label> <expected> <actual>
 chk 1 "design FINAL" "$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const j=JSON.parse(s);console.log(j.loop_mode,j.state)' "$SESS/session.json")"
 
 # C2: [改訂前の主張: そのセッションのルーブリック基準 id 15件が当時の design プリセットと完全一致]
-# 実装後は presets/design.json が汎用8基準へ差し替えられ、ハーネス用基準は presets/design.harness.json（17基準）へ分離された
-chk 2 "sess=15 design=8 harness=17" "$(node -e '
+# 実装後は presets/design.json が汎用8基準へ差し替えられ、ハーネス用基準は presets/design.harness.json（18基準: 移設15件+numeric_roundtrip+defense_tradeoffs+dependency_conformance）へ分離された
+chk 2 "sess=15 design=8 harness=18" "$(node -e '
 const fs=require("fs");
 const s=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
 const d=JSON.parse(fs.readFileSync("strict-goal/presets/design.json","utf8"));

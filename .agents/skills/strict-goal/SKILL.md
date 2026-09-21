@@ -33,7 +33,7 @@ Users can invoke either the full chain or a single targeted phase using English 
   - **適用対象**: 単一クラス、アルゴリズム、データ構造、APIエンドポイント、ユーティリティ、業務ロジック等の通常のソフトウェア設計。
   - **判定根拠**: 要求がインメモリや局所コンポーネントのロジック・仕様であり、「耐不正性（anti-gaming）」「自律実行ループ状態機械」「合否判定権の外部化」といったエージェント自律基盤のメタ要件を含まない場合。
   - **指定方法**: `loop_open` に `rubric_preset: "design"` を指定（汎用設計のデフォルト）。
-- **フルセット（ハーネス用 `design.harness` / 17基準: packaging, self_hosting, anti_gaming, verdict_ownership 等）**:
+- **フルセット（ハーネス用 `design.harness` / 18基準: packaging, self_hosting, anti_gaming, verdict_ownership, dependency_conformance 等）**:
   - **適用対象**: 自律エージェントループ、MCPサーバー、FSM状態機械、反復検証ハーネス、プロトコル基盤の設計。
   - **判定根拠**: エージェント基盤そのもののメタ要件（配布パッケージ仕様、第三者監査ログ、自己適用レビュー手順、モデル不正採点防止等）が必須となる場合。
   - **指定方法**: `loop_open` に `rubric_preset: "design.harness"` を指定。

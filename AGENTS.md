@@ -19,5 +19,5 @@ The following protocol applies **ONLY during `strict-goal` workflows** (e.g., re
   - `sg-implementer`: In-loop implementation supervisor (session lifecycle & worker coordination).
   - `sg-coder`: Standalone autonomous executor for smaller self-contained goals.
 - **State Externalization**: NEVER trace back through chat history. Determine state and next action solely from bounded triplet $(P, \Sigma_t, O_t)$ via `loop_state(projection: "skill_state")`.
-- **Autonomous Scope Selection**: On `strict-goal design`, select rubric at `loop_open` based on prompt boundaries: generic `design` (8 criteria) for software/classes, or `design.harness` (17 criteria) for agent/harness infrastructure.
+- **Autonomous Scope Selection**: On `strict-goal design`, select rubric at `loop_open` based on prompt boundaries: generic `design` (8 criteria) for software/classes, or `design.harness` (18 criteria) for agent/harness infrastructure.
 <!-- knowledge-kit:end section=agents-entry -->
