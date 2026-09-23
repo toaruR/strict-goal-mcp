@@ -18,6 +18,8 @@ export function assertEvidenceRequired(criterionId, evidence) {
 }
 
 // verification:"auto" の基準には command 根拠が最低1つ必要。
+// numeric_roundtrip 等「数式が本文に存在しない」非該当免除は、grep等で不在を確認した
+// command 根拠（exit_code:0）を提出すれば本チェックを満たす。専用の kind は用意しない。
 export function assertEvidenceKindForAuto(criterionId, verification, evidence) {
   if (verification !== 'auto') return;
   const hasCommand = evidence.some((e) => e.kind === 'command');
