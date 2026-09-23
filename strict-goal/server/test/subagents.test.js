@@ -13,7 +13,7 @@ const agentsDirs = [
 const canonicalAgentsDir = path.resolve(repoRoot, 'strict-goal', 'agents');
 // 正本 strict-goal/agents/ と配布コピーで内容一致が保証されているファイル。
 // 乖離解消が未完了のものは意図的に含めない。
-const syncedAgents = ['sg-worker', 'sg-verifier'];
+const syncedAgents = ['sg-worker', 'sg-verifier', 'sg-designer'];
 const skillFiles = [
   path.resolve(repoRoot, 'strict-goal', 'skills', 'strict-goal', 'SKILL.md'),
   ...(existsSync(path.resolve(repoRoot, '.claude', 'skills', 'strict-goal', 'SKILL.md'))
@@ -49,7 +49,7 @@ function parseFrontmatter(filePath) {
 }
 
 test('サブエージェント定義ファイルが存在し、正しいフロントマターを持つ (.agents & .claude)', () => {
-  const sgAgents = ['sg-coder', 'sg-implementer', 'sg-worker', 'sg-scout', 'sg-verifier'];
+  const sgAgents = ['sg-coder', 'sg-implementer', 'sg-worker', 'sg-scout', 'sg-verifier', 'sg-designer'];
   for (const dir of agentsDirs) {
     for (const name of sgAgents) {
       const file = path.resolve(dir, `${name}.md`);
@@ -59,6 +59,21 @@ test('サブエージェント定義ファイルが存在し、正しいフロ�
       assert.ok(meta.description && meta.description.length > 10);
       assert.ok(meta.tools && meta.tools.length > 0);
     }
+  }
+});
+
+test('sg-designer は設計監督者として Subagent / Agent および strict-goal ツールを持ち、設計反復手順を規定している', () => {
+  for (const dir of agentsDirs) {
+    const file = path.resolve(dir, 'sg-designer.md');
+    const { meta, body } = parseFrontmatter(file);
+    assert.match(meta.tools, /(Subagent|Agent)/i);
+    assert.match(meta.tools, /mcp__strict-goal__/);
+    assert.match(body, /loop_open/);
+    assert.match(body, /helper\.js/);
+    assert.match(body, /sg-verifier/);
+    assert.match(body, /design-draft/);
+    assert.match(body, /design-fix/);
+    assert.match(body, /FINAL/);
   }
 });
 
@@ -102,6 +117,7 @@ test('SKILL.md にサブエージェント委譲および階層型タスク委�
     const content = readFileSync(file, 'utf8');
     assert.match(content, /## Subagent Delegation for Implementation/);
     assert.match(content, /Hierarchical Task Delegation/);
+    assert.match(content, /sg-designer/);
     assert.match(content, /sg-implementer/);
     assert.match(content, /sg-worker/);
     assert.match(content, /sg-coder/);
@@ -115,6 +131,7 @@ test('CLAUDE.md と AGENTS.md にそれぞれ適切な Agents / Subagents 記述
   assert.match(claudeContent, /## (Strict-Goal & Subagents Protocol|Agents \/ Subagents)/);
   assert.match(claudeContent, /\.claude\/agents\//);
   assert.match(claudeContent, /Agent\(subagent_type=/);
+  assert.match(claudeContent, /sg-designer/);
   assert.match(claudeContent, /sg-implementer/);
   assert.match(claudeContent, /sg-worker/);
   assert.match(claudeContent, /sg-coder/);
@@ -123,6 +140,7 @@ test('CLAUDE.md と AGENTS.md にそれぞれ適切な Agents / Subagents 記述
   const agentsContent = readFileSync(agentsMdFile, 'utf8');
   assert.match(agentsContent, /## (Strict-Goal & Subagents Protocol|Agents \/ Subagents)/);
   assert.match(agentsContent, /\.agents\/agents\//);
+  assert.match(agentsContent, /sg-designer/);
   assert.match(agentsContent, /sg-implementer/);
   assert.match(agentsContent, /sg-worker/);
   assert.match(agentsContent, /sg-coder/);

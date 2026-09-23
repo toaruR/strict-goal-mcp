@@ -94,3 +94,46 @@ test('helper.js design-check: 3000文字を超える出力に対して末尾3000
   assert.equal(parsed.design_check_evidence.output_excerpt.length, 3000);
 });
 
+test('helper.js design-draft / design-fix: 設定なしで exit 2 (NO_CONFIG) を返す', () => {
+  const resDraft = runHelper(['design-draft', 'docs/test.md', 'test-task']);
+  assert.equal(resDraft.status, 2);
+  assert.match(resDraft.stderr, /NO_CONFIG/);
+
+  const resFix = runHelper(['design-fix', 'docs/test.md', 'test-fix']);
+  assert.equal(resFix.status, 2);
+  assert.match(resFix.stderr, /NO_CONFIG/);
+});
+
+test('helper.js design-draft / design-fix: STRICT_GOAL_CONFIG 指定時にテンプレートを展開して実行する', async () => {
+  const { writeFileSync, unlinkSync } = await import('node:fs');
+  const tmpConfig = path.resolve(__dirname, '..', '..', 'temp_strict_goal_config.json');
+  try {
+    writeFileSync(tmpConfig, JSON.stringify({
+      design: {
+        draft_command: 'node -e "process.stdout.write(\'DRAFT:\' + process.argv[1] + \':\' + process.argv[2])" {path} {prompt}',
+        fix_command: 'node -e "process.stdout.write(\'FIX:\' + process.argv[1] + \':\' + process.argv[2])" {path} {must_fix}',
+      }
+    }));
+
+    const env = { ...process.env, STRICT_GOAL_CONFIG: tmpConfig };
+    const resDraft = spawnSync(process.execPath, [helperPath, 'design-draft', 'docs/design-foo.md', 'my-task'], {
+      encoding: 'utf8',
+      cwd: path.resolve(__dirname, '..', '..'),
+      env,
+    });
+    assert.equal(resDraft.status, 0);
+    assert.equal(resDraft.stdout, 'DRAFT:docs/design-foo.md:my-task');
+
+    const resFix = spawnSync(process.execPath, [helperPath, 'design-fix', 'docs/design-foo.md', 'my-fix-instruction'], {
+      encoding: 'utf8',
+      cwd: path.resolve(__dirname, '..', '..'),
+      env,
+    });
+    assert.equal(resFix.status, 0);
+    assert.equal(resFix.stdout, 'FIX:docs/design-foo.md:my-fix-instruction');
+  } finally {
+    try { unlinkSync(tmpConfig); } catch {}
+  }
+});
+
+

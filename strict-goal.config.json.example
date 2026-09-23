@@ -1,0 +1,6 @@
+{
+  "design": {
+    "draft_command": "claude -p \"設計書を作成して {path} に保存してください。タスク: {prompt}\" --model opus-5.5 --dangerously-skip-permissions",
+    "fix_command": "claude -p \"{path} を読み込み、以下の指摘事項 (must_fix) を反映して修正してください。指摘事項: {must_fix}\" --model opus-5.5 --dangerously-skip-permissions"
+  }
+}

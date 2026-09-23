@@ -148,6 +148,41 @@ function runCommand(commandStr) {
   return { stdout, stderr, combined, exitCode };
 }
 
+function findConfigFile(baseDir = process.cwd()) {
+  if (process.env.STRICT_GOAL_CONFIG && existsSync(process.env.STRICT_GOAL_CONFIG)) {
+    return process.env.STRICT_GOAL_CONFIG;
+  }
+  const candidates = [
+    path.join(baseDir, 'strict-goal.config.json'),
+    path.join(baseDir, '.strict-goal', 'config.json'),
+  ];
+  for (const c of candidates) {
+    if (existsSync(c)) return c;
+  }
+  return null;
+}
+
+function loadDesignConfig(baseDir = process.cwd()) {
+  const configFile = findConfigFile(baseDir);
+  if (!configFile) return null;
+  try {
+    const raw = readFileSync(configFile, 'utf8');
+    const parsed = JSON.parse(raw);
+    return parsed.design || null;
+  } catch (err) {
+    console.error(`Warning: failed to read config file ${configFile}: ${err.message}`);
+    return null;
+  }
+}
+
+function formatCommandTemplate(template, vars) {
+  let result = template;
+  for (const [key, value] of Object.entries(vars)) {
+    result = result.replaceAll(`{${key}}`, value);
+  }
+  return result;
+}
+
 function main() {
   const args = process.argv.slice(2);
   const command = args[0];
@@ -173,6 +208,12 @@ Usage:
 
   node strict-goal/server/helper.js design-check <check command...>
     Runs check command and returns design_check_evidence JSON, propagating exit code.
+
+  node strict-goal/server/helper.js design-draft <path> "<prompt>"
+    Runs configured external design CLI to draft a design document. Exit code 2 if not configured.
+
+  node strict-goal/server/helper.js design-fix <path> "<must_fix>"
+    Runs configured external design CLI to apply must-fix remediation. Exit code 2 if not configured.
 `);
     process.exit(0);
   }
@@ -397,6 +438,52 @@ Usage:
       },
     };
     console.log(JSON.stringify(evidence, null, 2));
+    process.exit(res.exitCode);
+  } else if (command === 'design-draft') {
+    const docPath = args[1];
+    const prompt = args.slice(2).join(' ');
+    if (!docPath || !prompt) {
+      console.error('Usage: helper.js design-draft <path> "<prompt>"');
+      process.exit(1);
+    }
+    const designConfig = loadDesignConfig();
+    if (!designConfig || !designConfig.draft_command) {
+      console.error('NO_CONFIG: external design CLI draft_command not configured in strict-goal.config.json or .strict-goal/config.json');
+      process.exit(2);
+    }
+    const vars = {
+      path: docPath,
+      output_path: docPath,
+      prompt,
+      task: prompt,
+    };
+    const cmdStr = formatCommandTemplate(designConfig.draft_command, vars);
+    const res = runCommand(cmdStr);
+    if (res.stdout) process.stdout.write(res.stdout);
+    if (res.stderr) process.stderr.write(res.stderr);
+    process.exit(res.exitCode);
+  } else if (command === 'design-fix') {
+    const docPath = args[1];
+    const mustFix = args.slice(2).join(' ');
+    if (!docPath || !mustFix) {
+      console.error('Usage: helper.js design-fix <path> "<must_fix>"');
+      process.exit(1);
+    }
+    const designConfig = loadDesignConfig();
+    if (!designConfig || !designConfig.fix_command) {
+      console.error('NO_CONFIG: external design CLI fix_command not configured in strict-goal.config.json or .strict-goal/config.json');
+      process.exit(2);
+    }
+    const vars = {
+      path: docPath,
+      output_path: docPath,
+      must_fix: mustFix,
+      text: mustFix,
+    };
+    const cmdStr = formatCommandTemplate(designConfig.fix_command, vars);
+    const res = runCommand(cmdStr);
+    if (res.stdout) process.stdout.write(res.stdout);
+    if (res.stderr) process.stderr.write(res.stderr);
     process.exit(res.exitCode);
   } else {
     console.error(`Unknown command: ${command}`);

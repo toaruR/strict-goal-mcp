@@ -61,7 +61,7 @@ Never guess it (the server rejects a wrong guess with `E_UPSTREAM_DIGEST_MISMATC
   4. 状態復帰は過去の会話履歴を辿らず、サーバーから返される Canonical State $\Sigma_t$（`loop_state(projection: "skill_state")` の有界三つ組 $(P, \Sigma_t, O_t)$）のみを参照する。
 
 - **フェーズ別の委譲運用**:
-  - **`design`**: 親が LLM スコープ判定に基づき `design` または `design.harness` を選んで `loop_open`。初稿執筆および `must_fix` 修正を `sg-worker` に委譲。ドラフト完了後、採点・根拠抽出・`score_submit` は必ず `sg-verifier` に委譲する。
+  - **`design`**: `strict-goal design <instruction>` 実行時は、設計スーパーバイザー `sg-designer` へ委譲する（Claude Code: `Agent(subagent_type="sg-designer", prompt=...)`、Antigravity: `invoke_subagent`）。`sg-designer` は FSM ライフサイクル、外部CLI（設定ファイル `strict-goal.config.json` 等を `helper.js design-draft` / `design-fix` 経由で実行）または自律設計によるドラフト・修正、および `sg-verifier` による採点ループを統括する。**`design` フェーズ単独完了時（サーバが判定した結果が FINAL となった時点）は、下流（plan/implement）へ自動進行せず、確定した設計書パス（`docs/design-<topic>.md`）とダイジェストを親に報告して停止する**。
   - **`plan`**: 上流設計書をインプットに、タスク分解と DAG 作成を `sg-worker` に委譲。検証・採点は `sg-verifier` に委譲する。
   - **`implement`**: 以下のとおり階層委譲を実行する。
 

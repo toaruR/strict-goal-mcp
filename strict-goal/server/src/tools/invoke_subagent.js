@@ -3,9 +3,9 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 
 const RUNNER_COMMANDS = {
-  agy: process.platform === 'win32' ? 'agy.exe' : 'agy',
-  claude: process.platform === 'win32' ? 'claude.exe' : 'claude',
-  codex: process.platform === 'win32' ? 'codex.exe' : 'codex',
+  agy: 'agy',
+  claude: 'claude',
+  codex: 'codex',
 };
 
 function resolveAgentPrompt(agentType, workspaceDir) {
@@ -107,13 +107,14 @@ export function invokeSubagent({ input }) {
   const env = { ...process.env };
   delete env.NODE_TEST_CONTEXT; // Prevent node:test subagent suppression
 
+  const isWin = process.platform === 'win32';
   const res = spawnSync(runnerBin, args, {
     cwd: resolvedWorkspace,
     env,
     encoding: 'utf8',
     timeout: timeout_sec * 1000,
     maxBuffer: 20 * 1024 * 1024, // 20MB
-    shell: false,
+    shell: isWin,
   });
 
   const durationMs = Date.now() - startTime;

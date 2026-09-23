@@ -20,6 +20,7 @@ planモードで作成したマークダウンファイルは、<プロジェク
 The following protocol applies **ONLY during `strict-goal` workflows** (e.g., requests matching `strict-goal [design|plan|implement]` or within an active rubric loop). For standard non-strict-goal requests, execute directly as usual.
 - **Parent Role (Zero Direct Work)**: In strict-goal sessions, the parent agent acts strictly as a lightweight dispatcher. MUST NOT perform drafting, testing, hash calculation, scoring, or exploratory scripts directly to prevent $\mathcal{O}(T^2)$ token explosion.
 - **Subagent Delegation Matrix** (subagents defined under `.claude/agents/`, launch via `Agent(subagent_type="<name>", prompt=...)`):
+  - `sg-designer`: In-loop design supervisor (FSM lifecycle, external CLI / autonomous draft coordination, verifier scoring).
   - `sg-worker`: Draft & modify code/docs across all phases (`design`, `plan`, `implement`).
   - `sg-verifier`: Ephemeral verification, test execution, evidence extraction, and score submission.
   - `sg-scout`: Ephemeral codebase exploration (stateless inspection without context pollution).
@@ -65,4 +66,8 @@ The following protocol applies **ONLY during `strict-goal` workflows** (e.g., re
 - **階層サブエージェント実行時のクライアント別探索パスの注意点**: サブエージェント定義は Claude Code が `.claude/agents/`、Codex が `.codex/agents/*.toml`、Antigravity が `.agents/agents/` を参照する。環境ごとに適切なディレクトリへ配置・追跡する必要がある（詳細: `@docs/design-quantitative-evaluation.md`）。
 - **テスト実行環境・アサーション連動・モックに関する注意点**: `node --test` の引数罠（Windows/Node24）、並列ワーカー競合、ESM自動判定差、`subagents.test.js` / プリセット件数等のアサーション同期更新ルール（詳細: `@docs/testing.md`）
 - **AgentのBashツールはコマンドごとにcwdがリセットされる**: `cd` した状態は次のコマンド呼び出しに引き継がれない。ディレクトリ移動を伴うインストール・検証（例: `npx -p typescript tsc` の一時プロジェクトでの実行）は `cd <dir> && <install> && <run>` のように1コマンドにまとめること。
+- **Claude Code Desktop app (Code タブ) は `settings.json`/Windowsユーザー環境変数の `ANTHROPIC_BASE_URL` を無視する**: グローバル・プロジェクトどちらの `env.ANTHROPIC_BASE_URL` (headroom proxyへの向き先) を設定しても、Code タブが起動する子プロセスの実プロセス環境は常に `https://api.anthropic.com` に固定される（`[Environment]::GetEnvironmentVariable('ANTHROPIC_BASE_URL','Process')` で確認可）。VSCode拡張版・ターミナル版 `claude` CLI はこの `env` を尊重するため、headroom計測に差が出る。Code タブでheadroom等のGatewayを使うには、アプリ本体の「サードパーティ推論の設定 → 接続」で Gateway ベースURLを直接設定する必要がある。
+- **Gatewayの「認証情報の種類」＝インタラクティブサインインだと接続テストが赤のまま出ることがある**: headroom側のリクエストログでは200・`token_accounting_status: complete` で正常完了していても、Desktop app の「接続をテスト」表示は失敗のままになるケースを確認（Gateway併用時のOAuthサインイン検証にアプリ側の制限がある可能性）。「静的APIキー」はconsole.anthropic.comの生API課金キーが無いと起動失敗する（subscription契約ではキーを持たないため）。本命は「ヘルパースクリプト」＋ `claude setup-token`（subscription向け長期トークン発行コマンド）を組み合わせ、トークンを標準出力するスクリプトを指定する方式（`apiKeyHelper` と同じ規約）。※未検証、要実機確認。
+- **SKILL.md での `FINAL` 記述は `skill_md.test.js` の正規表現ゲートに合わせる**: `SKILL.md` 内に `FINAL` を含める場合、スキル自身が自称・宣言していないか検査されるため、「サーバが判定した結果が FINAL」「returns FINAL」など `isServerAuthority` に合致する厳密な定型句を用いること。
+- **Windows 上の Node.js `spawnSync` で `.cmd` を呼ぶ際は `shell: true` が必須**: Windows では拡張子なしコマンドや `.cmd` スクリプトを `shell: false` で起動すると `ENOENT` で失敗するため、OS 判定を行い `shell: true`（または `cmd.exe /c`）を指定すること。
 <!-- knowledge-kit:end section=gotchas -->
