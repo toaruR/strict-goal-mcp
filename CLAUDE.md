@@ -71,3 +71,4 @@ The following protocol applies **ONLY during `strict-goal` workflows** (e.g., re
 - **SKILL.md での `FINAL` 記述は `skill_md.test.js` の正規表現ゲートに合わせる**: `SKILL.md` 内に `FINAL` を含める場合、スキル自身が自称・宣言していないか検査されるため、「サーバが判定した結果が FINAL」「returns FINAL」など `isServerAuthority` に合致する厳密な定型句を用いること。
 - **Windows 上の Node.js `spawnSync` で `.cmd` を呼ぶ際は `shell: true` が必須**: Windows では拡張子なしコマンドや `.cmd` スクリプトを `shell: false` で起動すると `ENOENT` で失敗するため、OS 判定を行い `shell: true`（または `cmd.exe /c`）を指定すること。
 <!-- knowledge-kit:end section=gotchas -->
+- **`strict-goal.config.json` の `{prompt}` / `{must_fix}` を `"..."` に直埋めすると cmd.exe で壊れる**: 改行や `" & | < > ^ %` を含む値は引数分割が崩れる。外部CLIには標準入力（helper が常に値を stdin に流す）か `{prompt_file}` / `{must_fix_file}` / `{input_file}`（一時ファイルパス）で渡すこと。helper 呼び出し側も値に `-` を指定し heredoc で stdin から渡せる。

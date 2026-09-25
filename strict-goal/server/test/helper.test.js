@@ -136,4 +136,32 @@ test('helper.js design-draft / design-fix: STRICT_GOAL_CONFIG 指定時にテン
   }
 });
 
+test('helper.js design-draft / design-fix: 特殊文字・改行を含む値を stdin と {*_file} で壊さずに渡す', async () => {
+  const { writeFileSync, unlinkSync } = await import('node:fs');
+  const tmpConfig = path.resolve(__dirname, '..', '..', 'temp_strict_goal_config_stdin.json');
+  const tricky = '1. "quoted" & a | b < c > d ^ e %PATH%\n2. 二行目';
+  const echoStdin = 'node -e "process.stdin.pipe(process.stdout)"';
+  const echoFile = 'node -e "process.stdout.write(require(\'fs\').readFileSync(process.argv[1], \'utf8\'))"';
+  try {
+    writeFileSync(tmpConfig, JSON.stringify({
+      design: {
+        draft_command: `${echoFile} {prompt_file}`,
+        fix_command: echoStdin,
+      }
+    }));
+    const opts = { encoding: 'utf8', cwd: path.resolve(__dirname, '..', '..'), env: { ...process.env, STRICT_GOAL_CONFIG: tmpConfig } };
+
+    const resDraft = spawnSync(process.execPath, [helperPath, 'design-draft', 'docs/design-foo.md', tricky], opts);
+    assert.equal(resDraft.status, 0, resDraft.stderr);
+    assert.equal(resDraft.stdout, tricky);
+
+    // "-" 指定時は helper 自身が stdin から値を読む
+    const resFix = spawnSync(process.execPath, [helperPath, 'design-fix', 'docs/design-foo.md', '-'], { ...opts, input: tricky });
+    assert.equal(resFix.status, 0, resFix.stderr);
+    assert.equal(resFix.stdout, tricky);
+  } finally {
+    try { unlinkSync(tmpConfig); } catch {}
+  }
+});
+
 

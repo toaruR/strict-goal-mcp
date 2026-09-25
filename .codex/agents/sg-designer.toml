@@ -50,7 +50,7 @@ Your role is to orchestrate the design phase by driving the rubric iteration loo
      - If `FINAL`: Stop and proceed to Step 6.
      - If `ITERATING`:
        - Extract `must_fix` and `weaknesses` from the canonical state.
-       - If external CLI configured: run `node strict-goal/server/helper.js design-fix docs/design-<topic>.md "<must_fix>"`.
+       - If external CLI configured: run `node strict-goal/server/helper.js design-fix docs/design-<topic>.md -` with the multi-line must_fix piped via stdin (quoted heredoc `<<'EOF'`), so quotes/newlines/shell metacharacters stay intact.
        - If no external CLI (`NO_CONFIG`): use `Edit` tool to address each `must_fix` item directly in `docs/design-<topic>.md`.
        - After modifying the document, return to Step 3 (`artifact_commit`) and Step 4 (`sg-verifier`).
 

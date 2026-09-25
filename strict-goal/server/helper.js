@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { readFileSync, statSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, statSync, readdirSync, existsSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
@@ -123,7 +124,7 @@ function parseTestOutput(rawOutput, exitCode) {
   return { counts: { total, passed, failed, skipped }, tests };
 }
 
-function runCommand(commandStr) {
+function runCommand(commandStr, input) {
   const isWin = process.platform === 'win32';
   const shell = isWin ? 'cmd.exe' : '/bin/sh';
   const flag = isWin ? '/c' : '-c';
@@ -137,6 +138,7 @@ function runCommand(commandStr) {
     encoding: 'utf8',
     maxBuffer: 10 * 1024 * 1024,
     env,
+    ...(input !== undefined ? { input } : {}),
     ...(isWin ? { windowsVerbatimArguments: true } : {}),
   });
 
@@ -209,11 +211,13 @@ Usage:
   node strict-goal/server/helper.js design-check <check command...>
     Runs check command and returns design_check_evidence JSON, propagating exit code.
 
-  node strict-goal/server/helper.js design-draft <path> "<prompt>"
+  node strict-goal/server/helper.js design-draft <path> "<prompt>" | -
     Runs configured external design CLI to draft a design document. Exit code 2 if not configured.
+    "-" reads the prompt from stdin. The value is also piped to the CLI's stdin and written to {prompt_file}.
 
-  node strict-goal/server/helper.js design-fix <path> "<must_fix>"
+  node strict-goal/server/helper.js design-fix <path> "<must_fix>" | -
     Runs configured external design CLI to apply must-fix remediation. Exit code 2 if not configured.
+    "-" reads must_fix from stdin. The value is also piped to the CLI's stdin and written to {must_fix_file}.
 `);
     process.exit(0);
   }
@@ -439,49 +443,38 @@ Usage:
     };
     console.log(JSON.stringify(evidence, null, 2));
     process.exit(res.exitCode);
-  } else if (command === 'design-draft') {
+  } else if (command === 'design-draft' || command === 'design-fix') {
+    const isDraft = command === 'design-draft';
     const docPath = args[1];
-    const prompt = args.slice(2).join(' ');
-    if (!docPath || !prompt) {
-      console.error('Usage: helper.js design-draft <path> "<prompt>"');
+    let value = args.slice(2).join(' ');
+    if (value === '-') value = readFileSync(0, 'utf8');
+    if (!docPath || !value.trim()) {
+      console.error(isDraft
+        ? 'Usage: helper.js design-draft <path> "<prompt>"  (use "-" to read prompt from stdin)'
+        : 'Usage: helper.js design-fix <path> "<must_fix>"  (use "-" to read must_fix from stdin)');
       process.exit(1);
     }
+    const configKey = isDraft ? 'draft_command' : 'fix_command';
     const designConfig = loadDesignConfig();
-    if (!designConfig || !designConfig.draft_command) {
-      console.error('NO_CONFIG: external design CLI draft_command not configured in strict-goal.config.json or .strict-goal/config.json');
+    if (!designConfig || !designConfig[configKey]) {
+      console.error(`NO_CONFIG: external design CLI ${configKey} not configured in strict-goal.config.json or .strict-goal/config.json`);
       process.exit(2);
     }
-    const vars = {
-      path: docPath,
-      output_path: docPath,
-      prompt,
-      task: prompt,
-    };
-    const cmdStr = formatCommandTemplate(designConfig.draft_command, vars);
-    const res = runCommand(cmdStr);
-    if (res.stdout) process.stdout.write(res.stdout);
-    if (res.stderr) process.stderr.write(res.stderr);
-    process.exit(res.exitCode);
-  } else if (command === 'design-fix') {
-    const docPath = args[1];
-    const mustFix = args.slice(2).join(' ');
-    if (!docPath || !mustFix) {
-      console.error('Usage: helper.js design-fix <path> "<must_fix>"');
-      process.exit(1);
+    // 値を cmd.exe / sh のコマンドライン経由で渡すと、改行や " & | % 等で引数が壊れる。
+    // 一時ファイル ({*_file}) と標準入力の両方で渡せるようにし、テンプレート側で安全な経路を選べるようにする。
+    const tmpDir = mkdtempSync(path.join(tmpdir(), 'strict-goal-design-'));
+    const valueFile = path.join(tmpDir, isDraft ? 'prompt.txt' : 'must_fix.txt');
+    writeFileSync(valueFile, value, 'utf8');
+    const vars = isDraft
+      ? { path: docPath, output_path: docPath, prompt: value, task: value, prompt_file: valueFile, input_file: valueFile }
+      : { path: docPath, output_path: docPath, must_fix: value, text: value, must_fix_file: valueFile, input_file: valueFile };
+    const cmdStr = formatCommandTemplate(designConfig[configKey], vars);
+    let res;
+    try {
+      res = runCommand(cmdStr, value);
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
     }
-    const designConfig = loadDesignConfig();
-    if (!designConfig || !designConfig.fix_command) {
-      console.error('NO_CONFIG: external design CLI fix_command not configured in strict-goal.config.json or .strict-goal/config.json');
-      process.exit(2);
-    }
-    const vars = {
-      path: docPath,
-      output_path: docPath,
-      must_fix: mustFix,
-      text: mustFix,
-    };
-    const cmdStr = formatCommandTemplate(designConfig.fix_command, vars);
-    const res = runCommand(cmdStr);
     if (res.stdout) process.stdout.write(res.stdout);
     if (res.stderr) process.stderr.write(res.stderr);
     process.exit(res.exitCode);
