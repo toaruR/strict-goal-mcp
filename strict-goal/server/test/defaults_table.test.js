@@ -150,7 +150,7 @@ test('チェーン予算 chain_max_rounds は28', () => {
   assert.equal(defaults.CHAIN_MAX_ROUNDS, 28);
 });
 
-test('チェーン上乗せ chain_extra_rounds は6（人間承認で1回だけ）', () => {
+test('チェーン上乗せ chain_extra_rounds は6（新しい人間承認ごとに累積）', () => {
   assert.equal(defaults.CHAIN_EXTRA_ROUNDS, 6);
 });
 

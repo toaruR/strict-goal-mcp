@@ -52,15 +52,12 @@ export function assertKickbackBudget(chain) {
   }
 }
 
-// escalate(resolve, resolution:"continue") が呼ぶ想定。1チェーンにつき1回だけ効く。
+// escalate(resolve, resolution:"continue") が呼ぶ。新しい承認ごとに追加予算を累積する。
 export function grantExtraRounds(dataDir, chainId) {
   const chain = readChain(dataDir, chainId);
-  if (chain.granted_extra_rounds > 0) {
-    fail('E_RESOLUTION_NOT_APPLICABLE', 'extra rounds already granted for this chain', {
-      reason: 'extra_rounds_already_granted',
-    });
-  }
-  const updated = setGrantedExtraRounds(dataDir, chainId, chain.policy.chain_extra_rounds);
+  const updated = setGrantedExtraRounds(
+    dataDir, chainId, chain.granted_extra_rounds + chain.policy.chain_extra_rounds,
+  );
   appendEvent(dataDir, chainId, {
     at: new Date().toISOString(),
     type: 'extra_rounds_granted',

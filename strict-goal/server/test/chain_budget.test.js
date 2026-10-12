@@ -97,17 +97,20 @@ test('3 回目の escalate(action:"kickback")（が用いる契約）が E_CHAIN
   }
 });
 
-test('人間承認による chain_extra_rounds 6 の上乗せが同一チェーンで1回しか効かない', () => {
+test('人間承認による chain_extra_rounds 6 の上乗せを同一チェーンで累積できる', () => {
   const persistence = durablePersistence();
   const session = createSession(persistence, { loop_mode: 'design' });
 
-  const updated = grantExtraRounds(persistence.dir, session.chain_id);
-  assert.equal(updated.granted_extra_rounds, 6);
-
-  assert.throws(() => grantExtraRounds(persistence.dir, session.chain_id), {
-    code: 'E_RESOLUTION_NOT_APPLICABLE',
-    detail: { reason: 'extra_rounds_already_granted' },
-  });
+  for (const expectedExtra of [6, 12, 18]) {
+    const updated = grantExtraRounds(persistence.dir, session.chain_id);
+    assert.equal(updated.granted_extra_rounds, expectedExtra);
+    const persisted = readChain(persistence.dir, session.chain_id);
+    assert.equal(persisted.granted_extra_rounds, expectedExtra);
+    assert.equal(assertRoundBudget(persistence.dir, session.chain_id).limit, 28 + expectedExtra);
+    const grants = persisted.events.filter((event) => event.type === 'extra_rounds_granted');
+    assert.equal(grants.length, expectedExtra / 6);
+    assert.ok(grants.every((event) => event.amount === 6));
+  }
 });
 
 test('予算判定がチェーン内の全メンバーの round を合算する（単一セッションの値だけに依存しない）', () => {

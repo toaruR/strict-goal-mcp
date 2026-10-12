@@ -280,7 +280,7 @@ export function scoreSubmit({ input, persistence }) {
         }
       } else {
         if (chainBudgetExhausted) {
-          if (chainObj && (chainObj.granted_extra_rounds > 0 || chainRoundsCount > chainLimit)) {
+          if (chainRoundsCount > chainLimit) {
             fail('E_CHAIN_BUDGET_EXHAUSTED', 'chain round budget exhausted', chainBudgetDetail);
           }
           effectiveVerdict = 'REVISE';

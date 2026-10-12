@@ -14,6 +14,7 @@ import { loopOpenResume } from '../src/tools/loop_open_resume.js';
 import { handleToolsCall } from '../src/mcp/tools_call.js';
 import { validate } from '../src/schema/validate.js';
 import { TOOL_SCHEMAS } from '../src/schema/tools_schema.js';
+import { readChain } from '../src/chain/store.js';
 
 function tmpDataDir() {
   return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-escalate-'));
@@ -495,4 +496,45 @@ test('承認経路の違うMRTR返答は確認を消費せず、チャット返�
   assert.equal(readSessionRaw(persistence, created.session_id).state, 'ESCALATED');
   const result = escalate({ input: { session_id: created.session_id, submission_id: submissionId(), action: 'resolve', resolution: 'continue', escalation_id: pending.escalation.escalation_id, human_reply: '続行を承認します', note: NOTE }, persistence });
   assert.equal(result.state, 'DRAFTING');
+});
+
+test('MRTRの新しい続行承認ごとにチェーン予算を累積し、再送では二重加算しない', () => {
+  const persistence = durablePersistence();
+  const created = createSession(persistence, oneCriterionRubric());
+  let previousEscalationId;
+  for (const [index, round] of [28, 34, 40].entries()) {
+    const session = readSessionRaw(persistence, created.session_id);
+    session.round = round;
+    writeFileSync(sessionJsonPath(persistence, created.session_id), JSON.stringify(session, null, 2));
+    const pending = escalate({
+      input: { session_id: created.session_id, submission_id: submissionId(), action: 'request_human', note: NOTE },
+      persistence,
+      meta: { clientCapabilities: { elicitation: true } },
+    });
+    assert.equal(pending.resultType, 'input_required');
+    const input = { session_id: created.session_id, submission_id: submissionId(), action: 'request_human', note: NOTE };
+    const meta = {
+      clientCapabilities: { elicitation: true },
+      requestState: pending.requestState,
+      inputResponses: [{ resolution: 'continue', note: '追加予算による続行を承認します' }],
+    };
+    if (previousEscalationId) {
+      assert.throws(() => escalate({
+        input: { ...input, submission_id: submissionId() },
+        persistence,
+        meta: { ...meta, requestState: { escalation_id: previousEscalationId } },
+      }), { code: 'E_RESOLUTION_NOT_APPLICABLE' });
+    }
+    const resolved = escalate({ input, persistence, meta });
+    assert.equal(resolved.state, 'DRAFTING');
+    assert.equal(resolved.round, round + 1);
+    assert.equal(resolved.chain.limit, 28 + 6 * (index + 1));
+    assert.equal(resolved.chain.granted_extra_rounds, 6 * (index + 1));
+    assert.deepEqual(escalate({ input, persistence, meta }), resolved);
+    assert.equal(readSessionRaw(persistence, created.session_id).counters.extra_rounds_granted, 3 * (index + 1));
+    const chain = readChain(persistence.dir, readSessionRaw(persistence, created.session_id).chain_id);
+    assert.equal(chain.granted_extra_rounds, 6 * (index + 1));
+    assert.equal(chain.events.filter((event) => event.type === 'extra_rounds_granted').length, index + 1);
+    previousEscalationId = pending.requestState.escalation_id;
+  }
 });
