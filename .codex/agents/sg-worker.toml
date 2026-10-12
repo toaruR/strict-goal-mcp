@@ -1,4 +1,4 @@
-# knowledge-kit version=1.12.1 (sg-worker.md から自動生成。直接編集せずキット側を直すこと)
+# knowledge-kit version=1.13.0 (sg-worker.md から自動生成。直接編集せずキット側を直すこと)
 name = "sg-worker"
 description = "Grandchild worker for strict-goal implement. Implements a single plan task or must_fix item assigned by sg-implementer, passes all unit tests, and reports results back to the supervisor."
 model = "gpt-5.6-terra"

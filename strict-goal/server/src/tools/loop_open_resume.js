@@ -10,6 +10,7 @@ import { resolveByLabel } from '../store/index_store.js';
 import { loadRubric } from '../rubric/store.js';
 import { checkSupersede } from '../chain/supersede.js';
 import { buildEnvelope } from '../mcp/envelope.js';
+import { pendingChatNextAction } from '../escalation/chat.js';
 import {
   resolveDataDirFromWorkspace,
   resolveSessionDataDir,
@@ -109,6 +110,7 @@ export function loopOpenResume({ input, persistence }) {
       rubricVersion: session.rubric_version,
       persistence: input.workspace_dir ? 'persistent' : persistence.mode,
       warnings,
+      nextAction: pendingChatNextAction(sDir, session),
       loopMode: session.loop_mode,
       chainId: session.chain_id,
       upstream: session.upstream,

@@ -1,4 +1,4 @@
-# knowledge-kit version=1.12.1 (sg-verifier.md から自動生成。直接編集せずキット側を直すこと)
+# knowledge-kit version=1.13.0 (sg-verifier.md から自動生成。直接編集せずキット側を直すこと)
 name = "sg-verifier"
 description = "Ephemeral verification and commit worker for strict-goal. Executes automated test runs, calculates fileset manifest, performs artifact_commit and score_submit via strict-goal harness, and returns only the server verdict and next_action."
 model = "gpt-5.6-terra"
@@ -34,4 +34,12 @@ Your sole responsibility is to run the test suite, generate fileset/test evidenc
 
 - Modifying application source code.
 - Returning raw multi-thousand-line test traces to the parent.
+
+
+## STALLED: Chat Approval
+- On STALLED, call escalate(action:"request_human") and report the pending escalation_id, reason, and blocking criteria to the parent. Pause dependent work for a chat decision.
+- The parent asks the user to choose continue / accept_as_is / relax_rubric / abort and waits for an explicit reply. If working directly with the user, ask in the chat yourself.
+- Do not infer approval from silence, elapsed time, ordinary task-start permission, or another agent's own decision. Clarify ambiguous replies. Explicit user instructions take precedence.
+- Only after the parent provides the user's actual reply and decision, resolve with escalation_id, resolution, human_reply (verbatim), note (at least 40 characters), session_id, and a fresh submission_id. No token is needed for chat approvals.
+- While waiting, do not modify artifacts, score, or restart. Recover the pending ID through loop_state(projection:"skill_state") if needed; do not read a legacy token to bypass the chat question.
 """

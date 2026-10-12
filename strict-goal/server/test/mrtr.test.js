@@ -141,7 +141,7 @@ test('MRTR 対応クライアントは1往復で request_human を完結でき�
   assert.ok(!/[0-9a-f]{48}/.test(JSON.stringify(answer)));
 });
 
-test('MRTR 非対応クライアント（meta なし）は従来の token ファイル方式に縮退し、warnings に mrtr_unavailable が入る', () => {
+test('MRTR 非対応クライアント（meta なし）はチャット承認を使い、トークンを作らない', () => {
   const persistence = durablePersistence();
   const created = driveToStalled(persistence);
 
@@ -151,19 +151,15 @@ test('MRTR 非対応クライアント（meta なし）は従来の token ファ
   });
 
   assert.equal(result.state, 'ESCALATED');
-  assert.ok(result.warnings.includes('mrtr_unavailable'));
-  assert.ok(existsSync(result.escalation.token_path));
+  assert.deepEqual(result.warnings, []);
+  assert.equal(result.escalation.channel, 'chat');
+  assert.equal(result.escalation.token_path, undefined);
 
   const escId = result.escalation.escalation_id;
   const dir = escalationsDir(persistence, created.session_id);
   const realToken = readdirSync(dir).includes(`${escId}.token`);
-  assert.ok(realToken);
-  assert.ok(!JSON.stringify(result).includes(readTokenValue(dir, escId)));
+  assert.equal(realToken, false);
 });
-
-function readTokenValue(dir, escId) {
-  return readFileSync(path.join(dir, `${escId}.token`), 'utf8').trim();
-}
 
 test('clientCapabilities.elicitation が無い meta は非対応クライアントとして扱われる', () => {
   const persistence = durablePersistence();
@@ -176,5 +172,6 @@ test('clientCapabilities.elicitation が無い meta は非対応クライアン�
   });
 
   assert.equal(result.state, 'ESCALATED');
-  assert.ok(result.warnings.includes('mrtr_unavailable'));
+  assert.equal(result.escalation.channel, 'chat');
+  assert.deepEqual(result.warnings, []);
 });

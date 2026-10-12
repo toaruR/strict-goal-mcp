@@ -9,6 +9,7 @@ import { computeChainRounds } from '../chain/budget.js';
 import { checkSupersede } from '../chain/supersede.js';
 import { artifactStoredPath } from '../artifact/store.js';
 import { buildEnvelope } from '../mcp/envelope.js';
+import { pendingChatNextAction } from '../escalation/chat.js';
 import { projectSkillState } from '../skill_state/projector.js';
 
 const DEFAULT_INCLUDE = ['rubric', 'history', 'last_scores', 'must_fix'];
@@ -141,6 +142,7 @@ export function loopState({ input, persistence }) {
     rubricVersion: session.rubric_version,
     persistence: persistence.mode,
     warnings,
+    nextAction: pendingChatNextAction(sDir, session),
     loopMode: session.loop_mode,
     chainId: session.chain_id,
     task: session.task,

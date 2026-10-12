@@ -44,6 +44,11 @@ function currentEscalationId(sDir) {
   return `esc_${String(Math.max(...nums)).padStart(2, '0')}`;
 }
 
+export function readCurrentEscalation(sDir) {
+  const escalationId = currentEscalationId(sDir);
+  return escalationId ? readJson(jsonPath(sDir, escalationId)) : null;
+}
+
 export function createEscalation(sDir, { reason, summaryForHuman, channel = 'token_file', detail }) {
   const dir = escalationsDir(sDir);
   fs.mkdirSync(dir, { recursive: true });
@@ -70,7 +75,7 @@ export function createEscalation(sDir, { reason, summaryForHuman, channel = 'tok
 
 // §18.3 MRTR 経路。往復がプロトコルの input_required/inputResponses で完結するため、
 // トークンファイルを一切作らない（human_token 自体が不要）。
-export function createMrtrEscalation(sDir, { reason, summaryForHuman }) {
+export function createMrtrEscalation(sDir, { reason, summaryForHuman, channel = 'mrtr' }) {
   const dir = escalationsDir(sDir);
   fs.mkdirSync(dir, { recursive: true });
   const escalationId = nextEscalationId(sDir);
@@ -78,7 +83,7 @@ export function createMrtrEscalation(sDir, { reason, summaryForHuman }) {
     escalation_id: escalationId,
     created_at: new Date().toISOString(),
     reason,
-    channel: 'mrtr',
+    channel,
     ...(summaryForHuman ? { summary_for_human: summaryForHuman } : {}),
     consumed: false,
     consumed_at: null,
@@ -92,17 +97,20 @@ export function createMrtrEscalation(sDir, { reason, summaryForHuman }) {
 // MRTR 往復の2回目。inputResponses で運ばれた resolution をそのまま適用する
 // （human_token との照合は行わない。channel が "mrtr" でない、または既に消費済み／
 // 存在しない escalation_id を指す場合は E_TOKEN_INVALID）。
-export function resolveMrtrEscalation(sDir, escalationId, { resolution }) {
+export function resolveMrtrEscalation(sDir, escalationId, { resolution, channel = 'mrtr', humanReply }) {
+  const errorCode = channel === 'chat' ? 'E_RESOLUTION_NOT_APPLICABLE' : 'E_TOKEN_INVALID';
   const path_ = jsonPath(sDir, escalationId);
   if (!fs.existsSync(path_)) {
-    fail('E_TOKEN_INVALID', 'no such escalation for this session', { escalation_id: escalationId });
+    fail(errorCode, 'no such escalation for this session', { escalation_id: escalationId });
   }
   const record = readJson(path_);
-  if (record.channel !== 'mrtr' || record.consumed) {
-    fail('E_TOKEN_INVALID', 'escalation is not a pending MRTR round-trip', { escalation_id: escalationId });
+  if (record.channel !== channel || record.consumed || escalationId !== currentEscalationId(sDir)) {
+    fail(errorCode, 'escalation is not an active approval request for this channel', { escalation_id: escalationId });
   }
   const consumedAt = new Date().toISOString();
-  const updated = { ...record, consumed: true, consumed_at: consumedAt, resolution };
+  const updated = { ...record, consumed: true, consumed_at: consumedAt, resolution,
+    ...(humanReply !== undefined ? { human_reply: humanReply } : {}),
+  };
   writeJson(path_, updated);
   return updated;
 }

@@ -1,4 +1,4 @@
-# knowledge-kit version=1.12.1 (sg-scout.md から自動生成。直接編集せずキット側を直すこと)
+# knowledge-kit version=1.13.0 (sg-scout.md から自動生成。直接編集せずキット側を直すこと)
 name = "sg-scout"
 description = "Ephemeral exploration worker for strict-goal. Investigates codebase and files for an assigned task without polluting parent context with raw file content, returning only summarized findings."
 model = "gpt-5.6-terra"

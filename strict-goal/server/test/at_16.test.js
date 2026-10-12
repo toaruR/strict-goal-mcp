@@ -333,7 +333,7 @@ test('AT-16: チェーン予算の超過（28周上限、不合格時ESCALATED�
     input: {
       session_id: sessionCCC,
       submission_id: subId(),
-      action: 'request_human',
+      action: 'request_human', approval_channel: 'token_file',
       note: 'チェーン予算超過後の2回目の人間介入要求テスト用ノートです。十分な文字数を確保するための説明文を追加します。',
     },
     persistence,

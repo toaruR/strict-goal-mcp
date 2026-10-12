@@ -295,7 +295,7 @@ expectCode('escalate', 'E_STATE_VIOLATION', () => {
 expectCode('escalate', 'E_TOKEN_INVALID', () => {
   const persistence = durablePersistence();
   const created = createDesignSession(persistence);
-  escalate({ input: { session_id: created.session_id, submission_id: submissionId(), action: 'request_human', note: NOTE }, persistence });
+  escalate({ input: { session_id: created.session_id, submission_id: submissionId(), action: 'request_human', approval_channel: 'token_file', note: NOTE }, persistence });
   escalate({
     input: { session_id: created.session_id, submission_id: submissionId(), action: 'resolve', resolution: 'continue', human_token: 'wrong-token-wrong-token-wrong-token', note: NOTE },
     persistence,

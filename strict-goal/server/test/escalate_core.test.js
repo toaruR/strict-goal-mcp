@@ -9,6 +9,11 @@ import { scoreSubmit } from '../src/tools/score_submit.js';
 import { rubricAmend } from '../src/tools/rubric_amend.js';
 import { escalate } from '../src/tools/escalate.js';
 import { createEscalation, consumeToken } from '../src/escalation/token.js';
+import { loopState } from '../src/tools/loop_state.js';
+import { loopOpenResume } from '../src/tools/loop_open_resume.js';
+import { handleToolsCall } from '../src/mcp/tools_call.js';
+import { validate } from '../src/schema/validate.js';
+import { TOOL_SCHEMAS } from '../src/schema/tools_schema.js';
 
 function tmpDataDir() {
   return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-escalate-'));
@@ -131,12 +136,82 @@ function readEscalationToken(persistence, sessionId, escalationId) {
   return readFileSync(tokenFile, 'utf8').trim();
 }
 
+function requestChatApproval(persistence, sessionId) {
+  return escalate({ input: { session_id: sessionId, submission_id: submissionId(), action: 'request_human', note: NOTE }, persistence });
+}
+
+test('STALLEDのMCP呼出しはチャット承認待ちになり、再取得・resumeでも確認IDと待機指示を返す', () => {
+  const persistence = durablePersistence();
+  const created = driveToStalled(persistence);
+  const response = handleToolsCall({ name: 'escalate', arguments: {
+    session_id: created.session_id, submission_id: submissionId(), action: 'request_human', note: NOTE,
+  } }, { persistence });
+  assert.notEqual(response.isError, true);
+  const pending = response.structuredContent;
+  validate(TOOL_SCHEMAS.escalate.output.properties.escalation, pending.escalation);
+  assert.equal(pending.state, 'ESCALATED');
+  assert.equal(pending.escalation.channel, 'chat');
+  assert.equal(pending.escalation.token_path, undefined);
+  assert.deepEqual(pending.warnings, []);
+  const dir = path.join(persistence.dir, 'sessions', created.session_id, 'escalations');
+  assert.equal(readdirSync(dir).some(name => name.endsWith('.token')), false);
+  assert.equal(pending.next_action.input_skeleton.escalation_id, pending.escalation.escalation_id);
+  assert.match(pending.next_action.instruction, /Wait for an explicit user reply/);
+  const state = loopState({ input: { session_id: created.session_id, projection: 'skill_state' }, persistence });
+  assert.deepEqual(state.next_action, pending.next_action);
+  const resumed = loopOpenResume({ input: { mode: 'resume', session_id: created.session_id, submission_id: submissionId() }, persistence });
+  assert.deepEqual(resumed.next_action, pending.next_action);
+  assert.equal(readSessionRaw(persistence, created.session_id).state, 'ESCALATED');
+});
+
+for (const [resolution, expectedState] of [['continue', 'DRAFTING'], ['accept_as_is', 'FINAL_WITH_RELAXATION'], ['relax_rubric', 'SCORING'], ['abort', 'ABORTED']]) {
+  test(`チャット返答を記録して${resolution}を反映し、同じ確認を再利用できない`, () => {
+    const persistence = durablePersistence();
+    const created = driveToStalled(persistence);
+    const pending = requestChatApproval(persistence, created.session_id);
+    const input = {
+      session_id: created.session_id, submission_id: submissionId(), action: 'resolve',
+      escalation_id: pending.escalation.escalation_id, resolution, human_reply: 'この選択で進めてください', note: NOTE,
+    };
+    const result = escalate({ input, persistence });
+    validate(TOOL_SCHEMAS.escalate.output.properties.escalation, result.escalation);
+    assert.equal(result.state, expectedState);
+    const record = JSON.parse(readFileSync(path.join(persistence.dir, 'sessions', created.session_id, 'escalations', `${input.escalation_id}.json`), 'utf8'));
+    assert.equal(record.human_reply, input.human_reply);
+    assert.equal(record.resolution, resolution);
+    assert.equal(record.consumed, true);
+    assert.ok(record.consumed_at);
+    if (resolution === 'continue') {
+      const nextPending = requestChatApproval(persistence, created.session_id);
+      assert.notEqual(nextPending.escalation.escalation_id, input.escalation_id);
+      assert.throws(() => escalate({ input: { ...input, submission_id: submissionId() }, persistence }), { code: 'E_RESOLUTION_NOT_APPLICABLE' });
+      assert.equal(readSessionRaw(persistence, created.session_id).state, 'ESCALATED');
+    } else {
+      assert.throws(() => escalate({ input: { ...input, submission_id: submissionId() }, persistence }));
+    }
+  });
+}
+
+test('返答なし・空白・確認IDなし・別確認ID・トークンとの混在は承認として扱わない', () => {
+  const persistence = durablePersistence();
+  const created = driveToStalled(persistence);
+  const pending = requestChatApproval(persistence, created.session_id);
+  const base = { session_id: created.session_id, action: 'resolve', resolution: 'continue', escalation_id: pending.escalation.escalation_id, human_reply: '続けて', note: NOTE };
+  for (const patch of [{ human_reply: undefined }, { human_reply: '   ' }, { escalation_id: undefined }, { human_token: 'x'.repeat(24) }]) {
+    assert.throws(() => escalate({ input: { ...base, ...patch, submission_id: submissionId() }, persistence }), { code: 'E_VALIDATION' });
+  }
+  assert.throws(() => escalate({ input: { ...base, escalation_id: 'esc_99', submission_id: submissionId() }, persistence }), { code: 'E_RESOLUTION_NOT_APPLICABLE' });
+  assert.equal(readSessionRaw(persistence, created.session_id).state, 'ESCALATED');
+  const record = JSON.parse(readFileSync(path.join(persistence.dir, 'sessions', created.session_id, 'escalations', `${base.escalation_id}.json`), 'utf8'));
+  assert.equal(record.consumed, false);
+});
+
 test('STALLED で request_human を呼ぶと ESCALATED になり token ファイルが作られ、応答にトークン値が含まれない', () => {
   const persistence = durablePersistence();
   const created = driveToStalled(persistence);
 
   const result = escalate({
-    input: { session_id: created.session_id, submission_id: submissionId(), action: 'request_human', note: NOTE },
+    input: { session_id: created.session_id, submission_id: submissionId(), action: 'request_human', approval_channel: 'token_file', note: NOTE },
     persistence,
   });
 
@@ -152,7 +227,7 @@ test('誤った human_token の resolve は E_TOKEN_INVALID になり state は 
   const persistence = durablePersistence();
   const created = driveToStalled(persistence);
   escalate({
-    input: { session_id: created.session_id, submission_id: submissionId(), action: 'request_human', note: NOTE },
+    input: { session_id: created.session_id, submission_id: submissionId(), action: 'request_human', approval_channel: 'token_file', note: NOTE },
     persistence,
   });
 
@@ -217,7 +292,7 @@ test('resolve/accept_as_is で ESCALATED から FINAL_WITH_RELAXATION になり�
   const created = createSession(persistence, oneCriterionRubric());
 
   const escalated = escalate({
-    input: { session_id: created.session_id, submission_id: submissionId(), action: 'request_human', note: NOTE },
+    input: { session_id: created.session_id, submission_id: submissionId(), action: 'request_human', approval_channel: 'token_file', note: NOTE },
     persistence,
   });
   assert.equal(escalated.state, 'ESCALATED');

@@ -5,6 +5,7 @@ import { checkStateTransition } from '../fsm/guard.js';
 import { readSession, sessionDir, sessionExists } from '../store/session_store.js';
 import { persistSession } from '../store/persist.js';
 import { createEscalation, createMrtrEscalation, resolveMrtrEscalation, consumeToken, recordSystemEvent } from '../escalation/token.js';
+import { createChatEscalation, resolveChatEscalation, pendingChatNextAction } from '../escalation/chat.js';
 import { checkSupersede } from '../chain/supersede.js';
 import { chainExists, readChain } from '../chain/store.js';
 import { grantExtraRounds, effectiveRoundLimit, computeChainRounds } from '../chain/budget.js';
@@ -35,7 +36,8 @@ function toEscalationInfo(record, tokenPath) {
   return {
     escalation_id: record.escalation_id,
     created_at: record.created_at,
-    token_path: tokenPath,
+    ...(record.channel !== undefined ? { channel: record.channel } : {}),
+    ...(tokenPath !== undefined ? { token_path: tokenPath } : {}),
     reason: record.reason,
     ...(record.summary_for_human ? { summary_for_human: record.summary_for_human } : {}),
   };
@@ -44,8 +46,13 @@ function toEscalationInfo(record, tokenPath) {
 // 入力スキーマの allOf 条件分岐(§6.4.6)は共有 validate() が対応しないキーワードのため、
 // ここで手動検査する(score_submit.js の weakness 検査と同じ理由。CLAUDE.md ハマりポイント参照)。
 function assertActionInputs(input) {
-  if (input.action === 'resolve' && (!input.resolution || !input.human_token)) {
-    fail('E_VALIDATION', 'resolve requires resolution and human_token', { path: '$.resolution|$.human_token' });
+  if (input.action === 'resolve' && (!input.resolution ||
+    (!input.human_token && (!input.escalation_id || !input.human_reply?.trim())))) {
+    fail('E_VALIDATION', 'resolve requires resolution and either escalation_id + human_reply or human_token',
+      { path: '$.resolution|$.escalation_id|$.human_reply' });
+  }
+  if (input.action === 'resolve' && input.human_token && (input.escalation_id || input.human_reply !== undefined)) {
+    fail('E_VALIDATION', 'resolve must use a single approval channel');
   }
   if (input.action === 'reopen' && !input.human_token) {
     fail('E_VALIDATION', 'reopen requires human_token', { path: '$.human_token' });
@@ -130,7 +137,7 @@ export function escalate({ input, persistence, meta }) {
           : 'manual_request';
         const summaryForHuman = buildSummaryForHuman(session);
 
-        if (clientSupportsMrtr(meta)) {
+        if (clientSupportsMrtr(meta) && !input.approval_channel) {
           const { escalationId, record } = createMrtrEscalation(sDir, { reason, summaryForHuman });
           session.state = 'ESCALATED';
           session.updated_at = new Date().toISOString();
@@ -138,18 +145,27 @@ export function escalate({ input, persistence, meta }) {
           return buildElicitationRequest(escalationId, record.summary_for_human);
         }
 
-        const { tokenPath, record } = createEscalation(sDir, { reason, summaryForHuman, channel: 'token_file' });
+        if (input.approval_channel === 'token_file') {
+          const { tokenPath, record } = createEscalation(sDir, { reason, summaryForHuman, channel: 'token_file' });
+          escalationInfo = toEscalationInfo(record, tokenPath);
+          mrtrUnavailable = true;
+        } else {
+          const { record } = createChatEscalation(sDir, { reason, summaryForHuman });
+          escalationInfo = toEscalationInfo(record);
+        }
         session.state = 'ESCALATED';
-        escalationInfo = toEscalationInfo(record, tokenPath);
-        mrtrUnavailable = true;
       }
     } else if (input.action === 'resolve') {
       if (session.state !== 'ESCALATED') {
         fail('E_RESOLUTION_NOT_APPLICABLE', 'resolve is only valid in ESCALATED', { state: session.state });
       }
-      const consumed = consumeToken(sDir, input.human_token, { resolution: input.resolution });
+      const consumed = input.human_token
+        ? consumeToken(sDir, input.human_token, { resolution: input.resolution })
+        : resolveChatEscalation(sDir, input.escalation_id, {
+          resolution: input.resolution, humanReply: input.human_reply,
+        });
       chainInfo = applyResolution(session, input.resolution, consumed.escalation_id, dataDir);
-      escalationInfo = toEscalationInfo(consumed, '');
+      escalationInfo = toEscalationInfo(consumed, consumed.channel === 'chat' ? undefined : '');
     } else if (input.action === 'abort') {
       const reason = session.last_evaluation?.verdict_reason ?? 'manual_abort';
       const { tokenPath, record } = recordSystemEvent(sDir, { reason, resolution: 'abort' });
@@ -198,6 +214,7 @@ export function escalate({ input, persistence, meta }) {
       rubricVersion: session.rubric_version,
       persistence: persistence.mode,
       warnings: mrtrUnavailable ? ['mrtr_unavailable'] : [],
+      nextAction: pendingChatNextAction(sDir, session),
       escalation: escalationInfo,
       reopened: session.reopened,
       chain: chainInfo,

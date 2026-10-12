@@ -92,7 +92,13 @@ function defaultNextAction(state, ctx = {}) {
   if (state === 'DRAFTING') {
     return { tool: 'artifact_commit', input_skeleton: artifactCommitSkeleton(sessionId, round, requiredAddress, budgetBytes) };
   }
-  if (state === 'STALLED' || state === 'ESCALATED') {
+  if (state === 'STALLED') {
+    return { tool: 'escalate', input_skeleton: {
+      session_id: sessionId ?? '<session_id>', submission_id: '<fresh_submission_id>',
+      action: 'request_human', note: '<stalled reason and decision requested, at least 40 characters>',
+    } };
+  }
+  if (state === 'ESCALATED') {
     return { tool: 'escalate', input_skeleton: { session_id: sessionId ?? '<session_id>', action: '<resolve|request_human|rebase|kickback|reopen>' } };
   }
   return { tool: 'loop_state', input_skeleton: { session_id: sessionId ?? null } };

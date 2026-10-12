@@ -124,7 +124,7 @@ test('AT-4: 改善が続かず3周でSTALLED、STALLED中の commit は拒否、
 
   // 2. escalate(request_human) → ESCALATED、トークンはファイルのみ・応答本文には出ない
   const escalated = escalate({
-    input: { session_id: created.session_id, submission_id: submissionId(), action: 'request_human', note: NOTE },
+    input: { session_id: created.session_id, submission_id: submissionId(), action: 'request_human', approval_channel: 'token_file', note: NOTE },
     persistence,
   });
   assert.equal(escalated.state, 'ESCALATED');

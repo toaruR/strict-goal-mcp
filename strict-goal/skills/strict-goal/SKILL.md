@@ -1,6 +1,6 @@
 ---
 name: strict-goal
-description: Enforces iterative rubric validation until the server returns a passing verdict. Use for strict-goal design, plan, or implement requests (設計・計画・実装), or "/strict-goal" followed by a goal.
+description: Run strict-goal design, plan, or implement workflows with iterative fixes until the server returns a passing verdict. Use for strict-goal or /strict-goal requests, including Japanese mode names; handle STALLED decisions through explicit chat approval.
 ---
 <!-- knowledge-kit version=1.12.0 (自動調整済み: 移植先固有の書き換えあり) -->
 
@@ -193,3 +193,17 @@ Degraded-mode requirements per mode:
 - implement — same as above, plus always attach test run results (command, exit code, count). Do
   not assert this artifact is safe to merge or deploy. Explicitly request human review.
   Never claim FINAL yourself.
+
+
+## STALLED: Chat Approval
+When the server reports STALLED, call escalate(action:"request_human", approval_channel:"chat") to enter ESCALATED.
+The ordinary MCP path uses chat approval: no token file or user copy/paste is needed.
+Show the reason, blocking criteria, and choices (continue / accept_as_is / relax_rubric / abort) in chat, then WAIT for an explicit user reply to that decision.
+Ordinary permission to start the task, silence, or elapsed time is not approval. If the reply does not identify a choice, clarify it; do not choose for the user.
+After a clear reply, call escalate(action:"resolve", escalation_id:<pending ID>, resolution:<chosen action>, human_reply:<verbatim user reply>, note:<decision explanation of at least 40 characters>, submission_id:<fresh ID>, session_id:<session ID>).
+Record the exact user reply, not an agent-written claim of approval. Do not change artifacts, score, or restart while waiting.
+Subagents report the pending confirmation ID, reason, and blocking criteria to the parent and wait. The parent handles the chat question and passes the user's explicit reply and decision back before resolution.
+If context is lost, loop_state(projection:"skill_state") or loop_open(mode:"resume") returns the pending confirmation ID in next_action.
+The server checks the pending ID and records the reply; it does not authenticate the speaker. Explicit user instructions take precedence over this workflow.
+Legacy token approvals remain available only when explicitly requested with approval_channel:"token_file" or when resolving an existing token-based request; do not read tokens to bypass chat confirmation.
+See docs/chat-approval.md for the STALLED flow and compatibility boundaries.

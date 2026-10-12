@@ -91,7 +91,7 @@ Every round records artifact snapshots, diffs, self-scores, rationale, evidence 
 | `artifact_commit` | Commit full artifact content or fileset for the round | `session_id`, `expected_round`, `change_note`, `content` or `files`, `addresses` |
 | `score_submit` | Submit self-evaluations across all rubric criteria | `session_id`, `scores` (`[{ criterion_id, score, rationale, weakness, evidence }]`) |
 | `rubric_amend` | Amend rubric criteria or pass thresholds under strict policy | `session_id`, `reason` (>=40 chars), `amendments` |
-| `escalate` | Request human guidance, upstream rebase, or kickback | `session_id`, `action` (`request_human` / `rebase` / `kickback`), `human_token` |
+| `escalate` | Request human guidance ([chat approval](docs/chat-approval.md)), upstream rebase, or kickback | `session_id`, `action`; chat resolution: `escalation_id`, `resolution`, `human_reply` |
 | `audit_export` | Export cryptographic audit JSON for compliance and verification | `session_id`, `scope` (`session` / `chain`), `include_artifacts` |
 | `invoke_subagent` | Execute an ephemeral subagent in an isolated child session and retrieve results | `prompt`, `agent_type`, `runner` (`"auto"` / `"agy"` / `"claude"` / `"codex"`), `workspace_dir`, `timeout_sec` |
 

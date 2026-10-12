@@ -118,9 +118,11 @@
 | `artifact_commit` | 成果物（Markdown文字列、JSON、ファイルパス参照、またはfilesetマニフェスト）のコミット | `session_id`, `expected_round`, `change_note`, `content` または `source_path` または `files`, `addresses`, `test_inventory` | `state`, `artifact_digest`, `diff`, `warnings`, `next_action: "score_submit"` |
 | `score_submit` | ルーブリック全基準に対する採点・理由・弱点・エビデンスの提出 | `session_id`, `expected_round`, `artifact_digest`, `scores` (`[{ criterion_id, score, rationale, weakness, evidence }]`) | `verdict` (`ITERATING` / `FINAL` / `REVISE`), `weighted_mean`, `min_score`, `must_fix`, `next_action`, `escalation`, `warnings` |
 | `rubric_amend` | 基準や閾値の変更（40文字以上の理由と緩和ログ記録） | `session_id`, `reason`, `amendments` (`add`, `modify`, `remove`) | `state`, `rubric_version`, `rubric_diff`, `is_final_reachable` |
-| `escalate` | 人間への支援要請、上流リベース、キックバック、セッション再開 | `session_id`, `action` (`request_human` / `rebase` / `kickback` / `resolve` / `abort`), `human_token` | `state`, `escalation_id`, `resolution`, `chain` |
+| `escalate` | 人間への支援要請、上流リベース、キックバック、セッション再開 | `session_id`, `action`; チャット承認は `escalation_id`, `resolution`, `human_reply`、既存経路は `human_token` | `state`, `escalation_id`, `resolution`, `chain` |
 | `audit_export` | 改ざん検知可能な監査 JSON（セッション単位またはチェーン全体）の出力 | `session_id`, `scope` (`session` / `chain`), `include_artifacts`, `include_rejected`, `include_diffs` | `export` (`path`, `sha256`, `schema`) |
 | `invoke_subagent` | 孤立した子セッションでエフェメラルなサブエージェントを実行し結果を取得 | `prompt`, `agent_type`, `runner` (`"auto"` / `"agy"` / `"claude"` / `"codex"`), `workspace_dir`, `timeout_sec` | `ok`, `output`, `conversation_id`, `subagent_session_id`, `exit_code`, `duration_ms` |
+
+STALLED時の標準承認はチャットでの明示的な返答を待ち、確認ID・返答原文・判断を記録する方式とする（[手順・互換性](chat-approval.md)）。
 
 - **監査スキーマ識別子 (URN)**:
   - 単体セッション監査: `urn:strict-goal:schema:audit:v1`
