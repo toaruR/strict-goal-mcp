@@ -75,7 +75,7 @@ export function createEscalation(sDir, { reason, summaryForHuman, channel = 'tok
 
 // §18.3 MRTR 経路。往復がプロトコルの input_required/inputResponses で完結するため、
 // トークンファイルを一切作らない（human_token 自体が不要）。
-export function createMrtrEscalation(sDir, { reason, summaryForHuman, channel = 'mrtr' }) {
+export function createMrtrEscalation(sDir, { reason, summaryForHuman, channel = 'mrtr', detail }) {
   const dir = escalationsDir(sDir);
   fs.mkdirSync(dir, { recursive: true });
   const escalationId = nextEscalationId(sDir);
@@ -85,6 +85,7 @@ export function createMrtrEscalation(sDir, { reason, summaryForHuman, channel = 
     reason,
     channel,
     ...(summaryForHuman ? { summary_for_human: summaryForHuman } : {}),
+    ...(detail !== undefined ? { detail } : {}),
     consumed: false,
     consumed_at: null,
     token_read_at: null,

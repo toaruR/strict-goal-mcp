@@ -124,6 +124,8 @@
 
 STALLED時の標準承認はチャットでの明示的な返答を待ち、確認ID・返答原文・判断を記録する方式とする（[手順・互換性](chat-approval.md)）。
 
+`kickback` も `escalation_id` と `human_reply` で承認できる。`request_human` に `target_criteria` を渡すと差し戻し専用の確認を作り、同じ対象基準と明示的な返答で実行する。差し戻し用のチャット承認要求に限り `FINAL` / `FINAL_WITH_RELAXATION` からも受け付ける。
+
 - **監査スキーマ識別子 (URN)**:
   - 単体セッション監査: `urn:strict-goal:schema:audit:v1`
   - 連鎖監査: `urn:strict-goal:schema:audit-chain:v1`

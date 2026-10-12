@@ -34,4 +34,18 @@
 
 サーバーは確認ID・返答の存在・未消費状態を検査し、返答原文と選択を保存する。返答の発言者認証は行わず、実際にユーザーへ確認して待つ責任はエージェントの手順に置く。
 
-旧トークン方式は `request_human` に `approval_channel:"token_file"` を指定した場合、および既存のトークンを持つセッションとの互換用に残す。MRTR対応経路は維持し、明示的に `approval_channel:"chat"` を指定すればチャット方式を使用できる。自動的な基準緩和承認の既存経路や `reopen` / `kickback` は今回の変更範囲外。
+旧トークン方式は `request_human` に `approval_channel:"token_file"` を指定した場合、および既存のトークンを持つセッションとの互換用に残す。MRTR対応経路は維持し、明示的に `approval_channel:"chat"` を指定すればチャット方式を使用できる。自動的な基準緩和承認の既存経路や `reopen` は変更範囲外。
+
+## kickbackのチャット承認
+
+差し戻しには `human_token` の代わりに `escalation_id` と `human_reply` を渡せる。`target_criteria` は引き続き必須。
+
+1. `escalate(action:"request_human", approval_channel:"chat", target_criteria:["対象の上流基準ID"], ...)` で差し戻し用の確認を作成する。この用途に限り `FINAL` / `FINAL_WITH_RELAXATION` からも承認待ちに移行できる。
+2. 親エージェントが上流の問題・差し戻す基準をチャットで提示し、ユーザーの明示的な返答を待つ。この間、上流は変更しない。
+3. 許可後に `escalate(action:"kickback", escalation_id:"返された確認ID", human_reply:"返答原文", target_criteria:["同じ上流基準ID"], ...)` を呼ぶ。
+
+成功すると確認を消費し、返答原文と `resolution:"kickback"` を監査記録に保存して、上流を `DRAFTING`、下流を `FROZEN` にする。保留中の確認ID・kickbackの入力例は `loop_state` / `loop_open(mode:"resume")` でも取得できる。
+
+確認IDの不一致、空の返答、確認時と異なる対象基準、チャットとトークンの混在は拒否する。上流不在や差し戻し予算超過も、確認を消費する前に検査する。差し戻し用の確認を通常の `resolve(continue)` に流用することはできない。中止を選ぶ場合は `resolve(resolution:"abort")` で下流セッションを終了できる。
+
+`DRAFTING` などで通常の `request_human` が作ったチャット確認も、ユーザーが差し戻しを許可した場合はkickbackに使用できる。旧 `human_token` を渡すkickbackの動作は維持する。

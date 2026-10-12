@@ -30,8 +30,8 @@ function buildKickbackMustFix(upstreamSDir, upstreamRubricVersion, targetCriteri
 }
 
 // §19.4。下流からの差し戻し: 上流を FINAL -> DRAFTING に再オープンし、下流を FROZEN にする。
-// human_token の消費(E_TOKEN_INVALID)は呼び出し元(escalate.js)が resolve と同じ経路で行う。
-export function performKickback(dataDir, session, { targetCriteria, note }) {
+// Validate before consuming a chat approval so failed preconditions leave the request pending.
+export function prepareKickback(dataDir, session, { targetCriteria, note }) {
   const upstreamSessionId = session.upstream?.session_id;
   if (!upstreamSessionId) {
     fail('E_UPSTREAM_NOT_FOUND', 'session has no upstream to kick back to', { session_id: session.session_id });
@@ -45,6 +45,14 @@ export function performKickback(dataDir, session, { targetCriteria, note }) {
 
   const upstreamSession = readSession(dataDir, upstreamSessionId);
   const upstreamSDir = sessionDir(dataDir, upstreamSessionId);
+  const mustFix = upstreamSession.last_evaluation
+    ? buildKickbackMustFix(upstreamSDir, upstreamSession.rubric_version, targetCriteria, note)
+    : undefined;
+  return { upstreamSessionId, upstreamSession, mustFix };
+}
+
+export function performKickback(dataDir, session, { targetCriteria, note, prepared = prepareKickback(dataDir, session, { targetCriteria, note }) }) {
+  const { upstreamSessionId, upstreamSession, mustFix } = prepared;
   const previousFinalDigest = upstreamSession.current_artifact?.digest ?? null;
   const now = new Date().toISOString();
 
@@ -55,12 +63,7 @@ export function performKickback(dataDir, session, { targetCriteria, note }) {
     { at: now, by: 'kickback', from_session: session.session_id, reason: note, previous_final_digest: previousFinalDigest },
   ];
   if (upstreamSession.last_evaluation) {
-    upstreamSession.last_evaluation.must_fix = buildKickbackMustFix(
-      upstreamSDir,
-      upstreamSession.rubric_version,
-      targetCriteria,
-      note,
-    );
+    upstreamSession.last_evaluation.must_fix = mustFix;
   }
   upstreamSession.updated_at = now;
   persistSession(dataDir, upstreamSession);

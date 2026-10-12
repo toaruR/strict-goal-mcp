@@ -1,6 +1,6 @@
 ---
 name: strict-goal
-description: Run strict-goal design, plan, or implement workflows with iterative fixes until the server returns a passing verdict. Use for strict-goal or /strict-goal requests, including Japanese mode names; handle STALLED decisions through explicit chat approval.
+description: Run strict-goal design, plan, or implement workflows with iterative fixes until the server returns a passing verdict. Use for strict-goal or "/strict-goal" requests, including Japanese mode names; handle STALLED and upstream kickback decisions through explicit chat approval.
 ---
 <!-- knowledge-kit version=1.12.0 (自動調整済み: 移植先固有の書き換えあり) -->
 
@@ -137,7 +137,11 @@ In chained runs (`design` → `plan` → `implement`) or complex projects, **del
    - In implement, command evidence must always include target_digest (the digest returned by
      the most recent artifact_commit).
    - Tip: run `node strict-goal/server/helper.js test-run "<test command>"` to run tests and output test_inventory and command evidence JSON.
-5. If the server returns FINAL, that phase is complete. If chained, advance to the next mode linking the upstream digest. If the server returns ITERATING, resolve must_fix and go back to step 3. The server alone determines FINAL; never claim FINAL yourself.
+5. Dispatch by the returned state and next_action:
+- If the server returns FINAL, the phase is complete. If chained, advance to the next mode linking the upstream digest. The server alone determines FINAL; never claim FINAL yourself.
+- If the server returns ITERATING, resolve must_fix and go back to step 3.
+- If the server reports STALLED, follow Chat Approval below; do not continue editing or scoring automatically.
+- If the session is ESCALATED, recover the pending next_action and wait for the user's explicit decision. Use its action (resolve or kickback); do not substitute resolve for every approval.
 
 ## When Upstream Changes
 
@@ -147,9 +151,10 @@ need re-scoring — fix only those. Don't redo everything.
 
 ## When Upstream Is Flawed
 
-Don't paper over it downstream. Propose
-escalate{action:"kickback", target_criteria:[…], note:"description of the flaw"} and request
-human approval. Your session is frozen and resumes once upstream is fixed.
+Don't paper over an upstream flaw downstream. Identify the upstream target_criteria and describe why a kickback is needed.
+Follow the Kickback branch of Chat Approval below: request_human with approval_channel:"chat" and target_criteria, then wait for the user's reply through the parent.
+After explicit approval, use the returned kickback input skeleton, preserving escalation_id and target_criteria and adding the user's verbatim human_reply.
+The server records and consumes that confirmation, reopens the upstream, and freezes the downstream until the upstream is fixed. An ordinary resolve(continue) cannot authorize this kickback.
 
 ## Checking Version
 
@@ -195,15 +200,35 @@ Degraded-mode requirements per mode:
   Never claim FINAL yourself.
 
 
-## STALLED: Chat Approval
-When the server reports STALLED, call escalate(action:"request_human", approval_channel:"chat") to enter ESCALATED.
-The ordinary MCP path uses chat approval: no token file or user copy/paste is needed.
-Show the reason, blocking criteria, and choices (continue / accept_as_is / relax_rubric / abort) in chat, then WAIT for an explicit user reply to that decision.
-Ordinary permission to start the task, silence, or elapsed time is not approval. If the reply does not identify a choice, clarify it; do not choose for the user.
-After a clear reply, call escalate(action:"resolve", escalation_id:<pending ID>, resolution:<chosen action>, human_reply:<verbatim user reply>, note:<decision explanation of at least 40 characters>, submission_id:<fresh ID>, session_id:<session ID>).
-Record the exact user reply, not an agent-written claim of approval. Do not change artifacts, score, or restart while waiting.
-Subagents report the pending confirmation ID, reason, and blocking criteria to the parent and wait. The parent handles the chat question and passes the user's explicit reply and decision back before resolution.
-If context is lost, loop_state(projection:"skill_state") or loop_open(mode:"resume") returns the pending confirmation ID in next_action.
-The server checks the pending ID and records the reply; it does not authenticate the speaker. Explicit user instructions take precedence over this workflow.
-Legacy token approvals remain available only when explicitly requested with approval_channel:"token_file" or when resolving an existing token-based request; do not read tokens to bypass chat confirmation.
-See docs/chat-approval.md for the STALLED flow and compatibility boundaries.
+## Chat Approval: STALLED and Kickback
+
+### Shared rules
+
+- Every escalate call requires session_id, a fresh submission_id, action, and note (40-4000 characters). Use the actual session ID; do not execute a short example note literally.
+- Use approval_channel:"chat" when creating a chat confirmation. No token file or user copy/paste is needed.
+- The session owner requests approval and reports escalation_id, reason, and the proposed decision to the parent. The parent asks the user in chat and passes back the actual reply and decision. When working directly with the user, ask in the same chat yourself.
+- Wait for an explicit reply to the presented decision. Ordinary task-start permission, silence, elapsed time, or another agent's own decision is not approval. A short "yes" is sufficient only when the question identifies one action; clarify a reply that does not select an action.
+- Set human_reply to the user's reply verbatim, not an agent-written claim of approval. While waiting, do not modify artifacts, score, or restart.
+- After context loss, call loop_state(projection:"skill_state") or loop_open(mode:"resume"). The pending next_action.input_skeleton retains the confirmation ID and action. Do not create a replacement confirmation or choose a different action merely because context was lost.
+- Fill the pending input skeleton only after receiving the reply, replace its submission_id with a fresh ID, and supply a note of at least 40 characters. If no reply is available, remain in approval wait.
+- The server checks and consumes the pending ID and records the reply; it does not authenticate the speaker. Explicit user instructions take precedence over these steps.
+
+### STALLED
+
+1. Call escalate with action:"request_human", approval_channel:"chat", session_id, a fresh submission_id, and note describing the stalled reason. Omit target_criteria: supplying it would request a kickback instead.
+2. Present the stalled reason, blocking criteria, and choices: continue / accept_as_is / relax_rubric / abort. Wait for the user to choose.
+3. After a clear reply, call escalate with action:"resolve", the pending escalation_id, the chosen resolution, human_reply, session_id, a fresh submission_id, and note. This branch does not require target_criteria or human_token.
+
+### Kickback
+
+If an ordinary chat confirmation is already pending and the user explicitly approves a kickback, reuse that escalation_id with action:kickback and the approved target_criteria instead of creating another request. Do not call request_human again while ESCALATED; a kickback-specific pending confirmation still requires its original target_criteria.
+
+1. Call escalate with action:"request_human", approval_channel:"chat", target_criteria containing the upstream criterion IDs, session_id, a fresh submission_id, and note describing the flaw. This creates a kickback-specific confirmation, including after the server returns FINAL / FINAL_WITH_RELAXATION.
+2. Present the upstream flaw and proposed target_criteria in chat and wait for explicit permission to kick back. The upstream remains unchanged while the confirmation is pending.
+3. After approval, call escalate with action:"kickback", the returned escalation_id, human_reply, the same target_criteria, session_id, a fresh submission_id, and note. Do not supply human_token or a normal resolution value; use the returned kickback skeleton.
+4. On success, the server records resolution:"kickback" and the verbatim reply, consumes the confirmation, reopens the upstream into DRAFTING, and freezes the downstream into FROZEN. Follow the upstream repair and rebase flow before continuing downstream work.
+5. If the user explicitly chooses to terminate the downstream session, call resolve with resolution:"abort" and that reply. Do not infer permission to terminate from a simple refusal to kick back. A kickback-specific confirmation cannot be resolved with continue / accept_as_is / relax_rubric.
+
+Do not change the target_criteria after confirmation or reuse a consumed ID. Wrong IDs, empty replies, changed criteria, mixed chat/token inputs, missing upstreams, and exhausted kickback budgets are rejected; precondition failures leave the confirmation pending.
+Legacy token-based sessions and explicitly requested legacy kickback inputs remain supported. Never read a token to bypass a chat question, and never combine human_token with escalation_id + human_reply.
+See docs/chat-approval.md for examples and compatibility boundaries.

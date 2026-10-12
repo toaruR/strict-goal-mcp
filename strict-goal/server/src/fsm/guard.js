@@ -14,7 +14,7 @@ function violation(state, tool, expectedTools) {
   return err;
 }
 
-export function checkStateTransition(state, tool, { action } = {}) {
+export function checkStateTransition(state, tool, { action, approvalAction } = {}) {
   const table = TOOL_PERMISSIONS[state];
   if (!table) {
     const err = new Error(`unknown state: ${state}`);
@@ -27,7 +27,8 @@ export function checkStateTransition(state, tool, { action } = {}) {
     throw violation(state, tool, allowedTools(state));
   }
 
-  if (tool === 'escalate' && permission.actions && action && !permission.actions.includes(action)) {
+  const effectiveAction = action === 'request_human' && approvalAction === 'kickback' ? 'kickback' : action;
+  if (tool === 'escalate' && permission.actions && action && !permission.actions.includes(effectiveAction)) {
     throw violation(state, tool, allowedTools(state));
   }
 
