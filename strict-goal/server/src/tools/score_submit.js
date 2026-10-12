@@ -18,7 +18,7 @@ import { computeWeightedMean, computeMinScore, nextRoundsWithoutImprovement, dec
 import { checkScoreInflation, checkScoreJump, checkEvidenceStale } from '../judge/anti_gaming.js';
 import { checkTestNotGreen } from '../implement/test_inventory.js';
 import { recordAcceptedRound, recordRejectedSubmission } from '../judge/round_store.js';
-import { createEscalation } from '../escalation/token.js';
+import { createChatEscalation, pendingChatNextAction } from '../escalation/chat.js';
 import { checkSupersede } from '../chain/supersede.js';
 import { chainExists, readChain } from '../chain/store.js';
 import { computeChainRounds, effectiveRoundLimit } from '../chain/budget.js';
@@ -336,14 +336,15 @@ export function scoreSubmit({ input, persistence }) {
       let escalationInfo;
       // 緩和承認待ちや予算超過等の自動 ESCALATED（§7.1 手順12）
       if (session.state === 'ESCALATED') {
-        const { record: escRecord, tokenPath } = createEscalation(sDir, escalationData ?? {
-          reason: effectiveVerdictReason,
+        const { record: escRecord } = createChatEscalation(sDir, {
+          reason: escalationData?.reason ?? effectiveVerdictReason,
           summaryForHuman: { rounds: scoredRound, weighted_mean_trend: [weightedMeanValue], blocking_criteria: mustFix.map((m) => m.criterion_id) },
+          ...(escalationData?.detail ? { detail: escalationData.detail } : {}),
         });
         escalationInfo = {
           escalation_id: escRecord.escalation_id,
           created_at: escRecord.created_at,
-          token_path: tokenPath,
+          channel: 'chat',
           reason: escRecord.reason,
           ...(escalationData?.detail ? { detail: escalationData.detail } : {}),
           ...(escRecord.summary_for_human ? { summary_for_human: escRecord.summary_for_human } : {}),
@@ -351,6 +352,7 @@ export function scoreSubmit({ input, persistence }) {
       }
 
       return buildEnvelope({
+        nextAction: pendingChatNextAction(sDir, session),
         ok: true,
         sessionId: session.session_id,
         state: session.state,

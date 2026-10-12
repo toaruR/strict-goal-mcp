@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadRubric } from '../rubric/store.js';
 import { sessionDir } from '../store/session_store.js';
+import { pendingChatNextAction } from '../escalation/chat.js';
 
 const ALLOWED_TOOLS_BY_STATE = {
   DRAFTING: ['loop_open', 'loop_state', 'artifact_commit', 'rubric_amend', 'escalate', 'audit_export'],
@@ -93,6 +94,12 @@ export function projectSkillState({ dataDir, session }) {
       summary: `Session ready in ${session.state}`,
       details: {},
     };
+  }
+
+  const approvalAction = pendingChatNextAction(sDir, session);
+  if (approvalAction) {
+    recentObservation.summary = 'Human approval pending. Wait for the explicit user reply before applying the next action.';
+    recentObservation.details.next_action = approvalAction;
   }
 
   return {

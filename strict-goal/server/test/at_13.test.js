@@ -1,3 +1,4 @@
+import { approvalFields } from './helpers/chat-approval.js';
 // AT-13: 差し戻し（implement → plan）。docs/design-rubric-loop-mcp.md §13 AT-13。
 // implement(fileset)はartifact_commitに未結線のため、kickback.test.jsと同じdesign/planの2セッション
 // チェーンでkickback/budget機構そのもの(下流→上流の差し戻し・凍結・上限)を検証する。
@@ -30,7 +31,6 @@ function submissionId() {
 }
 
 const NOTE = 'T004 が T007 の成果物を前提にしているが依存が逆向きで実装順に並べると失敗する';
-const HUMAN_TOKEN = 'human-approval-token-placeholder';
 const DESIGN_CONTENT = '# 設計\n実装は完全に動作することを実行ログで確認したという記録がある。';
 const DESIGN_EXCERPT = '実装は完全に動作することを実行ログで確認したという記録がある。';
 const PLAN_CONTENT = JSON.stringify({
@@ -178,7 +178,7 @@ function kickback(persistence, sessionId) {
       session_id: sessionId,
       submission_id: submissionId(),
       action: 'kickback',
-      human_token: HUMAN_TOKEN,
+      ...approvalFields(persistence, sessionId, { action: 'kickback', targetCriteria: ['dependency_soundness'], note: NOTE }),
       target_criteria: ['dependency_soundness'],
       note: NOTE,
     },

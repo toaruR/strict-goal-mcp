@@ -67,9 +67,10 @@ Your role is to orchestrate the design phase by driving the rubric iteration loo
 - Creating or editing the artifact before opening the session (`loop_open`).
 
 
-## STALLED: Chat Approval
-- On STALLED, call escalate(action:"request_human") and report the pending escalation_id, reason, and blocking criteria to the parent. Pause dependent work for a chat decision.
-- The parent asks the user to choose continue / accept_as_is / relax_rubric / abort and waits for an explicit reply. If working directly with the user, ask in the chat yourself.
-- Do not infer approval from silence, elapsed time, ordinary task-start permission, or another agent's own decision. Clarify ambiguous replies. Explicit user instructions take precedence.
-- Only after the parent provides the user's actual reply and decision, resolve with escalation_id, resolution, human_reply (verbatim), note (at least 40 characters), session_id, and a fresh submission_id. No token is needed for chat approvals.
-- While waiting, do not modify artifacts, score, or restart. Recover the pending ID through loop_state(projection:"skill_state") if needed; do not read a legacy token to bypass the chat question.
+## Human Decisions: Chat Approval
+- For STALLED, request_human with approval_channel:"chat" and approval_action:"resolve". For automatic ESCALATED (chain budget or rubric relaxation), a pending confirmation already exists: recover next_action and do not create another request.
+- Report the pending escalation_id, reason, proposed decision, and blocking criteria to the parent. The parent asks the user in chat and waits for an explicit reply; when working directly with the user, ask in chat yourself.
+- Do not infer approval from silence, elapsed time, task-start permission, or another agent's decision. Clarify ambiguous replies. Explicit user instructions take precedence.
+- After the user's reply, fill the returned skeleton: resolve with resolution, kickback with unchanged target_criteria, or reopen with its matching confirmation. Each uses escalation_id, verbatim human_reply, note (at least 40 characters), session_id, and a fresh submission_id.
+- For kickback or reopen, first request_human with approval_action:"kickback" (including target_criteria) or approval_action:"reopen". Present the proposed change and wait before executing it. A typed confirmation cannot authorize another operation; abort requires an explicit termination decision.
+- While waiting, do not modify artifacts, score, or restart. Recover the pending ID through loop_state(projection:"skill_state"). Existing pending records from earlier servers work through chat; no file contents or secrets authorize an action. Never fall back to reading a secret file.

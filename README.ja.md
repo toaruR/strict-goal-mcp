@@ -62,7 +62,7 @@ LLMエージェントがプロンプト内の自己反省（「段階的に考�
 
 - **ダイジェストのピン留め**: 下流セッションは開始時に上流セッションIDとその成果物ダイジェストを記録します。
 - **リベース (Rebase)**: 上流成果物が改訂された場合、下流セッションは自動的に `SUPERSEDED`（無効化）となります。`escalate(action: "rebase")` を実行すると、差分から影響を受けた基準のみを特定して再採点対象とします（最初からやり直す必要はありません）。
-- **キックバック (Kickback)**: 実装中に上流仕様の重大な欠陥を発見した場合、下流で辻褄を合わせず `escalate(action: "kickback")` を提起します。セッションは凍結され、人間の承認トークンと上流の修正を要求します。
+- **キックバック (Kickback)**: 実装中に上流仕様の欠陥を発見した場合、`request_human(approval_action: "kickback", target_criteria)` でチャット承認を求めます。返答後に `kickback(escalation_id, human_reply, target_criteria)` を実行すると、上流を再開し下流セッションを凍結します。
 
 ### 3. サーバー側アンチゲーミングとガードレール
 
@@ -90,7 +90,7 @@ LLMエージェントがプロンプト内の自己反省（「段階的に考�
 | `artifact_commit` | 周回の成果物全文（Markdown等）または fileset のコミット | `session_id`, `expected_round`, `change_note`, `content` または `files`, `addresses` |
 | `score_submit` | ルーブリック全基準に対する自己評価・理由・弱点・根拠の提出 | `session_id`, `scores` (`[{ criterion_id, score, rationale, weakness, evidence }]`) |
 | `rubric_amend` | 厳格なポリシーと40文字以上の理由ログを伴う基準・閾値の変更 | `session_id`, `reason` (40文字以上), `amendments` |
-| `escalate` | 人間への支援要請、上流リベース、上流への差し戻し（キックバック） | `session_id`, `action` (`request_human` / `rebase` / `kickback`), `human_token` |
+| `escalate` | 人間への支援要請（[チャット承認](docs/chat-approval.md)）、上流リベース、差し戻し、再開 | `session_id`, `action`; 全ての承認: `escalation_id`, `human_reply`; resolveには`resolution`、kickbackには`target_criteria`も必要 |
 | `audit_export` | 検証用監査JSON（セッション単位またはチェーン全体）の出力 | `session_id`, `scope` (`session` / `chain`), `include_artifacts` |
 | `invoke_subagent` | 孤立した子セッションでエフェメラルなサブエージェントを実行し結果を取得 | `prompt`, `agent_type`, `runner` (`"auto"` / `"agy"` / `"claude"` / `"codex"`), `workspace_dir`, `timeout_sec` |
 

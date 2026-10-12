@@ -87,10 +87,7 @@ function scoreOnce(persistence, sessionId, expectedRound, digest) {
   });
 }
 
-function readEscalationToken(persistence, sessionId, escalationId) {
-  const tokenFile = path.join(persistence.dir, 'sessions', sessionId, 'escalations', `${escalationId}.token`);
-  return readFileSync(tokenFile, 'utf8').trim();
-}
+
 
 function readSessionRaw(persistence, sessionId) {
   return JSON.parse(readFileSync(path.join(persistence.dir, 'sessions', sessionId, 'session.json'), 'utf8'));
@@ -122,16 +119,16 @@ test('AT-4: 改善が続かず3周でSTALLED、STALLED中の commit は拒否、
     },
   );
 
-  // 2. escalate(request_human) → ESCALATED、トークンはファイルのみ・応答本文には出ない
+  // 2. escalate(request_human) → ESCALATED、確認IDとチャット返答で承認する
   const escalated = escalate({
-    input: { session_id: created.session_id, submission_id: submissionId(), action: 'request_human', approval_channel: 'token_file', note: NOTE },
+    input: { session_id: created.session_id, submission_id: submissionId(), action: 'request_human', approval_channel: 'chat', note: NOTE },
     persistence,
   });
   assert.equal(escalated.state, 'ESCALATED');
-  const realToken = readEscalationToken(persistence, created.session_id, escalated.escalation.escalation_id);
-  assert.ok(!JSON.stringify(escalated).includes(realToken));
 
-  // 3. 誤った human_token は E_TOKEN_INVALID、state は ESCALATED のまま
+
+
+  // 3. 誤った確認ID は E_RESOLUTION_NOT_APPLICABLE、state は ESCALATED のまま
   assert.throws(
     () =>
       escalate({
@@ -140,22 +137,22 @@ test('AT-4: 改善が続かず3周でSTALLED、STALLED中の commit は拒否、
           submission_id: submissionId(),
           action: 'resolve',
           resolution: 'continue',
-          human_token: 'wrong-token-wrong-token-wrong-token',
+          escalation_id: 'esc_99', human_reply: '続けて',
           note: NOTE,
         },
         persistence,
       }),
-    { code: 'E_TOKEN_INVALID' },
+    { code: 'E_RESOLUTION_NOT_APPLICABLE' },
   );
 
-  // 4. 正しい human_token で resolve/continue → DRAFTING に戻り停滞カウンタがリセットされる
+  // 4. 正しい確認ID で resolve/continue → DRAFTING に戻り停滞カウンタがリセットされる
   const resolved = escalate({
     input: {
       session_id: created.session_id,
       submission_id: submissionId(),
       action: 'resolve',
       resolution: 'continue',
-      human_token: realToken,
+      escalation_id: escalated.escalation.escalation_id, human_reply: 'この操作を承認します',
       note: NOTE,
     },
     persistence,

@@ -4,7 +4,7 @@ import { readJson } from '../store/atomic.js';
 import { readSession, sessionDir, sessionExists } from '../store/session_store.js';
 import { readChain } from '../chain/store.js';
 import { computeChainRounds } from '../chain/budget.js';
-import { listEscalations } from '../escalation/token.js';
+import { listEscalations } from '../escalation/approval.js';
 import { sha256Hex } from '../hash/digest.js';
 import { buildRubricVersions, buildRounds, buildRejectedSubmissions } from './session_v1.js';
 import { AUDIT_VERSION_CHAIN } from '../config/defaults.js';

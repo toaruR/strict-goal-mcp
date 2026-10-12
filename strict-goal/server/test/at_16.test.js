@@ -306,8 +306,8 @@ test('AT-16: チェーン予算の超過（28周上限、不合格時ESCALATED�
   ]);
 
   // Step 2: escalate resolve continue で +6 上乗せ (limit 28 -> 34)
-  const tokenPath = path.join(dataDir, 'sessions', sessionCCC, 'escalations', 'esc_01.token');
-  const token1 = readFileSync(tokenPath, 'utf8').trim();
+  assert.equal(scoreFailRes.escalation.channel, 'chat');
+  assert.equal(scoreFailRes.next_action.input_skeleton.escalation_id, 'esc_01');
 
   const resolveContinue1 = escalate({
     input: {
@@ -315,7 +315,7 @@ test('AT-16: チェーン予算の超過（28周上限、不合格時ESCALATED�
       submission_id: subId(),
       action: 'resolve',
       resolution: 'continue',
-      human_token: token1,
+      escalation_id: 'esc_01', human_reply: '続行を承認します',
       note: 'あと少しで通る見込みであるため続行を承認する。40文字以上の詳細な説明文である。',
     },
     persistence,
@@ -333,13 +333,12 @@ test('AT-16: チェーン予算の超過（28周上限、不合格時ESCALATED�
     input: {
       session_id: sessionCCC,
       submission_id: subId(),
-      action: 'request_human', approval_channel: 'token_file',
+      action: 'request_human', approval_channel: 'chat',
       note: 'チェーン予算超過後の2回目の人間介入要求テスト用ノートです。十分な文字数を確保するための説明文を追加します。',
     },
     persistence,
   });
-  const token2Path = path.join(dataDir, 'sessions', sessionCCC, 'escalations', 'esc_02.token');
-  const token2 = readFileSync(token2Path, 'utf8').trim();
+
 
   assert.throws(
     () =>
@@ -349,7 +348,7 @@ test('AT-16: チェーン予算の超過（28周上限、不合格時ESCALATED�
           submission_id: subId(),
           action: 'resolve',
           resolution: 'continue',
-          human_token: token2,
+          escalation_id: 'esc_02', human_reply: '続行を承認します',
           note: '2回目の続行承認を試行する。40文字以上の詳細な説明文を確実に確保して要件を満たすように記述しています。',
         },
         persistence,

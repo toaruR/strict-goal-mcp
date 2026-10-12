@@ -1,3 +1,4 @@
+import { approvalFields } from './helpers/chat-approval.js';
 // T073: 失敗モード F11-F20（設計書 §2 の表）の対策が実際に効くことを検査する。
 // F18 は checkDesignRefs（src/artifact/design_refs.js）が artifact_commit から未結線
 // （CLAUDE.md ハマりポイント参照）のため、公開ツール artifactCommit() 経由では
@@ -40,7 +41,6 @@ function submissionId() {
 
 const NOTE = 'a'.repeat(45);
 const CHANGE_NOTE = 'これは20文字以上ある変更理由の説明文です';
-const HUMAN_TOKEN = 'human-approval-token-placeholder';
 const CONTENT = '# 設計\n実装は完全に動作することを実行ログで確認したという記録がある。';
 const EXCERPT = '実装は完全に動作することを実行ログで確認したという記録がある。';
 
@@ -281,7 +281,7 @@ test('F17: escalate(kickback) で下流は FROZEN になり、下流だけを進
   finalizePlan(persistence, plan.session_id);
 
   const kicked = escalate({
-    input: { session_id: plan.session_id, submission_id: submissionId(), action: 'kickback', human_token: HUMAN_TOKEN, target_criteria: ['impl_works'], note: NOTE },
+    input: { session_id: plan.session_id, submission_id: submissionId(), action: 'kickback', ...approvalFields(persistence, plan.session_id, { action: 'kickback', targetCriteria: ['impl_works'], note: NOTE }), target_criteria: ['impl_works'], note: NOTE },
     persistence,
   });
   assert.equal(kicked.state, 'FROZEN');

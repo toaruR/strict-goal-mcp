@@ -3,7 +3,7 @@ import { loadRubric } from '../rubric/store.js';
 import { loadRubricDiff } from '../rubric/diff.js';
 import { readArtifactContent, artifactRelativePath } from '../artifact/store.js';
 import { listAcceptedRounds, listRejectedSubmissions, readCommitForRound } from '../judge/round_store.js';
-import { listEscalations } from '../escalation/token.js';
+import { listEscalations } from '../escalation/approval.js';
 import { AUDIT_VERSION_SESSION } from '../config/defaults.js';
 
 const VERIFICATION_RECIPE = Object.freeze({

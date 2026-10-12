@@ -53,12 +53,12 @@
 2. **リベース (`rebase`)**:
    - `escalate(action: "rebase")` により、改定された上流との差分を自動検査し、影響を受けた評価基準のみを特定して再採点対象とし、状態を `DRAFTING` へ復帰させる。
 3. **差し戻し (`kickback`)**:
-   - 実装中に上流仕様の欠陥を発見した場合、`escalate(action: "kickback")` を提起する。下流セッションは `FROZEN` 状態（`E_FROZEN`）で凍結され、上流セッションの再改定と人間の承認トークンを要求する。
+   - 実装中に上流仕様の欠陥を発見した場合、`escalate(action: "kickback")` を提起する。下流セッションは `FROZEN` 状態（`E_FROZEN`）で凍結され、上流セッションの再改定を行う。実行前に request_human(approval_action:"kickback", target_criteria) でチャット承認を求め、確認IDと返答原文を受け取る。
 4. **チェーンラウンド予算管理 (`chain round budget`)**:
    - チェーン全体の累積ラウンド数（`computeChainRounds`）を `score_submit` 時に自動検査。
    - 予算超過時:
      - 採点合格（`verdict === "FINAL"` / `"FINAL_WITH_RELAXATION"`）の場合: `FINAL` を維持し、`warnings: ["chain_budget_exceeded"]` を付与。
-     - 採点不合格（`verdict !== "FINAL"`）の場合: `verdict: "REVISE"`, `state: "ESCALATED"` へ自動遷移し、エスカレーション情報（`detail: { reason: "chain_budget_exhausted", ... }`）と人間介入用トークンを発行。
+     - 採点不合格（`verdict !== "FINAL"`）の場合: `verdict: "REVISE"`, `state: "ESCALATED"` へ自動遷移し、エスカレーション情報（`detail: { reason: "chain_budget_exhausted", ... }`）とチャット承認用の確認IDと next_action を発行。追加の request_human は不要。
      - 追加ラウンド消費後も超過が継続した場合は `E_CHAIN_BUDGET_EXHAUSTED` エラーを返出。
    - `escalate(action: "resolve", resolution: "continue")` により、セッションおよびチェーン全体に追加ラウンド枠（既定 +6周）が付与（`grantExtraRounds`）され、状態が `DRAFTING` へ復帰。
 
@@ -118,7 +118,7 @@
 | `artifact_commit` | 成果物（Markdown文字列、JSON、ファイルパス参照、またはfilesetマニフェスト）のコミット | `session_id`, `expected_round`, `change_note`, `content` または `source_path` または `files`, `addresses`, `test_inventory` | `state`, `artifact_digest`, `diff`, `warnings`, `next_action: "score_submit"` |
 | `score_submit` | ルーブリック全基準に対する採点・理由・弱点・エビデンスの提出 | `session_id`, `expected_round`, `artifact_digest`, `scores` (`[{ criterion_id, score, rationale, weakness, evidence }]`) | `verdict` (`ITERATING` / `FINAL` / `REVISE`), `weighted_mean`, `min_score`, `must_fix`, `next_action`, `escalation`, `warnings` |
 | `rubric_amend` | 基準や閾値の変更（40文字以上の理由と緩和ログ記録） | `session_id`, `reason`, `amendments` (`add`, `modify`, `remove`) | `state`, `rubric_version`, `rubric_diff`, `is_final_reachable` |
-| `escalate` | 人間への支援要請、上流リベース、キックバック、セッション再開 | `session_id`, `action`; チャット承認は `escalation_id`, `resolution`, `human_reply`、既存経路は `human_token` | `state`, `escalation_id`, `resolution`, `chain` |
+| `escalate` | 人間への支援要請、上流リベース、キックバック、セッション再開 | `session_id`, `action`; 全ての承認は `escalation_id`, `human_reply`。resolveは `resolution`、kickbackは `target_criteria` を指定し、reopenは目的付き確認を使う | `state`, `escalation_id`, `resolution`, `chain` |
 | `audit_export` | 改ざん検知可能な監査 JSON（セッション単位またはチェーン全体）の出力 | `session_id`, `scope` (`session` / `chain`), `include_artifacts`, `include_rejected`, `include_diffs` | `export` (`path`, `sha256`, `schema`) |
 | `invoke_subagent` | 孤立した子セッションでエフェメラルなサブエージェントを実行し結果を取得 | `prompt`, `agent_type`, `runner` (`"auto"` / `"agy"` / `"claude"` / `"codex"`), `workspace_dir`, `timeout_sec` | `ok`, `output`, `conversation_id`, `subagent_session_id`, `exit_code`, `duration_ms` |
 

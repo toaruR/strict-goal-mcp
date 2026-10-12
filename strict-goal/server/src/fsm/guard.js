@@ -27,7 +27,7 @@ export function checkStateTransition(state, tool, { action, approvalAction } = {
     throw violation(state, tool, allowedTools(state));
   }
 
-  const effectiveAction = action === 'request_human' && approvalAction === 'kickback' ? 'kickback' : action;
+  const effectiveAction = action === 'request_human' && ['kickback', 'reopen'].includes(approvalAction) ? approvalAction : action;
   if (tool === 'escalate' && permission.actions && action && !permission.actions.includes(effectiveAction)) {
     throw violation(state, tool, allowedTools(state));
   }

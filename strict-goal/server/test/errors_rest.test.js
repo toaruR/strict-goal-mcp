@@ -1,3 +1,4 @@
+import { approvalFields } from './helpers/chat-approval.js';
 // T071: loop_state(2)/rubric_amend(8)/escalate(8)/audit_export(2) のエラーを全数検査する
 // （設計書 19.6.7 総覧・6.4.*）。plan-phase3.json の T071 受け入れ基準は rubric_amend=5 件・
 // escalate=7 件などと書かれているが、src/errors/codes.js の実装ベース補正後レジストリ
@@ -31,7 +32,6 @@ function submissionId() {
 
 const NOTE = 'a'.repeat(45);
 const CHANGE_NOTE = 'これは20文字以上ある変更理由の説明文です';
-const HUMAN_TOKEN = 'human-approval-token-placeholder';
 
 const CRITERION_A = {
   id: 'impl_works',
@@ -156,7 +156,7 @@ function buildFinalChainK(persistence) {
 }
 function kickback(persistence, sessionId, targetCriteria = ['impl_works']) {
   return escalate({
-    input: { session_id: sessionId, submission_id: submissionId(), action: 'kickback', human_token: HUMAN_TOKEN, target_criteria: targetCriteria, note: NOTE },
+    input: { session_id: sessionId, submission_id: submissionId(), action: 'kickback', ...approvalFields(persistence, sessionId, { action: 'kickback', targetCriteria: ['impl_works'], note: NOTE }), target_criteria: targetCriteria, note: NOTE },
     persistence,
   });
 }
@@ -280,7 +280,7 @@ expectCode('escalate', 'E_RESOLUTION_NOT_APPLICABLE', () => {
   const persistence = durablePersistence();
   const created = createDesignSession(persistence);
   escalate({
-    input: { session_id: created.session_id, submission_id: submissionId(), action: 'resolve', resolution: 'continue', human_token: 'x'.repeat(20), note: NOTE },
+    input: { session_id: created.session_id, submission_id: submissionId(), action: 'resolve', resolution: 'continue', escalation_id: 'esc_00', human_reply: '続けて', note: NOTE },
     persistence,
   });
 });
@@ -292,12 +292,12 @@ expectCode('escalate', 'E_STATE_VIOLATION', () => {
   escalate({ input: { session_id: created.session_id, submission_id: submissionId(), action: 'abort', note: NOTE }, persistence });
 });
 
-expectCode('escalate', 'E_TOKEN_INVALID', () => {
+expectCode('escalate', 'E_RESOLUTION_NOT_APPLICABLE', () => {
   const persistence = durablePersistence();
   const created = createDesignSession(persistence);
-  escalate({ input: { session_id: created.session_id, submission_id: submissionId(), action: 'request_human', approval_channel: 'token_file', note: NOTE }, persistence });
+  escalate({ input: { session_id: created.session_id, submission_id: submissionId(), action: 'request_human', approval_channel: 'chat', note: NOTE }, persistence });
   escalate({
-    input: { session_id: created.session_id, submission_id: submissionId(), action: 'resolve', resolution: 'continue', human_token: 'wrong-token-wrong-token-wrong-token', note: NOTE },
+    input: { session_id: created.session_id, submission_id: submissionId(), action: 'resolve', resolution: 'continue', escalation_id: 'esc_99', human_reply: '続けて', note: NOTE },
     persistence,
   });
 });

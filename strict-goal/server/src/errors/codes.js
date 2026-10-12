@@ -58,7 +58,6 @@ export const CODES = Object.freeze({
   E_RELAXATION_UNACKNOWLEDGED: { detailKeys: [] },
 
   // escalate 固有
-  E_TOKEN_INVALID: { detailKeys: [] },
   E_RESOLUTION_NOT_APPLICABLE: { detailKeys: [] },
 });
 
@@ -132,7 +131,6 @@ export const TOOL_ERRORS = Object.freeze({
   ],
   escalate: [
     'E_STATE_VIOLATION',
-    'E_TOKEN_INVALID',
     'E_RESOLUTION_NOT_APPLICABLE',
     'E_VALIDATION',
     'E_SESSION_NOT_FOUND',

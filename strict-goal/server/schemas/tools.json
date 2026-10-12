@@ -1663,11 +1663,6 @@
               "abort"
             ]
           },
-          "human_token": {
-            "type": "string",
-            "minLength": 16,
-            "maxLength": 256
-          },
           "upstream_digest": {
             "type": "string",
             "pattern": "^sha256:[0-9a-f]{64}$"
@@ -1688,10 +1683,9 @@
           "approval_channel": {
             "type": "string",
             "enum": [
-              "chat",
-              "token_file"
+              "chat"
             ],
-            "description": "Chat approval is the default; token_file is for legacy clients."
+            "description": "Use chat approval."
           },
           "escalation_id": {
             "type": "string",
@@ -1702,6 +1696,15 @@
             "minLength": 1,
             "maxLength": 4000,
             "description": "Verbatim explicit user reply to this approval request. Wait for the reply before resolving."
+          },
+          "approval_action": {
+            "type": "string",
+            "enum": [
+              "resolve",
+              "kickback",
+              "reopen"
+            ],
+            "description": "Purpose of request_human; defaults to kickback when target_criteria is supplied, otherwise resolve."
           }
         }
       },
@@ -1731,9 +1734,11 @@
             "enum": [
               "ESCALATED",
               "DRAFTING",
+              "SCORING",
               "FINAL_WITH_RELAXATION",
               "ABORTED",
-              "FINAL"
+              "FINAL",
+              "FROZEN"
             ]
           },
           "round": {
@@ -1762,9 +1767,6 @@
                 "type": "string"
               },
               "created_at": {
-                "type": "string"
-              },
-              "token_path": {
                 "type": "string"
               },
               "reason": {
@@ -1800,8 +1802,8 @@
                 "type": "string",
                 "enum": [
                   "chat",
-                  "token_file",
-                  "mrtr"
+                  "mrtr",
+                  "system"
                 ]
               }
             }

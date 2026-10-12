@@ -1,3 +1,4 @@
+import { approvalFields } from './helpers/chat-approval.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
@@ -193,7 +194,7 @@ function kickback(persistence, sessionId, targetCriteria = ['impl_works']) {
       session_id: sessionId,
       submission_id: submissionId(),
       action: 'kickback',
-      human_token: HUMAN_TOKEN,
+      ...approvalFields(persistence, sessionId, { action: 'kickback', targetCriteria: targetCriteria, note: NOTE }),
       target_criteria: targetCriteria,
       note: NOTE,
     },
@@ -310,14 +311,15 @@ test('FINALでは通常の承認要求を拒否し、対象基準のある差し
   assert.equal(readSessionRaw(persistence, plan.session_id).state, 'FINAL');
 });
 
-test('上流のないFINALでは差し戻し確認を作成せず、トークン方式の確認IDもチャット承認に流用できない', () => {
+test('上流のないFINALでは差し戻し確認を作成せず、再開用の確認IDを差し戻しに流用できない', () => {
   const persistence = durablePersistence();
   const design = createDesign(persistence);
   finalizeDesign(persistence, design.session_id, 1);
   assert.throws(() => requestChatKickback(persistence, design.session_id), { code: 'E_UPSTREAM_NOT_FOUND' });
   assert.equal(readSessionRaw(persistence, design.session_id).state, 'FINAL');
   const plan = createPlan(persistence, { session_id: design.session_id, artifact_digest: readSessionRaw(persistence, design.session_id).current_artifact.digest });
-  const legacy = escalate({ input: { session_id: plan.session_id, submission_id: submissionId(), action: 'request_human', approval_channel: 'token_file', note: NOTE }, persistence });
+  finalizePlan(persistence, plan.session_id);
+  const legacy = escalate({ input: { session_id: plan.session_id, submission_id: submissionId(), action: 'request_human', approval_action: 'reopen', note: NOTE }, persistence });
   assert.throws(() => escalate({ input: chatKickbackInput(plan.session_id, legacy.escalation.escalation_id), persistence }), { code: 'E_RESOLUTION_NOT_APPLICABLE' });
   assert.equal(readApproval(persistence, plan.session_id, legacy.escalation.escalation_id).consumed, false);
   assert.equal(readSessionRaw(persistence, design.session_id).state, 'FINAL');

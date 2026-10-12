@@ -1,3 +1,4 @@
+import { approvalFields } from './helpers/chat-approval.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync } from 'node:fs';
@@ -199,7 +200,6 @@ test('include_artifacts:true は chain 監査の各セッションの成果物�
   assert.equal(audit.sessions[1].rounds[0].artifact.content, `${PLAN_CONTENT}\n`);
 });
 
-const HUMAN_TOKEN = 'human-approval-token-placeholder';
 const NOTE = 'a'.repeat(45);
 
 test('kickback と rebase の履歴が時刻付きで chain 監査に反映される', () => {
@@ -212,7 +212,7 @@ test('kickback と rebase の履歴が時刻付きで chain 監査に反映さ�
       session_id: plan.session_id,
       submission_id: submissionId(),
       action: 'kickback',
-      human_token: HUMAN_TOKEN,
+      ...approvalFields(persistence, plan.session_id, { action: 'kickback', targetCriteria: ['impl_works'], note: NOTE }),
       target_criteria: ['impl_works'],
       note: NOTE,
     },

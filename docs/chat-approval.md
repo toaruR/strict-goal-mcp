@@ -1,13 +1,19 @@
-# STALLED時のチャット承認
+# strict-goalの人間による承認
 
-通常のMCP呼出しでは、停滞時の判断をチャット上で受け付ける。ユーザーによるトークンの読み取り・貼り付けは不要。
+人間の判断を必要とする操作は、保留中の確認ID（escalation_id）とチャット返答原文（human_reply）で承認する。秘密ファイルの生成・読み取り・貼り付けは行わない。
 
-1. サーバーが `STALLED` を返すと、エージェントが `escalate(action:"request_human")` を呼ぶ。
-2. サーバーは `ESCALATED` に移行し、`channel:"chat"` の確認IDと判断用の概要を返す。トークンファイルは作らない。
-3. エージェントは停滞理由と未達項目を示し、「続行／現状受入れ／基準緩和／中止」の選択をチャットで尋ね、返答を待つ。
-4. 明示的な返答後、エージェントが `escalate(action:"resolve")` に確認ID、選択、返答原文を渡す。
+## 承認要求と待機
 
-例：「もう少し続けて」とユーザーが返答した場合の入力（`session_id` は実際の値に置き換える）：
+- STALLED: escalate(action:"request_human", approval_channel:"chat", approval_action:"resolve") を呼び、理由と続行・現状受入れ・基準緩和・中止の選択を提示する。
+- score_submitによる自動ESCALATED: チェーン予算超過または基準緩和の承認待ちでは、既に確認IDが作成されている。返されたnext_actionを使い、request_humanを再実行しない。
+- kickback: request_humanにapproval_action:"kickback"とtarget_criteriaを指定する。上流の欠陥と差し戻す基準を提示する。
+- reopen: サーバーがFINALまたはFINAL_WITH_RELAXATIONを返したセッションで、request_humanにapproval_action:"reopen"を指定する。確定成果物を再改訂する理由を提示する。
+
+全ての呼出しにsession_id、8文字以上の新しいsubmission_id、action、40–4000文字のnoteが必要。ユーザーの明示的な返答まで変更・採点・再開を止める。単一の操作を提示した質問への「はい」「ok」も承認として扱える。複数の選択肢への曖昧な返答、沈黙、時間経過、通常のタスク開始許可から判断を推測しない。
+
+サブエージェントは確認ID・理由・提案する操作を親へ渡し、親がチャットでユーザーへ確認して返答を引き渡す。コンテキストを失った場合はloop_state(projection:"skill_state")またはloop_open(mode:"resume")から保留中のnext_actionを回収する。
+
+## 承認を反映する
 
 ```json
 {
@@ -16,36 +22,26 @@
   "action": "resolve",
   "escalation_id": "esc_01",
   "resolution": "continue",
-  "human_reply": "もう少し続けて",
-  "note": "ユーザーからこの停滞確認に対して続行するよう明示的な返答があったため、追加周回を行う。"
+  "human_reply": "計画セッションの続行を承認します",
+  "note": "ユーザーがこの計画セッションの承認待ちに対して続行を明示的に選択したため、追加周回を行う。"
 }
 ```
 
-| 選択 | `resolution` | 結果 |
-|---|---|---|
-| 続行 | `continue` | 追加周回を付与し `DRAFTING` に戻る |
-| 現状受入れ | `accept_as_is` | `FINAL_WITH_RELAXATION` として終了、未達の受入れを監査記録に残す |
-| 基準緩和 | `relax_rubric` | 緩和の承認を記録し `SCORING` に戻る。基準変更は既存の `rubric_amend` 手順 |
-| 中止 | `abort` | `ABORTED` として終了 |
+| 操作 | 承認後の結果 |
+|---|---|
+| resolve / continue | DRAFTINGへ戻りセッションの周回枠を3増やす。チェーン予算超過時はチェーン枠を6増やす（1回限り）。 |
+| resolve / accept_as_is | FINAL_WITH_RELAXATIONとして終了し、未達の受入れを監査に記録する。 |
+| resolve / relax_rubric | 緩和の承認を記録しSCORINGへ戻る。基準変更にはrubric_amendを使う。 |
+| resolve / abort | ABORTEDとして終了する。 |
+| kickback | 同じtarget_criteriaを添えて実行し、上流をDRAFTINGへ再開、下流をFROZENへ凍結する。 |
+| reopen | 確定成果物に紐付く確認を消費し、自セッションを次ラウンドのDRAFTINGへ再開する。 |
 
-「続行してよい？」への「はい」のように選択が一意なら許可として扱う。複数の選択肢への単なる「はい」など曖昧な返答は確認し直す。沈黙・時間経過・通常のタスク開始許可から選択を推測しない。
+kickbackとreopenにも返された確認IDとhuman_replyを渡す。resolutionは付けず、返されたinput_skeletonを使う。目的付きの確認を別操作に流用できない。kickbackまたはreopenの確認をresolveで処理できるのは、ユーザーが明示的に終了を選んだabortのみ。単に差し戻し・再開を拒否した返答から終了許可を推測しない。
 
-サブエージェントは確認ID・理由・未達項目を親へ渡し、親がユーザーへの確認と返答の引き渡しを担当する。返答が届くまで変更・採点・再開を行わない。コンテキストを失った場合も `loop_state(projection:"skill_state")` または `loop_open(mode:"resume")` の `next_action` から保留中の確認IDを取得できる。
+サーバーは最新の保留中ID、返答の存在、目的、対象基準・成果物、操作の前提条件を検査し、確認を一度だけ消費する。返答原文、選択、消費時刻を監査に保存する。発言者の認証は行わず、実際のユーザー返答を得る責任はエージェントの手順に置く。前提条件エラーでは確認を消費せず、エラー理由を確認する。
 
-サーバーは確認ID・返答の存在・未消費状態を検査し、返答原文と選択を保存する。返答の発言者認証は行わず、実際にユーザーへ確認して待つ責任はエージェントの手順に置く。
+## 既存記録とMRTR
 
-旧トークン方式は `request_human` に `approval_channel:"token_file"` を指定した場合、および既存のトークンを持つセッションとの互換用に残す。MRTR対応経路は維持し、明示的に `approval_channel:"chat"` を指定すればチャット方式を使用できる。自動的な基準緩和承認の既存経路や `reopen` は変更範囲外。
+旧サーバーで作られた保留中JSONも、確認IDとチャット返答で処理できる。付随する秘密ファイルは参照せず、その値を承認に使わない。既存ファイルは履歴として保持し、消費時にJSONを現在の監査形式へ正規化する。廃止された承認パラメータ・承認経路は入力検証で拒否する。
 
-## kickbackのチャット承認
-
-差し戻しには `human_token` の代わりに `escalation_id` と `human_reply` を渡せる。`target_criteria` は引き続き必須。
-
-1. `escalate(action:"request_human", approval_channel:"chat", target_criteria:["対象の上流基準ID"], ...)` で差し戻し用の確認を作成する。この用途に限り `FINAL` / `FINAL_WITH_RELAXATION` からも承認待ちに移行できる。
-2. 親エージェントが上流の問題・差し戻す基準をチャットで提示し、ユーザーの明示的な返答を待つ。この間、上流は変更しない。
-3. 許可後に `escalate(action:"kickback", escalation_id:"返された確認ID", human_reply:"返答原文", target_criteria:["同じ上流基準ID"], ...)` を呼ぶ。
-
-成功すると確認を消費し、返答原文と `resolution:"kickback"` を監査記録に保存して、上流を `DRAFTING`、下流を `FROZEN` にする。保留中の確認ID・kickbackの入力例は `loop_state` / `loop_open(mode:"resume")` でも取得できる。
-
-確認IDの不一致、空の返答、確認時と異なる対象基準、チャットとトークンの混在は拒否する。上流不在や差し戻し予算超過も、確認を消費する前に検査する。差し戻し用の確認を通常の `resolve(continue)` に流用することはできない。中止を選ぶ場合は `resolve(resolution:"abort")` で下流セッションを終了できる。
-
-`DRAFTING` などで通常の `request_human` が作ったチャット確認も、ユーザーが差し戻しを許可した場合はkickbackに使用できる。旧 `human_token` を渡すkickbackの動作は維持する。
+MRTR対応クライアントのelicitationとinputResponsesによる返答経路は継続する。通常のチャットではapproval_channel:"chat"を指定する。MRTR非対応時と自動ESCALATED時はチャット確認になり、秘密ファイル方式へ切り替わらない。実行中のサーバーは更新後に再起動する。

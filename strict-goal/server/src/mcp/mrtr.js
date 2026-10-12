@@ -1,6 +1,6 @@
 // §18.3。MRTR(Multi Round-Trip Requests) 対応クライアントでは escalate(request_human) を
-// 往復1回の input_required/inputResponses で完結させ、非対応クライアントは従来の
-// token ファイル方式（escalation/token.js）へ自動的に縮退する。サーバ発の要求は使わない。
+// 往復1回の input_required/inputResponses で完結させ、それ以外はチャットで判断を受け取る。
+// 承認情報は escalation/approval.js が確認IDと返答原文で管理する。
 
 export function clientSupportsMrtr(meta) {
   return Boolean(meta?.clientCapabilities?.elicitation);

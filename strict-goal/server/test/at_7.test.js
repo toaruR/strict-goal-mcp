@@ -97,10 +97,7 @@ function score(persistence, sessionId, expectedRound, digest, scores, excerpt) {
   });
 }
 
-function readEscalationToken(persistence, sessionId, escalationId) {
-  const tokenFile = path.join(persistence.dir, 'sessions', sessionId, 'escalations', `${escalationId}.token`);
-  return readFileSync(tokenFile, 'utf8').trim();
-}
+
 
 test('AT-7: self_hosting削除の緩和がESCALATEDで止まり、relax_rubric承認後にFINAL_WITH_RELAXATIONへ収束し監査に緩和の事実が残る', () => {
   const persistence = durablePersistence();
@@ -187,7 +184,7 @@ test('AT-7: self_hosting削除の緩和がESCALATEDで止まり、relax_rubric�
   const escDir = path.join(persistence.dir, 'sessions', created.session_id, 'escalations');
   const escFile = readdirSync(escDir).find((name) => name.endsWith('.json'));
   const escalationId = escFile.replace('.json', '');
-  const realToken = readEscalationToken(persistence, created.session_id, escalationId);
+
 
   // 5. escalate(resolve, relax_rubric) → state:SCORING、緩和が承認される
   const resolved = escalate({
@@ -196,7 +193,7 @@ test('AT-7: self_hosting削除の緩和がESCALATEDで止まり、relax_rubric�
       submission_id: submissionId(),
       action: 'resolve',
       resolution: 'relax_rubric',
-      human_token: realToken,
+      escalation_id: escalationId, human_reply: 'この操作を承認します',
       note: NOTE,
     },
     persistence,

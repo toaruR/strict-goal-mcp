@@ -1,3 +1,4 @@
+import { approvalFields } from './helpers/chat-approval.js';
 // AT-12: 上流変更による下流の失効と部分再検証。docs/design-rubric-loop-mcp.md §13 AT-12。
 // escalate action:"reopen" は公開ツールとして実装済み。上流の reopen は escalate 経由で実行する。
 import { test } from 'node:test';
@@ -228,7 +229,7 @@ test('AT-12: 上流reopenで下流FROZEN、上流再FINALでSUPERSEDED、rebase�
       session_id: design.session_id,
       submission_id: submissionId(),
       action: 'reopen',
-      human_token: 'token-human-reopen-design-001',
+      ...approvalFields(persistence, design.session_id, { action: 'reopen' }),
       note: '設計を全面的に見直すため差し戻しを行う。これは40文字以上の詳細な説明文である。',
     },
     persistence,
@@ -351,8 +352,8 @@ test('escalate(reopen): 非 FINAL または FINAL_WITH_RELAXATION から呼ぶ�
         input: {
           session_id: design.session_id,
           submission_id: submissionId(),
-          action: 'reopen',
-          human_token: 'token-human-reopen-invalid-01',
+          action: 'request_human', approval_action: 'reopen',
+
           note: 'DRAFTINGから直接reopenを呼んで失敗させるための40文字以上の説明文である。',
         },
         persistence,
