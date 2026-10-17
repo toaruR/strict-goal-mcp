@@ -1,0 +1,8 @@
+{
+  "package": "strict-goal-round-reduction-design-support",
+  "version": "2.0.0-draft.1",
+  "schema_version": "round-reduction-v2",
+  "files": ["design-strict-goal-round-reduction.md", "strict-goal-round-reduction-schema.json", "validate-strict-goal-round-reduction-package.js"],
+  "entrypoints": ["score_submit", "loop_state"],
+  "portability": {"allowed_environment_variables": [], "fallback": "resolve paths relative to this manifest; use the Node executable on PATH"}
+}
