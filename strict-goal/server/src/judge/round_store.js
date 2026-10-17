@@ -1,6 +1,7 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { writeJson, readJson } from '../store/atomic.js';
+import { readIssueLedger } from '../evidence/issue_ledger.js';
 
 function roundsDir(sDir) {
   return path.join(sDir, 'rounds');
@@ -17,6 +18,12 @@ export function recordAcceptedRound(sDir, round, record) {
 export function recordRejectedSubmission(sDir, round, record) {
   const dir = path.join(roundsDir(sDir), `${round}.rejected`);
   fs.mkdirSync(dir, { recursive: true });
+  if (record.submission_id && record.payload_digest) {
+    for (const name of fs.readdirSync(dir).filter((entry) => /^\d+\.json$/.test(entry))) {
+      const existingRecord = readJson(path.join(dir, name));
+      if (existingRecord.submission_id === record.submission_id && existingRecord.payload_digest === record.payload_digest) return existingRecord;
+    }
+  }
   const existing = fs
     .readdirSync(dir)
     .map((name) => Number.parseInt(name, 10))
@@ -73,4 +80,47 @@ export function listRejectedSubmissions(sDir) {
   }
   all.sort((a, b) => a.round - b.round || a.attempt - b.attempt);
   return all;
+}
+
+// Stable position cursors keep pages ordered when later submissions are appended.
+export function pageRejectedSubmissions(sDir, { limit = 20, cursor = null } = {}) {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new RangeError('limit must be between 1 and 100');
+  if (cursor !== null && (typeof cursor !== 'string' || !/^\d+:\d+$/.test(cursor))) throw new TypeError('invalid cursor');
+  const records = listRejectedSubmissions(sDir);
+  const [round, attempt] = cursor === null ? [0, 0] : cursor.split(':').map(Number);
+  const remaining = records.filter((item) => item.round > round || (item.round === round && item.attempt > attempt));
+  const items = remaining.slice(0, limit);
+  const last = items.at(-1);
+  return {
+    items,
+    next_cursor: remaining.length > items.length ? `${last.round}:${last.attempt}` : null,
+    total_count: records.length,
+    reference: 'rounds/',
+  };
+}
+
+export function pageUnresolvedIssues(dataDir, sessionId, { limit = 20, cursor = null } = {}) {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new RangeError('limit must be between 1 and 100');
+  if (cursor !== null && (typeof cursor !== 'string' || !/^\d+$/.test(cursor))) throw new TypeError('invalid cursor');
+  const events = readIssueLedger(dataDir, sessionId);
+  const issues = new Map();
+  events.forEach((event, index) => {
+    const previous = issues.get(event.issue_id);
+    issues.set(event.issue_id, {
+      issue_id: event.issue_id,
+      first_sequence: previous?.first_sequence ?? index + 1,
+      blocking: event.blocking === true || previous?.blocking === true,
+      state: event.lifecycle === 'resolved' ? 'resolved' : 'open',
+    });
+  });
+  const unresolved = [...issues.values()].filter((issue) => issue.state === 'open' && issue.blocking)
+    .sort((a, b) => a.first_sequence - b.first_sequence);
+  const remaining = unresolved.filter((issue) => issue.first_sequence > Number(cursor ?? 0));
+  const items = remaining.slice(0, limit);
+  return {
+    items,
+    next_cursor: remaining.length > items.length ? String(items.at(-1).first_sequence) : null,
+    total_count: unresolved.length,
+    ledger_ref: { path: 'issue-ledger.jsonl', event_count: events.length, head_hash: events.at(-1)?.hash ?? null },
+  };
 }

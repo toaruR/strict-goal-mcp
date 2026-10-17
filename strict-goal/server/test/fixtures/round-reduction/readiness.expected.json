@@ -1,0 +1,15 @@
+{
+  "status": "hold",
+  "tests": {
+    "collected": 4,
+    "selected": 3,
+    "deselected": 1,
+    "skipped": 1,
+    "passed": 2,
+    "failed": 0,
+    "deselection_reason": "approved_selection",
+    "skip_reason": "environment_unavailable",
+    "result": "incomplete_or_failed"
+  },
+  "quality_gate": { "result": "hold", "reasons": ["missing_pairs"] }
+}

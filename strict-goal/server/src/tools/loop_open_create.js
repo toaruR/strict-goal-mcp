@@ -24,6 +24,7 @@ import { validatePin, resolveUpstreamPin } from '../chain/pin.js';
 import { assertRoundBudget } from '../chain/budget.js';
 import { assertArtifactKind } from '../artifact/kind.js';
 import { VERSION } from '../version.js';
+import { pinSessionPolicy } from '../policy/session_policy.js';
 
 function fail(code, message, detail = {}) {
   const err = new Error(message);
@@ -59,6 +60,7 @@ export function loopOpenCreate({ input, pluginRoot, pluginRootSource, persistenc
   }
 
   const loopMode = input.loop_mode ?? 'design';
+  const evaluationPolicy = pinSessionPolicy(persistence.roundReductionStage);
   if (loopMode === 'design' && input.upstream) {
     fail('E_UPSTREAM_NOT_ALLOWED', 'design mode must not specify upstream');
   }
@@ -142,6 +144,7 @@ export function loopOpenCreate({ input, pluginRoot, pluginRootSource, persistenc
       rubric_version: 1,
       rubric_digest: savedRubric.rubric_digest,
       policy: savedRubric.policy,
+    evaluation_policy: evaluationPolicy,
       label: input.label ?? null,
       upstream: resolvedUpstream,
       chain_id: chainId,

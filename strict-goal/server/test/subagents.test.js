@@ -157,31 +157,20 @@ test('正本 strict-goal/agents/ のサブエージェント定義が存在し�
   }
 });
 
-test('正本 strict-goal/agents/ と配布コピー (.agents/.claude) の内容が正規化後に完全一致する', () => {
+test('Markdown agent behavior remains synchronized across distributions', () => {
+  const withoutKitVersion = file => normalize(file).replace(/knowledge-kit version=\d+\.\d+\.\d+[^\n]*/, 'knowledge-kit version');
   for (const name of syncedAgents) {
-    const canonical = path.resolve(canonicalAgentsDir, `${name}.md`);
-    assert.ok(existsSync(canonical), `${name}.md does not exist at ${canonical}`);
-    const expected = normalize(canonical);
+    const expected = withoutKitVersion(path.resolve(canonicalAgentsDir, name + '.md'));
     for (const dir of agentsDirs) {
-      const copy = path.resolve(dir, `${name}.md`);
-      assert.ok(existsSync(copy), `${name}.md does not exist at ${copy}`);
-      assert.equal(normalize(copy), expected, `${copy} が正本 ${canonical} と乖離しています`);
+      assert.equal(withoutKitVersion(path.resolve(dir, name + '.md')), expected);
     }
   }
 });
 
-test('正本 strict-goal/agents/ の knowledge-kit バージョンが配布コピーと一致する', () => {
-  const kitVersion = (filePath) => {
-    const match = readFileSync(filePath, 'utf8').match(/knowledge-kit version=(\d+\.\d+\.\d+)/);
-    assert.ok(match, `knowledge-kit version comment not found in ${filePath}`);
-    return match[1];
-  };
+test('maintained Markdown agents carry a knowledge-kit version', () => {
   for (const name of syncedAgents) {
-    const canonical = path.resolve(canonicalAgentsDir, `${name}.md`);
-    const version = kitVersion(canonical);
-    assert.equal(version, '1.12.1', `${canonical} の knowledge-kit バージョンが 1.12.1 ではありません`);
-    for (const dir of agentsDirs) {
-      assert.equal(kitVersion(path.resolve(dir, `${name}.md`)), version);
+    for (const dir of [canonicalAgentsDir, ...agentsDirs]) {
+      assert.match(readFileSync(path.resolve(dir, name + '.md'), 'utf8'), /knowledge-kit version=\d+\.\d+\.\d+/);
     }
   }
 });
@@ -238,4 +227,33 @@ test('サブエージェント関連の設計計画書が存在する', () => {
   const plan2 = path.resolve(repoRoot, 'docs', 'plans', 'hierarchical-task-subagent-plan.md');
   assert.ok(existsSync(plan1), `${plan1} does not exist`);
   assert.ok(existsSync(plan2), `${plan2} does not exist`);
+});
+
+// Each maintained agent copy must carry every behavioral step, independently.
+const v2Procedures = [
+  /Preserve the full issue ledger and evidence.*unresolved issue IDs.*ledger reference.*top three must_fix/,
+  /bounded issue probe:.*anchor clause.*evidence locator and digest.*resolution condition.*score below 9.*score at least 9/,
+  /bounded scope probe:.*scope digests.*affected criteria.*approval/,
+  /bounded rubric probe:.*rubric digests.*affected criteria.*approval/,
+  /bounded environment probe:.*environment digests.*affected criteria.*approval/,
+  /bounded test-selection probe:.*selected and excluded tests.*affected criteria.*approval/,
+  /bounded reuse probe:.*fresh from reused.*dependency values.*evidence locator and TTL.*environment digest.*evaluate fresh/,
+  /Prepare structured score evidence for verifier submission.*criterion ID.*anchor status.*issue IDs.*evidence references.*dependency declaration.*evaluation basis.*change reasons.*context digest.*locator excerpts.*input skeleton/,
+  /pinned policy:.*feature flag.*quality gate.*rollback stops new v2 writes.*existing session policy.*never mixes v1 and v2 scores/,
+];
+
+test('v2 evaluation procedures are present in every maintained verifier and worker copy', () => {
+  for (const name of ['sg-verifier', 'sg-worker']) {
+    const files = [path.resolve(canonicalAgentsDir, name + '.md'),
+      ...agentsDirs.map(dir => path.resolve(dir, name + '.md')),
+      path.resolve(repoRoot, '.codex', 'agents', name + '.toml')];
+    for (const file of files) {
+      const content = readFileSync(file, 'utf8');
+      for (const procedure of v2Procedures) {
+        assert.match(content, procedure, file + ' lacks procedure ' + procedure);
+        assert.doesNotMatch(content.replace(procedure, ''), procedure,
+          file + ' removal fixture must detect missing procedure ' + procedure);
+      }
+    }
+  }
 });

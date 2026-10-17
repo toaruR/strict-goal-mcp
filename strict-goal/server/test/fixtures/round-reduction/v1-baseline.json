@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "fixture": "round-reduction-v1-baseline",
+  "phase": "unknown",
+  "snapshot_digests": {
+    "artifact_digest": "unknown",
+    "upstream_digest": "unknown",
+    "scope_digest": "unknown",
+    "rubric_digest": "unknown",
+    "environment_digest": "unknown"
+  },
+  "breakdown": {
+    "rounds": {
+      "total": 37,
+      "readable_score_json": 35,
+      "productive": "unknown"
+    },
+    "tokens": {
+      "parent": "unknown",
+      "subagents": "unknown",
+      "total": "unknown"
+    },
+    "wall_clock_ms": {
+      "active": "unknown",
+      "approval_wait": "unknown",
+      "total": "unknown"
+    },
+    "issues": {
+      "opened": "unknown",
+      "reaffirmed": "unknown",
+      "resolved": "unknown",
+      "reopened": "unknown"
+    }
+  },
+  "unknown_values": {
+    "phase_breakdown": "unknown",
+    "per_round_tokens": "unknown",
+    "per_round_wall_clock_ms": "unknown",
+    "issue_counter_breakdown": "unknown"
+  }
+}

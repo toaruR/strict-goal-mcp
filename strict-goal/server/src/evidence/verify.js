@@ -70,6 +70,20 @@ export function verifyLocatorEvidence(criterionId, evidence, artifactBody, optio
   });
 }
 
+// score_submit の事前検証用。通常の採点時に許容している改行・空白の揺れや
+// 作業 tree の fileset ソースは見ない。commit 時に保存された bytes のみを
+// 対象にし、引用がそのまま含まれることを要求する。
+export function verifyExactLocatorEvidence(criterionId, evidence, artifactBody) {
+  if (typeof artifactBody === 'string' && artifactBody.includes(evidence.excerpt)) {
+    return;
+  }
+  fail('E_EVIDENCE_EXCERPT_MISMATCH', 'locator excerpt was not found verbatim in committed artifact bytes', {
+    criterion_id: criterionId,
+    locator: evidence.locator,
+    excerpt: evidence.excerpt?.slice(0, 80),
+  });
+}
+
 // upstream 根拠は design モードでは使用禁止。それ以外ではピンした上流本文に対して照合する。
 export function verifyUpstreamEvidence(criterionId, evidence, loopMode, upstreamBody) {
   if (loopMode === 'design') {

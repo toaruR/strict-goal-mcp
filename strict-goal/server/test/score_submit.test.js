@@ -1,12 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { loopOpenCreate } from '../src/tools/loop_open_create.js';
 import { artifactCommit } from '../src/tools/artifact_commit.js';
 import { scoreSubmit } from '../src/tools/score_submit.js';
+import { appendIssueEvent, readIssueLedger } from '../src/evidence/issue_ledger.js';
+import { readSession } from '../src/store/session_store.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pluginRoot = path.resolve(__dirname, '..', '..');
@@ -106,6 +108,78 @@ function setupScoredSession(persistence) {
   const committed = commit(persistence, created.session_id, 1);
   return { created, committed };
 }
+
+function v2Context(persistence, created, committed) {
+  const digest = (c) => `sha256:${c.repeat(64)}`;
+  return { snapshot: { artifact_digest: committed.artifact.digest, rubric_digest: readSession(persistence.dir, created.session_id).rubric_digest, scope_digest: digest('a'), environment_digest: digest('b'), test_selection_digest: digest('c') }, condition_changes: [] };
+}
+
+test('score=8 は locator anchor を欠くと E_ISSUE_BINDING_REQUIRED になる', () => {
+  const persistence = durablePersistence();
+  persistence.roundReductionStage = 'enforce-new-session';
+  const { created, committed } = setupScoredSession(persistence);
+  const commandEvidence = {
+    kind: 'command', command: 'node --test', exit_code: 0, output_excerpt: 'passing',
+    output_sha256: 'a'.repeat(64), target_digest: committed.artifact.digest,
+  };
+
+  assert.throws(() => scoreSubmit({
+    input: {
+      session_id: created.session_id, submission_id: submissionId(), expected_round: 1,
+      artifact_digest: committed.artifact.digest,
+      evaluation_context: v2Context(persistence, created, committed),
+      scores: fullScores({ impl_works: { score: 8, evidence: [commandEvidence] } }),
+    },
+    persistence,
+  }), { code: 'E_ISSUE_BINDING_REQUIRED' });
+});
+
+test('score=8 の完全な binding は blocking issue を ledger に記録する', () => {
+  const persistence = durablePersistence();
+  persistence.roundReductionStage = 'enforce-new-session';
+  const { created, committed } = setupScoredSession(persistence);
+  const result = scoreSubmit({
+    input: {
+      session_id: created.session_id, submission_id: submissionId(), expected_round: 1,
+      artifact_digest: committed.artifact.digest,
+      evaluation_context: v2Context(persistence, created, committed),
+      scores: fullScores({ impl_works: { score: 8 } }),
+    },
+    persistence,
+  });
+
+  assert.equal(result.ok, true);
+  const issues = readIssueLedger(persistence.dir, created.session_id);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].issue_id, 'ISS-score-impl_works');
+  assert.equal(issues[0].blocking, true);
+  const record = JSON.parse(readFileSync(path.join(persistence.dir, 'sessions', created.session_id, 'rounds', '1.json'), 'utf8'));
+  assert.equal(record.metrics.phase, 'design');
+  assert.match(record.metrics.snapshot_digest, /^sha256:[0-9a-f]{64}$/);
+  assert.equal(record.metrics.fresh_count, 3);
+  assert.equal(record.metrics.reused_count, 0);
+  assert.equal(record.metrics.issue_events[0].issue_id, issues[0].issue_id);
+  assert.equal(record.metrics.tokens.total, 'unknown');
+  assert.equal(record.metrics.timing_ms.wall, 'unknown');
+});
+
+test('score=9 でも open blocking issue があれば E_ISSUE_STATE_INVALID になる', () => {
+  const persistence = durablePersistence();
+  persistence.roundReductionStage = 'enforce-new-session';
+  const { created, committed } = setupScoredSession(persistence);
+  appendIssueEvent(persistence.dir, created.session_id, {
+    issue_id: 'ISS-preexisting', lifecycle: 'opened', severity: 'blocking', blocking: true,
+    criterion_ids: ['impl_works'], submission_id: submissionId(), round: 1,
+  });
+
+  assert.throws(() => scoreSubmit({
+    input: {
+      session_id: created.session_id, submission_id: submissionId(), expected_round: 1,
+      artifact_digest: committed.artifact.digest, evaluation_context: v2Context(persistence, created, committed), scores: fullScores(),
+    },
+    persistence,
+  }), { code: 'E_ISSUE_STATE_INVALID' });
+});
 
 test('artifact_digest がサーバ保持値と不一致のとき E_DIGEST_MISMATCH になる', () => {
   const persistence = durablePersistence();
@@ -298,6 +372,56 @@ test('受理された提出は rounds/<round>.json に、拒否された提出�
   assert.ok(existsSync(acceptedPath));
   const accepted = JSON.parse(readFileSync(acceptedPath, 'utf8'));
   assert.equal(accepted.verdict, 'FINAL');
+});
+
+test('事前検証失敗は監査され、同じ bytes の再送は round も event 数も変えない', () => {
+  const persistence = durablePersistence();
+  const { created, committed } = setupScoredSession(persistence);
+  const sDir = path.join(persistence.dir, 'sessions', created.session_id);
+  const input = {
+    session_id: created.session_id,
+    submission_id: submissionId(),
+    expected_round: 1,
+    artifact_digest: committed.artifact.digest,
+    scores: fullScores({ impl_works: { unexpected: true } }),
+  };
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    assert.throws(() => scoreSubmit({ input, persistence }), { code: 'E_VALIDATION' });
+  }
+  const rejectedDir = path.join(sDir, 'rounds', '1.rejected');
+  assert.equal(readdirSync(rejectedDir).length, 1);
+  const record = JSON.parse(readFileSync(path.join(rejectedDir, '1.json'), 'utf8'));
+  assert.equal(record.event_type, 'rejected_prevalidation');
+  assert.equal(record.error_code, 'E_VALIDATION');
+  assert.equal(JSON.parse(readFileSync(path.join(sDir, 'session.json'), 'utf8')).round, 1);
+});
+
+test('事前検証は committed digest と locator excerpt を厳密に照合する', () => {
+  const persistence = durablePersistence();
+  persistence.roundReductionStage = 'enforce-new-session';
+  const { created, committed } = setupScoredSession(persistence);
+  const sDir = path.join(persistence.dir, 'sessions', created.session_id);
+  const base = {
+    session_id: created.session_id,
+    expected_round: 1,
+    scores: fullScores(),
+  };
+  assert.throws(() => scoreSubmit({
+    input: { ...base, submission_id: submissionId(), artifact_digest: `sha256:${'0'.repeat(64)}` },
+    persistence,
+  }), { code: 'E_DIGEST_MISMATCH' });
+  assert.throws(() => scoreSubmit({
+    input: {
+      ...base,
+      submission_id: submissionId(),
+      artifact_digest: committed.artifact.digest,
+      scores: fullScores({ impl_works: { evidence: [{ kind: 'locator', locator: '§1', excerpt: '実装は 完全に期待通り動作することを確認した。' }] } }),
+    },
+    persistence,
+  }), { code: 'E_EVIDENCE_EXCERPT_MISMATCH' });
+  const rejectedDir = path.join(sDir, 'rounds', '1.rejected');
+  assert.equal(readdirSync(rejectedDir).length, 2);
+  assert.equal(JSON.parse(readFileSync(path.join(sDir, 'session.json'), 'utf8')).round, 1);
 });
 
 test('buildMustFix は priority 降順 -> スコア昇順で並び替え、高優先・高得点が低優先・低得点より先頭に来る', () => {

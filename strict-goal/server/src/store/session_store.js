@@ -2,6 +2,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { writeJson, readJson } from './atomic.js';
 import { updateIndexForSession } from './index_store.js';
+import { readSessionVersion } from '../storage/session_migration.js';
 
 export function sessionDir(dataDir, sessionId) {
   return path.join(dataDir, 'sessions', sessionId);
@@ -28,7 +29,7 @@ export function writeSession(dataDir, session) {
 }
 
 export function readSession(dataDir, sessionId) {
-  return readJson(sessionPath(dataDir, sessionId));
+  return readSessionVersion(readJson(sessionPath(dataDir, sessionId)));
 }
 
 export function sessionExists(dataDir, sessionId) {

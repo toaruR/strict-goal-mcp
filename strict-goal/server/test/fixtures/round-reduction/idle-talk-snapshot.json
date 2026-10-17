@@ -1,0 +1,10 @@
+{
+  "description": "Synthetic acceptance cases; no measured release result is asserted.",
+  "snapshot": {"artifact": "idle-talk-artifact", "upstream": "idle-talk-upstream", "scope": "idle-talk-scope", "rubric": "idle-talk-rubric", "environment": "idle-talk-environment"},
+  "cases": [
+    {"id": "anchor-outside", "expected": "reject_unbound_deduction", "intervention": "A", "expected_blocking": false, "baseline_blocking": true},
+    {"id": "upstream-changed", "expected": "invalidate_affected_criteria", "intervention": "C", "expected_blocking": true, "baseline_blocking": true},
+    {"id": "test-exclusion", "expected": "require_approval", "intervention": "B", "expected_blocking": true, "baseline_blocking": true},
+    {"id": "readme-defect", "expected": "retain_real_defect", "intervention": "D", "expected_blocking": true, "baseline_blocking": true, "artifact": "README says: Missing setup instructions.", "excerpt": "Missing setup instructions."}
+  ]
+}

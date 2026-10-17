@@ -9,6 +9,9 @@ import { artifactCommit } from '../src/tools/artifact_commit.js';
 import { scoreSubmit } from '../src/tools/score_submit.js';
 import { escalate } from '../src/tools/escalate.js';
 import { saveContentArtifact } from '../src/artifact/store.js';
+import { buildCriterionCacheKey, isCacheReuseEligible } from '../src/evaluation/cache_key.js';
+import { calculateInvalidatedCriteria } from '../src/chain/rebase.js';
+import { deriveUpstreamChanges } from '../src/chain/upstream_diff.js';
 
 function tmpDataDir() {
   return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-rebase-'));
@@ -328,4 +331,52 @@ test('SUPERSEDED でない状態から rebase を呼ぶと E_STATE_VIOLATION に
       }),
     { code: 'E_STATE_VIOLATION' },
   );
+});
+
+test('dependency intersection invalidates its graph dependents but retains unrelated criteria', () => {
+  const scores = [
+    { criterion_id: 'contract', dependency_declaration: { artifact_paths: [], upstream_contract_ids: ['api-v2'], scope_ids: [], rubric_clause_ids: [], evidence_kinds: [], verification_env_keys: [] } },
+    { criterion_id: 'dependent', dependency_declaration: { artifact_paths: ['README.md'], upstream_contract_ids: [], scope_ids: [], rubric_clause_ids: [], evidence_kinds: [], verification_env_keys: [] } },
+    { criterion_id: 'unrelated', dependency_declaration: { artifact_paths: ['CHANGELOG.md'], upstream_contract_ids: [], scope_ids: [], rubric_clause_ids: [], evidence_kinds: [], verification_env_keys: [] } },
+  ];
+  const invalidated = calculateInvalidatedCriteria(scores, {
+    changedDependencyKeys: ['upstream:api-v2'],
+    criterionGraph: { contract: ['dependent'] },
+  });
+  assert.deepEqual([...invalidated].sort(), ['contract', 'dependent']);
+});
+
+test('fixed structured bytes reject ambiguity and derive fileset paths from complete records', () => {
+  const files = (items, extra = {}) => JSON.stringify({ files: items, ...extra });
+  const entry = (path, digit) => ({ path, sha256: digit.repeat(64) });
+  const old = files([entry('src/a.js', 'a'), entry('test/b.js', 'b')]);
+  const next = files([entry('src/a.js', 'c'), entry('test/b.js', 'b')]);
+  assert.deepEqual(deriveUpstreamChanges('fileset', old, next).changed, ['artifact:src/a.js']);
+  assert.equal(deriveUpstreamChanges('fileset', old, files([entry('../bad', 'a')])), null);
+  assert.equal(deriveUpstreamChanges('fileset', old, files([entry('src/a.js', 'a'), entry('src/a.js', 'b')])), null);
+  assert.equal(deriveUpstreamChanges('fileset', old, files([entry('src/a.js', 'c')], { command: 'changed' })), null);
+  assert.equal(deriveUpstreamChanges('markdown', old, next), null);
+});
+
+test('artifact glob dependencies invalidate only matching paths and reject traversal patterns', () => {
+  const decl = (artifact_paths) => ({ artifact_paths, upstream_contract_ids: [], scope_ids: [], rubric_clause_ids: [], evidence_kinds: [], verification_env_keys: [] });
+  const scores = [{ criterion_id: 'source', dependency_declaration: decl(['src/**/*.js']) }, { criterion_id: 'tests', dependency_declaration: decl(['test/**']) }, { criterion_id: 'unsafe', dependency_declaration: decl(['../*']) }];
+  const result = calculateInvalidatedCriteria(scores, { changedDependencyKeys: ['artifact:src/a.js'] });
+  assert.deepEqual([...result].sort(), ['source', 'unsafe']);
+});
+
+test('AC-RR-09 only reuses cache with unchanged keys, locator, and known environment', () => {
+  assert.equal(isCacheReuseEligible({ changedKeys: 0, locatorPresent: true, environmentKnown: true }), true);
+  assert.equal(isCacheReuseEligible({ changedKeys: 1, locatorPresent: true, environmentKnown: true }), false);
+  assert.equal(isCacheReuseEligible({ changedKeys: 0, locatorPresent: false, environmentKnown: true }), false);
+  assert.equal(isCacheReuseEligible({ changedKeys: 0, locatorPresent: true, environmentKnown: false }), false);
+});
+
+test('criterion cache key is stable for reordered dependency values and changes with inputs', () => {
+  const base = { criterionId: 'contract', rubricDigest: `sha256:${'a'.repeat(64)}`, verificationEnvDigest: `sha256:${'b'.repeat(64)}`, evidenceSetDigest: `sha256:${'c'.repeat(64)}` };
+  const first = buildCriterionCacheKey({ ...base, dependencyValues: { 'artifact:README.md': 'one', 'upstream:api': 'two' } });
+  const reordered = buildCriterionCacheKey({ ...base, dependencyValues: { 'upstream:api': 'two', 'artifact:README.md': 'one' } });
+  const changed = buildCriterionCacheKey({ ...base, dependencyValues: { 'artifact:README.md': 'three', 'upstream:api': 'two' } });
+  assert.equal(first, reordered);
+  assert.notEqual(first, changed);
 });

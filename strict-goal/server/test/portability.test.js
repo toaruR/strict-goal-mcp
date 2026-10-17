@@ -21,9 +21,10 @@ test('パッケージ直下のコンポーネントが skills/, agents/, mcp.jso
   assert.ok(statSync(path.join(packageRoot, 'skills')).isDirectory());
   assert.ok(existsSync(path.join(packageRoot, 'mcp.json')), 'mcp.json が必要');
   assert.ok(statSync(path.join(packageRoot, 'mcp.json')).isFile());
+  assert.ok(statSync(path.join(packageRoot, 'README.md')).isFile());
 
   const entries = readdirSync(packageRoot);
-  const nonComponentEntries = new Set(['plugin.json', 'mcp.http.json', 'presets', 'server']);
+  const nonComponentEntries = new Set(['plugin.json', 'mcp.http.json', 'presets', 'server', 'README.md']);
   const unexpected = entries.filter((e) => e !== 'skills' && e !== 'agents' && e !== 'mcp.json' && !nonComponentEntries.has(e));
   assert.deepEqual(unexpected, [], `未知のトップレベル項目: ${unexpected.join(', ')}`);
 });

@@ -1,10 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { writeSession, readSession } from '../src/store/session_store.js';
 import { readIndex, resolveByLabel, resolveByChain } from '../src/store/index_store.js';
+import { V1_POLICY } from '../src/policy/session_policy.js';
 
 function tmpDataDir() {
   return mkdtempSync(path.join(os.tmpdir(), 'strict-goal-session-'));
@@ -38,7 +39,10 @@ test('session.json を書いた直後に読み戻すと全フィールドが一�
   const session = sampleSession();
   writeSession(dataDir, session);
   const readBack = readSession(dataDir, session.session_id);
-  assert.deepEqual(readBack, session);
+  const { evaluation_policy, ...legacyFields } = readBack;
+  assert.deepEqual(legacyFields, session);
+  assert.deepEqual(evaluation_policy, V1_POLICY);
+  assert.deepEqual(JSON.parse(readFileSync(path.join(dataDir, 'sessions', session.session_id, 'session.json'), 'utf8')), session);
 });
 
 test('session.json に server.plugin_root_source が記録される', () => {

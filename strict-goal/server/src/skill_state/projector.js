@@ -3,6 +3,7 @@ import path from 'node:path';
 import { loadRubric } from '../rubric/store.js';
 import { sessionDir } from '../store/session_store.js';
 import { pendingChatNextAction } from '../escalation/chat.js';
+import { unresolvedIssueSummary } from '../evidence/issue_ledger.js';
 
 const ALLOWED_TOOLS_BY_STATE = {
   DRAFTING: ['loop_open', 'loop_state', 'artifact_commit', 'rubric_amend', 'escalate', 'audit_export'],
@@ -52,8 +53,16 @@ export function projectSkillState({ dataDir, session }) {
 
   const trialHistory = readTrialHistory(dataDir, session.session_id);
 
-  let mustFix = [];
-  if (session.last_evaluation?.must_fix) {
+ let mustFix = [];
+ let issueSummary;
+ try {
+   issueSummary = unresolvedIssueSummary(dataDir, session.session_id);
+ } catch {
+   issueSummary = undefined;
+ }
+ if (issueSummary?.ledger_ref.event_count > 0) {
+   mustFix = issueSummary.must_fix;
+ } else if (session.last_evaluation?.must_fix) {
     mustFix = session.last_evaluation.must_fix.map((item) => {
       return typeof item === 'string' ? item : item.criterion_id;
     }).filter(Boolean);
@@ -68,6 +77,11 @@ export function projectSkillState({ dataDir, session }) {
     counters: session.counters,
     policy: session.policy,
   };
+ if (issueSummary?.ledger_ref.event_count > 0) {
+   canonicalState.unresolved_count = issueSummary.unresolved_count;
+   canonicalState.undisplayed_issue_ids = issueSummary.undisplayed_issue_ids;
+   canonicalState.ledger_ref = issueSummary.ledger_ref;
+ }
 
   let recentObservation;
   if (session.state === 'COMMITTED' || session.state === 'SCORING') {

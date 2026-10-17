@@ -1,0 +1,607 @@
+{
+  "plan_version": 1,
+  "summary": "Risk-first implementation DAG for the finalized strict-goal round/time/token reduction design. Pinned upstream is .strict-goal/sessions/rl_01M52N8D8CJW50XQW9PM1WZ9ZQ/artifacts/sha256-7834436c8df49b67f9b4995d0ea9f9103cb2a8096ee9a3ccdd13762a791ba338.md (sha256:7834436c8df49b67f9b4995d0ea9f9103cb2a8096ee9a3ccdd13762a791ba338); the named design file differs only by one terminal LF and is not modified by this plan. T001 proves live runtime-source identity and captures the pre-change baseline before behavior changes; data contracts and reject-path invariants precede score admission, dependency-aware reuse, and rollout. Every completed task keeps the server test suite green; v2 remains policy/flag-gated until the A/B quality gate passes.",
+  "tasks": [
+    {
+      "id": "T001",
+      "title": "Pin runtime source identity and capture a reproducible v1 baseline",
+      "intent": "Before changing a source file, prove that the exercised MCP/server command resolves to the repository copy, record executable/version/path/digest and collect matched v1 fixtures for rounds, tokens, wall clock, issue churn and quality counters. Fail closed when identity is ambiguous.",
+      "design_refs": [
+        "# strict-goal round・時間・token削減 設計仕様",
+        "## 1. 背景、根拠の境界、決定",
+        "### 1.1 解決する問題",
+        "### 1.2 確認済みの現状事実",
+        "### 1.4 現行根拠の再現手順と提案との境界",
+        "## 2. 目的と非目的",
+        "### 2.1 目的",
+        "### 2.2 非目的",
+        "## 10. 観測、指標、A/B 評価",
+        "## 13. rollout、rollback、受入基準"
+      ],
+      "depends_on": [],
+      "changes": [
+        {
+          "path": "strict-goal/server/src/runtime/preflight.js",
+          "kind": "add",
+          "note": "Add read-only resolved-path, executable and content-digest identity checks that reject a non-repository runtime."
+        },
+        {
+          "path": "strict-goal/server/test/runtime_preflight.test.js",
+          "kind": "add",
+          "note": "Cover repository identity acceptance and mismatched/missing source rejection."
+        },
+        {
+          "path": "strict-goal/server/test/fixtures/round-reduction/v1-baseline.json",
+          "kind": "add",
+          "note": "Store redacted matched baseline fixture and explicit unknown fields."
+        }
+      ],
+      "acceptance": [
+        "A repository-resolved runtime emits the checked source path and SHA-256 digest, while a mismatched or absent path returns a typed preflight failure before scoring.",
+        "The baseline fixture contains phase, artifact/upstream/scope/rubric/environment snapshot digests, rounds, token and wall-clock breakdowns, issue counters and unknown values without secrets or full command output."
+      ],
+      "verify": [
+        {
+          "command": "cd ../strict-goal/server && node --test test/runtime_preflight.test.js",
+          "expect_exit_code": 0,
+          "note": "identity acceptance and fail-closed rejection"
+        },
+        {
+          "command": "cd ../strict-goal/server && node -e \"const x=require('./test/fixtures/round-reduction/v1-baseline.json'); for (const k of ['phase','snapshot','rounds','tokens','wall_clock','issue_counters']) if (!(k in x)) process.exit(1); console.log('baseline-fixture=ok')\"",
+          "expect_exit_code": 0,
+          "note": "baseline fields are machine-readable"
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T002",
+      "title": "Introduce versioned v2 evaluation, issue and change-reason contracts",
+      "intent": "Add bounded schemas and constructors for IssueRecord v1, CriterionEvaluation v2 and ChangeReason with stable IDs, lifecycle fields, anchor/evidence/resolution bindings and explicit unknown/not-applicable values.",
+      "design_refs": [
+        "## 3. 用語とデータ契約",
+        "### 3.1 `IssueRecord` v1",
+        "### 3.2 `CriterionEvaluation` v2",
+        "### 3.3 変更理由 `ChangeReason`",
+        "## 4. 採点と issue 台帳の規則"
+      ],
+      "depends_on": [
+        "T001"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/server/src/evaluation/contracts.js",
+          "kind": "add",
+          "note": "Define validated immutable v2 contract constructors and bounded fields."
+        },
+        {
+          "path": "strict-goal/server/schemas/evaluation-v2.json",
+          "kind": "add",
+          "note": "Publish versioned JSON schema for persisted evaluation records."
+        },
+        {
+          "path": "strict-goal/server/test/evaluation_contracts.test.js",
+          "kind": "add",
+          "note": "Test valid boundaries and rejected missing/oversized/unknown contract fields."
+        }
+      ],
+      "acceptance": [
+        "Valid records preserve issue_id, first_seen, lifecycle state, severity, anchor clause, evidence locator/digest and resolution condition; records lacking a required binding fail schema validation.",
+        "A ChangeReason is one of the documented reasons and cannot silently represent an unknown condition as unchanged."
+      ],
+      "verify": [
+        {
+          "command": "cd ../strict-goal/server && node --test test/evaluation_contracts.test.js",
+          "expect_exit_code": 0,
+          "note": "schema and contract boundary coverage"
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T003",
+      "title": "Persist append-only issue ledger and compact skill-state projection",
+      "intent": "Store lifecycle transitions as hash-linked append-only records and project the top three unresolved must_fix entries plus total count and ledger reference without losing the full ledger.",
+      "design_refs": [
+        "## 4. 採点と issue 台帳の規則",
+        "## 5. 正確な状態機械",
+        "### 5.1 遷移表",
+        "### 8.2 保存と監査",
+        "## 12. 実装対象と検証計画"
+      ],
+      "depends_on": [
+        "T002"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/server/src/evidence/issue_ledger.js",
+          "kind": "add",
+          "note": "Append, hash-chain and query issue lifecycle events including duplicated, reaffirmed, resolved and reopened."
+        },
+        {
+          "path": "strict-goal/server/src/skill_state/projector.js",
+          "kind": "modify",
+          "note": "Project ordered compact must_fix summary, unresolved_count and ledger_ref."
+        },
+        {
+          "path": "strict-goal/server/test/issue_ledger.test.js",
+          "kind": "add",
+          "note": "Test legal transitions, hash-chain continuity and AC-RR-04 ordering/count boundaries."
+        }
+      ],
+      "acceptance": [
+        "A four-unresolved-issue fixture returns exactly the oldest/priority-defined three IDs plus unresolved_count=4 and ledger_ref; no fourth issue is discarded from storage.",
+        "Illegal lifecycle transitions are rejected with E_ISSUE_STATE_INVALID and each accepted event links to the previous record hash."
+      ],
+      "verify": [
+        {
+          "command": "cd ../strict-goal/server && node --test test/issue_ledger.test.js",
+          "expect_exit_code": 0,
+          "note": "ledger transitions and AC-RR-04 boundary"
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T004",
+      "title": "Validate score_submit v2 input before round advancement",
+      "intent": "Add schema, size/unknown-field, committed-byte digest and exact-excerpt/locator prevalidation. Persist one rejected_prevalidation audit event and preserve effective round; same bytes retry is idempotent and differing bytes are distinct audit events.",
+      "design_refs": [
+        "### 1.3 提案であり未検証のこと",
+        "## 8. API、保存、skill state",
+        "### 8.1 `score_submit` 拡張",
+        "### 8.3 提出の事前検証と監査境界",
+        "### 12.0 自己適用の依存適合性追補",
+        "## 11. エラーと境界事例"
+      ],
+      "depends_on": [
+        "T002",
+        "T003"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/server/src/tools/score_submit.js",
+          "kind": "modify",
+          "note": "Run prevalidation before mutable scoring and return typed reject results."
+        },
+        {
+          "path": "strict-goal/server/src/evidence/verify.js",
+          "kind": "modify",
+          "note": "Verify exact locator excerpts and committed content digests."
+        },
+        {
+          "path": "strict-goal/server/test/score_submit.test.js",
+          "kind": "modify",
+          "note": "Cover unknown fields, byte/digest mismatch, locator mismatch, round invariance and idempotent retries."
+        }
+      ],
+      "acceptance": [
+        "Schema limit overflow, unknown fields, digest mismatch and excerpt mismatch each create one rejected_prevalidation event, return a typed error and leave effective_round unchanged.",
+        "Resending identical payload bytes/submission_id creates no extra event; different bytes create a distinct audit event without being counted as a successful score."
+      ],
+      "verify": [
+        {
+          "command": "cd ../strict-goal/server && node --test test/score_submit.test.js",
+          "expect_exit_code": 0,
+          "note": "prevalidation and idempotency regression suite"
+        }
+      ],
+      "estimate_rounds": 3
+    },
+    {
+      "id": "T005",
+      "title": "Enforce score, anchor and open-blocking admission rules",
+      "intent": "Apply the pass predicate and score<9 evidence/anchor/resolution requirements, rejecting score inflation, missing anchor bindings and finalization with an open blocking issue.",
+      "design_refs": [
+        "## 4. 採点と issue 台帳の規則",
+        "## 7. anti-gaming と承認統制",
+        "## 12. 実装対象と検証計画",
+        "## 13. rollout、rollback、受入基準"
+      ],
+      "depends_on": [
+        "T003",
+        "T004"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/server/src/judge/anti_gaming.js",
+          "kind": "modify",
+          "note": "Implement context-aware anchor/relevance/staleness and inflation guards."
+        },
+        {
+          "path": "strict-goal/server/src/tools/score_submit.js",
+          "kind": "modify",
+          "note": "Apply score admission and FINAL predicate after prevalidation."
+        },
+        {
+          "path": "strict-goal/server/test/score_submit.test.js",
+          "kind": "modify",
+          "note": "Add AC-RR-01, AC-RR-02, AC-RR-03 and AC-RR-07 boundary fixtures."
+        }
+      ],
+      "acceptance": [
+        "score=8 with an absent required anchor/evidence/resolution binding is rejected; score=8 with all required bindings updates the ledger.",
+        "score=9 and open_blocking=1 returns E_ISSUE_STATE_INVALID; score=9 and open_blocking=0 may pass only when all other policy requirements hold."
+      ],
+      "verify": [
+        {
+          "command": "cd ../strict-goal/server && node --test test/score_submit.test.js",
+          "expect_exit_code": 0,
+          "note": "AC-RR-01/02/03/07 boundary fixtures"
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T006",
+      "title": "Build dependency-aware invalidation and conservative cache reuse",
+      "intent": "Compute affected criteria from artifact, upstream, scope, rubric, environment and test-selection dependencies; reuse only when all declared dependency values, evidence locator/TTL and environment digest are valid.",
+      "design_refs": [
+        "## 6. 依存、再評価、キャッシュ",
+        "### 6.1 invalidation 算法",
+        "### 6.2 キャッシュ key と無効化",
+        "### 6.3 cache を使わない条件",
+        "### 12.1 AC-RR-09 の訂正: dependency-cache 診断"
+      ],
+      "depends_on": [
+        "T002",
+        "T004"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/server/src/chain/rebase.js",
+          "kind": "modify",
+          "note": "Calculate dependency-graph invalidation and criterion-local fresh/reused evaluation bases."
+        },
+        {
+          "path": "strict-goal/server/src/evaluation/cache_key.js",
+          "kind": "add",
+          "note": "Construct documented SHA-256 cache keys from sorted dependency values and verification inputs."
+        },
+        {
+          "path": "strict-goal/server/test/rebase.test.js",
+          "kind": "modify",
+          "note": "Test intersecting upstream invalidation, unknown dependency, missing locator and environment change."
+        }
+      ],
+      "acceptance": [
+        "An approved upstream change invalidates only criteria whose dependency declarations intersect it; unaffected criteria remain eligible for reuse.",
+        "The AC-RR-09 four cases yield reused only for changed_keys=0, locator=present and environment=known; every other case yields fresh."
+      ],
+      "verify": [
+        {
+          "command": "cd ../strict-goal/server && node --test test/rebase.test.js",
+          "expect_exit_code": 0,
+          "note": "invalidation and AC-RR-09 four-case fixture"
+        }
+      ],
+      "estimate_rounds": 3
+    },
+    {
+      "id": "T007",
+      "title": "Bind approval to condition changes and retain evaluation context",
+      "intent": "Persist hash-linked context/approval records and reject unapproved scope, rubric, environment or test-selection changes; mark approved digest-bound changes condition_changed without converting a condition change into artifact improvement.",
+      "design_refs": [
+        "### 3.3 変更理由 `ChangeReason`",
+        "## 7. anti-gaming と承認統制",
+        "### 8.2 保存と監査",
+        "## 11. エラーと境界事例"
+      ],
+      "depends_on": [
+        "T003",
+        "T006"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/server/src/evidence/evaluation_context.js",
+          "kind": "add",
+          "note": "Persist redacted snapshot/context and digest-bound approval bindings."
+        },
+        {
+          "path": "strict-goal/server/src/tools/score_submit.js",
+          "kind": "modify",
+          "note": "Reject unapproved condition changes and label approved changes."
+        },
+        {
+          "path": "strict-goal/server/test/evaluation_context.test.js",
+          "kind": "add",
+          "note": "Test scope/rubric/environment/test-selection approval and expiration/mismatch boundaries."
+        }
+      ],
+      "acceptance": [
+        "An unapproved scope_change returns E_SCOPE_APPROVAL_REQUIRED; exactly one matching digest-bound approval accepts the change and returns condition_changed=true.",
+        "Approval, context and invalidation records store no secret or full command output and retain previous-record hash linkage."
+      ],
+      "verify": [
+        {
+          "command": "cd ../strict-goal/server && node --test test/evaluation_context.test.js",
+          "expect_exit_code": 0,
+          "note": "AC-RR-06 and context audit coverage"
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T008",
+      "title": "Make rejection, replay and pagination behavior deterministic",
+      "intent": "Integrate v2 storage with idempotent submissions, rejected-submission artifacts and bounded oldest-to-newest pagination without duplicate ledger/cache/approval accounting.",
+      "design_refs": [
+        "## 5. 正確な状態機械",
+        "### 5.1 遷移表",
+        "### 8.2 保存と監査",
+        "### 8.3 提出の事前検証と監査境界",
+        "## 11. エラーと境界事例"
+      ],
+      "depends_on": [
+        "T003",
+        "T004",
+        "T007"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/server/src/judge/round_store.js",
+          "kind": "modify",
+          "note": "Store rejected artifacts, submission idempotency data and bounded return/page cursors."
+        },
+        {
+          "path": "strict-goal/server/src/tools/score_submit.js",
+          "kind": "modify",
+          "note": "Return deterministic compact summaries and pagination metadata."
+        },
+        {
+          "path": "strict-goal/server/test/round_store.test.js",
+          "kind": "add",
+          "note": "Test replay no-op, distinct submissions and serialize/restore pagination order."
+        }
+      ],
+      "acceptance": [
+        "The same submission_id is a no-op for round, ledger event, approval use and cache statistics; a different submission_id produces exactly one additional event.",
+        "Restoring a bounded page/window preserves oldest-to-newest order and returns a stable cursor/reference rather than dropping unresolved records."
+      ],
+      "verify": [
+        {
+          "command": "cd ../strict-goal/server && node --test test/round_store.test.js",
+          "expect_exit_code": 0,
+          "note": "AC-RR-08 and deterministic pagination/replay"
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T009",
+      "title": "Preserve v1 sessions through versioned migration and policy pinning",
+      "intent": "Add dual-read v1/v2 adapters and session-start policy pinning so legacy reload, kickback, rebase, artifact freeze, chain budget and approval tokens remain compatible; v2 enforcement applies only to new flagged sessions.",
+      "design_refs": [
+        "## 9. 互換性と移行",
+        "## 11. エラーと境界事例",
+        "## 13. rollout、rollback、受入基準"
+      ],
+      "depends_on": [
+        "T005",
+        "T006",
+        "T008"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/server/src/storage/session_migration.js",
+          "kind": "add",
+          "note": "Dual-read v1/v2 session adapter and additive migration helpers."
+        },
+        {
+          "path": "strict-goal/server/src/policy/session_policy.js",
+          "kind": "add",
+          "note": "Pin policy/schema version and feature flags at session creation."
+        },
+        {
+          "path": "strict-goal/server/test/session_migration.test.js",
+          "kind": "add",
+          "note": "Test legacy reload/rebase/kickback and no mixed v1/v2 score behavior."
+        }
+      ],
+      "acceptance": [
+        "A legacy v1 fixture reloads and completes existing freeze, chain-budget and approval-token regressions without creating v2 ledger requirements.",
+        "A v2 session retains its starting policy across reopen/kickback; rollback disables only new v2 writes and does not mix v1/v2 scores."
+      ],
+      "verify": [
+        {
+          "command": "cd ../strict-goal/server && node --test test/session_migration.test.js",
+          "expect_exit_code": 0,
+          "note": "legacy compatibility and policy pinning"
+        }
+      ],
+      "estimate_rounds": 3
+    },
+    {
+      "id": "T010",
+      "title": "Add observability and matched A/B quality release gate",
+      "intent": "Record required phase/timing/token/issue/reuse measurements, run paired fixtures that add A through D separately, and prevent default-on promotion if escaped defects or false positives worsen or measurements are missing.",
+      "design_refs": [
+        "## 10. 観測、指標、A/B 評価",
+        "## 11. エラーと境界事例",
+        "## 13. rollout、rollback、受入基準"
+      ],
+      "depends_on": [
+        "T005",
+        "T006",
+        "T007",
+        "T009"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/server/src/metrics/round_reduction.js",
+          "kind": "add",
+          "note": "Collect documented metric fields and represent absent data as unknown."
+        },
+        {
+          "path": "strict-goal/server/test/round_reduction_ab.test.js",
+          "kind": "add",
+          "note": "Run matched A/B fixtures and assert quality non-regression release criteria."
+        },
+        {
+          "path": "strict-goal/server/test/fixtures/round-reduction/idle-talk-snapshot.json",
+          "kind": "add",
+          "note": "Provide design-mandated snapshot fixture for anchor, upstream, test exclusion and README defects."
+        }
+      ],
+      "acceptance": [
+        "Each v2 session/round records phase, client/model/reasoning setting, snapshot digest, fresh/reused counts, invalidation reason, issue events, parent/child token breakdown, LLM/command/approval/idle/wall-clock timing, with missing values recorded as unknown.",
+        "The release gate compares matched snapshots and fails promotion when escaped defects or false positives increase, or when round/token/wall-clock reduction lacks the required breakdown."
+      ],
+      "verify": [
+        {
+          "command": "cd ../strict-goal/server && node --test test/round_reduction_ab.test.js",
+          "expect_exit_code": 0,
+          "note": "matched A/B metrics and quality gate"
+        }
+      ],
+      "estimate_rounds": 3
+    },
+    {
+      "id": "T011",
+      "title": "Update verifier and worker contracts consistently across distributed skill copies",
+      "intent": "Document structured score evidence, mandatory bounded issue/condition/reuse probes and v2 rollout/rollback behavior in the canonical agent guides and generated/distributed copies, with tests that assert behavioral contract parity rather than prose length.",
+      "design_refs": [
+        "### 8.1 `score_submit` 拡張",
+        "## 10. 観測、指標、A/B 評価",
+        "## 12. 実装対象と検証計画",
+        "## 13. rollout、rollback、受入基準"
+      ],
+      "depends_on": [
+        "T005",
+        "T006",
+        "T007",
+        "T009"
+      ],
+      "changes": [
+        {
+          "path": ".claude/agents/sg-verifier.md",
+          "kind": "modify",
+          "note": "Specify v2 evidence, adversarial probes and score-submit validation procedure."
+        },
+        {
+          "path": ".codex/agents/sg-verifier.toml",
+          "kind": "modify",
+          "note": "Keep Codex verifier contract synchronized with canonical verifier procedure."
+        },
+        {
+          "path": "strict-goal/server/test/subagents.test.js",
+          "kind": "modify",
+          "note": "Assert required structured contract tokens/steps across canonical and distributed copies."
+        }
+      ],
+      "acceptance": [
+        "Every maintained verifier/worker copy instructs the agent to preserve full issue ledger evidence, distinguish fresh from reused evaluation and run conditional scope/rubric/environment/test-selection probes before scoring.",
+        "The contract test identifies a missing required procedure in any maintained copy without requiring a fixed prose length."
+      ],
+      "verify": [
+        {
+          "command": "cd ../strict-goal/server && node --test test/subagents.test.js",
+          "expect_exit_code": 0,
+          "note": "distributed agent-contract parity"
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T012",
+      "title": "Publish migration and operator documentation with rollout controls",
+      "intent": "Document feature flags, observe-only through default-on stages, new-session-only rollback, policy pinning, additive storage, compatibility period and the separate approval required before v1 removal.",
+      "design_refs": [
+        "## 9. 互換性と移行",
+        "## 10. 観測、指標、A/B 評価",
+        "## 13. rollout、rollback、受入基準"
+      ],
+      "depends_on": [
+        "T009",
+        "T010",
+        "T011"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/README.md",
+          "kind": "add",
+          "note": "Describe user-visible v2 policy, feature flags and safe rollback behavior."
+        },
+        {
+          "path": "docs/strict-goal-round-reduction-migration.md",
+          "kind": "add",
+          "note": "Document migration, compatibility window, metrics gate and deferred v1 removal."
+        },
+        {
+          "path": "strict-goal/server/test/documentation_contract.test.js",
+          "kind": "add",
+          "note": "Check required commands and migration/rollback claims against actual flags/policy names."
+        }
+      ],
+      "acceptance": [
+        "Documentation states that existing sessions retain their start policy, rollback stops new v2 writes, and irreversible v1 removal requires a later separately approved change.",
+        "Operator documentation names the A/B quality gate and does not claim a reduction when data is unknown or approval wait is counted as productive work."
+      ],
+      "verify": [
+        {
+          "command": "cd ../strict-goal/server && node --test test/documentation_contract.test.js",
+          "expect_exit_code": 0,
+          "note": "documentation-to-runtime contract"
+        }
+      ],
+      "estimate_rounds": 2
+    },
+    {
+      "id": "T013",
+      "title": "Run integrated regression and staged rollout readiness gate",
+      "intent": "Execute targeted v2 boundary suites, legacy regressions and the full server suite; create a redacted readiness record only when all tests and the matched quality gate pass, otherwise keep the feature at the preceding stage.",
+      "design_refs": [
+        "## 12. 実装対象と検証計画",
+        "### 12.0 自己適用の依存適合性追補",
+        "### 12.1 AC-RR-09 の訂正: dependency-cache 診断",
+        "## 13. rollout、rollback、受入基準"
+      ],
+      "depends_on": [
+        "T008",
+        "T010",
+        "T012"
+      ],
+      "changes": [
+        {
+          "path": "strict-goal/server/test/round_reduction_integration.test.js",
+          "kind": "add",
+          "note": "Exercise AC-RR-01 through AC-RR-09, legacy regressions and idle-talk snapshot in one integrated flow."
+        },
+        {
+          "path": "strict-goal/server/test/fixtures/round-reduction/readiness.expected.json",
+          "kind": "add",
+          "note": "Define redacted expected readiness report shape and selected/deselected/skipped accounting."
+        },
+        {
+          "path": "strict-goal/server/src/rollout/readiness.js",
+          "kind": "add",
+          "note": "Produce readiness status from tests and quality gates without promoting the flag itself."
+        }
+      ],
+      "acceptance": [
+        "All AC-RR-01 through AC-RR-09 fixtures, legacy session regressions and the complete server test suite pass with exit code 0; any failure leaves the feature at observe-only/previous policy stage.",
+        "The readiness record includes collection/selected/deselected/skipped counts and reasons, quality gate result, and no secrets or full command output."
+      ],
+      "verify": [
+        {
+          "command": "cd ../strict-goal/server && node --test test/round_reduction_integration.test.js",
+          "expect_exit_code": 0,
+          "note": "integrated acceptance boundaries"
+        },
+        {
+          "command": "cd ../strict-goal/server && npm test",
+          "expect_exit_code": 0,
+          "note": "full server regression suite"
+        }
+      ],
+      "estimate_rounds": 3
+    }
+  ],
+  "assumptions": [
+    "Plan artifact scope only: implementation, fixture creation, live MCP deployment, and score submission are excluded. Current validation proves the plan shape and references; future-task test commands are required outputs, not claimed current executions.",
+    "All verify commands run from the docs workspace and explicitly cd ../strict-goal/server; success means the named task test exits 0 and reports its asserted boundary. T013 additionally requires npm test exit 0 after its integration test.",
+    "Partial-failure rule for every task: do not start a dependent task until its predecessor verification exits 0. Revert only the failing task transaction, retain prior green checkpoints and append-only records, then rerun that task verification before resuming.",
+    "Risk order is intentional: T001 resolves runtime identity and baseline uncertainty first; T002-T008 establish contracts, ledger, rejection and cache invariants before migration, A/B gate, skill copies, documentation, and integrated release readiness.",
+    "Design traceability is complete when the 32 immutable artifact headings are covered by task design_refs; the document title and context/non-goal headings map to T001, while executable contracts map to T002-T013."
+  ]
+}

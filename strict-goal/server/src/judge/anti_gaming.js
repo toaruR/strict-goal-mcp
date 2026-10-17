@@ -51,3 +51,35 @@ export function checkEvidenceStale(criterionId, currentScore, previousScore, evi
     });
   }
 }
+
+// A score below the pass threshold is a claim that a concrete blocking problem
+// remains.  Do not accept a generic command result or vague weakness as a
+// substitute for the anchor, evidence, and resolution bindings needed to make
+// that claim auditable.
+export function checkBelowPassBindings(criterionId, score, passScore, evidence, weakness) {
+  if (score >= passScore) return;
+
+  const anchors = evidence.filter((item) => item.kind === 'locator'
+    && typeof item.locator === 'string' && item.locator.trim().length > 0
+    && typeof item.excerpt === 'string' && item.excerpt.trim().length > 0);
+  if (anchors.length === 0) {
+    fail('E_ISSUE_BINDING_REQUIRED', 'score below pass threshold requires a locator anchor binding', {
+      criterion_id: criterionId,
+      required: 'anchor',
+    });
+  }
+
+  if (!Array.isArray(evidence) || evidence.length === 0) {
+    fail('E_ISSUE_BINDING_REQUIRED', 'score below pass threshold requires evidence binding', {
+      criterion_id: criterionId,
+      required: 'evidence',
+    });
+  }
+
+  if (typeof weakness !== 'string' || weakness.trim().length === 0 || weakness.trim().toLowerCase() === 'none') {
+    fail('E_ISSUE_BINDING_REQUIRED', 'score below pass threshold requires a resolution binding', {
+      criterion_id: criterionId,
+      required: 'resolution',
+    });
+  }
+}
