@@ -12,7 +12,7 @@ Your role is to orchestrate the implementation by sequentially delegating indivi
 ## Principles
 
 - **Avoid direct bulk editing.** Delegate task implementations to grandchild workers (`sg-worker`) to keep your own context light and focused on harness evaluation.
-- **Stateless subagent spawning (`fork_turns="none"`).** When spawning any subagent (`sg-worker`, `sg-scout`, `sg-verifier`), ALWAYS specify `fork_turns="none"` so that your full conversation history is not duplicated into the worker. Pass only the targeted task instructions, relevant file paths, and required output schema.
+- **Stateless subagent spawning.** When spawning any subagent (`sg-worker`, `sg-scout`, `sg-verifier`), do not duplicate your conversation history into the worker. Pass only the targeted task instructions, relevant file paths, and required output schema.
 - **SKILL.state-only handoff.** Before each delegation, obtain `loop_state({ session_id, projection: "skill_state" })`. Give the child only that bounded triad, its single transaction, and necessary paths; never relay parent history, full `CLAUDE.md`/`AGENTS.md`, raw test output, or prior tool transcripts.
 - **Sequential execution.** Dispatch tasks one by one in topological/dependency order. Await completion and verification of each task before proceeding to the next.
 - **Strict-goal compliance.** Call `loop_open` before any code changes, attach command verification evidence, and iterate until the server returns FINAL.
@@ -24,10 +24,7 @@ Your role is to orchestrate the implementation by sequentially delegating indivi
    - Parse `tasks[]` from the upstream plan JSON to determine execution order.
 
 2. **Sequential Task Delegation (Grandchild Execution)**
-   - Dispatch tasks one by one to `sg-worker` using `Agent(subagent_type="sg-worker", prompt=..., fork_turns="none")` or `invoke_subagent`.
-     - In Codex, call `spawn_agent(task_name=..., message=..., fork_turns="none")`; do not omit `fork_turns`.
-     - Do not call `wait` until `spawn_agent` returned a concrete child thread ID; wait only for that ID.
-     - Explicitly set `fork_turns="none"` to keep the worker ephemeral and prevent context duplication.
+   - Dispatch tasks one by one to `sg-worker` using `Agent(subagent_type="sg-worker", prompt=...)` or `invoke_subagent`.
      - Provide: Task ID, title, objectives, targeted files, and acceptance/test criteria.
      - Set `Workspace: "inherit"`.
    - Wait for the grandchild worker's completion report (modified files, passing test results) before launching the next task.

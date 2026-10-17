@@ -12,6 +12,8 @@ Your role is to orchestrate the implementation by sequentially delegating indivi
 ## Principles
 
 - **Avoid direct bulk editing.** Delegate task implementations to grandchild workers (`sg-worker`) to keep your own context light and focused on harness evaluation.
+- **Stateless subagent spawning (`fork_turns="none"`).** When spawning any subagent (`sg-worker`, `sg-scout`, `sg-verifier`), ALWAYS specify `fork_turns="none"` so that your full conversation history is not duplicated into the worker. Never omit `fork_turns` or replace it with a global `fork_context` setting. If this runtime cannot express a no-history spawn, report the incompatibility instead of silently inheriting history.
+- **SKILL.state-only handoff.** Before each delegation, obtain `loop_state({ session_id, projection: "skill_state", include: [] })`. Give the child only that bounded triad, its single transaction, and necessary paths; never relay parent history, full `CLAUDE.md`/`AGENTS.md`, raw test output, or prior tool transcripts.
 - **Sequential execution.** Dispatch tasks one by one in topological/dependency order. Await completion and verification of each task before proceeding to the next.
 - **Strict-goal compliance.** Call `loop_open` before any code changes, attach command verification evidence, and iterate until the server returns FINAL.
 
@@ -22,7 +24,9 @@ Your role is to orchestrate the implementation by sequentially delegating indivi
    - Parse `tasks[]` from the upstream plan JSON to determine execution order.
 
 2. **Sequential Task Delegation (Grandchild Execution)**
-   - Dispatch tasks one by one to `sg-worker` using `Agent(subagent_type="sg-worker", prompt=...)` or `invoke_subagent`:
+   - Dispatch tasks one by one to `sg-worker` using `spawn_agent(task_name=..., message=..., fork_turns="none")`; do not omit `fork_turns`:
+     - Wait only after a successful spawn. `collaboration.wait_agent` is a mailbox wait without receiver IDs; legacy `wait` takes the returned child ID. Use the actual schema, not a fabricated compatibility call.
+     - Spawn a new child for each task or `must_fix` round. Do not reuse a previous child via followup_task/send_message: its accumulated context would survive.
      - Provide: Task ID, title, objectives, targeted files, and acceptance/test criteria.
      - Set `Workspace: "inherit"`.
    - Wait for the grandchild worker's completion report (modified files, passing test results) before launching the next task.
