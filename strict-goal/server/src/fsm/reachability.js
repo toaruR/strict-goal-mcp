@@ -23,6 +23,7 @@ export const EDGES = Object.freeze([
   { from: 'SUPERSEDED', to: 'DRAFTING', requiresUpstream: true },
   { from: 'SUPERSEDED', to: 'ABORTED', requiresUpstream: true },
   { from: 'FROZEN', to: 'SUPERSEDED', requiresUpstream: true },
+  { from: 'FROZEN', to: 'DRAFTING', requiresUpstream: true },
   { from: 'FROZEN', to: 'ABORTED', requiresUpstream: true },
 ]);
 

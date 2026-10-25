@@ -449,6 +449,41 @@ test('上流が再び FINAL になれば下流は FROZEN から SUPERSEDED を�
   assert.equal(rebased.state, 'DRAFTING');
 });
 
+test('上流がピンと同じダイジェストで再び FINAL になれば下流は FROZEN から DRAFTING へ戻る', () => {
+  const persistence = durablePersistence();
+  const { design, plan } = buildFinalChain(persistence);
+  const pinned = readSessionRaw(persistence, plan.session_id).upstream.artifact_digest;
+  kickback(persistence, plan.session_id);
+  assert.equal(loopState({ input: { session_id: plan.session_id }, persistence }).state, 'FROZEN');
+
+  const c2 = artifactCommit({
+    input: {
+      session_id: design.session_id, submission_id: submissionId(), expected_round: 2,
+      content: DESIGN_CONTENT, change_note: 'これは20文字以上ある変更理由の説明文です', addresses: ['impl_works'],
+    },
+    persistence,
+  });
+  assert.equal(c2.artifact.digest, pinned);
+  const r2 = scoreSubmit({
+    input: {
+      session_id: design.session_id, submission_id: submissionId(), expected_round: 2,
+      artifact_digest: c2.artifact.digest,
+      scores: [{
+        criterion_id: 'impl_works', score: 9, rationale: 'a'.repeat(45), weakness: 'b'.repeat(15),
+        evidence: [{ kind: 'locator', locator: '§1', excerpt: DESIGN_EXCERPT }],
+      }],
+    },
+    persistence,
+  });
+  assert.equal(r2.verdict, 'FINAL');
+
+  const state = loopState({ input: { session_id: plan.session_id }, persistence });
+  assert.equal(state.state, 'DRAFTING');
+  const raw = readSessionRaw(persistence, plan.session_id);
+  assert.equal(raw.thawed.at(-1).reason, 'upstream_final_unchanged');
+  assert.equal(raw.thawed.at(-1).upstream_digest, pinned);
+});
+
 test('kickback が chain_max_kickbacks を超えると E_CHAIN_BUDGET_EXHAUSTED になる', () => {
   const persistence = durablePersistence();
   const { design, plan } = buildFinalChain(persistence);

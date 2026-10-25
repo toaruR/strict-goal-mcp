@@ -45,7 +45,21 @@ export function checkSupersede(dataDir, session, toolName) {
     }
   }
 
-  if (!target) return session;
+  if (!target) {
+    // 差し戻し後に上流がピンと同じダイジェストで FINAL に戻った場合、乗せ直す差分が無いので
+    // rebase を経ずに DRAFTING へ戻す。これが無いと FROZEN からは abort しか出口が無くなる。
+    if (session.state === 'FROZEN') {
+      const now = new Date().toISOString();
+      session.state = 'DRAFTING';
+      session.thawed = [
+        ...(session.thawed ?? []),
+        { at: now, reason: 'upstream_final_unchanged', upstream_digest: session.upstream.artifact_digest },
+      ];
+      session.updated_at = now;
+      persistSession(dataDir, session);
+    }
+    return session;
+  }
 
   if (session.state !== target.state) {
     session.state = target.state;

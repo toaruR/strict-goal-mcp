@@ -71,6 +71,8 @@
    - v2 のリベース結果は `session.verified_reuse`（新しい上流ダイジェストと引継ぎ基準 ID）に残る。次の `score_submit` がこれを参照し、消去する。
 3. **差し戻し (`kickback`)**:
    - 実装中に上流仕様の欠陥を発見した場合、`escalate(action: "kickback")` を提起する。下流セッションは `FROZEN` 状態（`E_FROZEN`）で凍結され、上流セッションの再改定を行う。実行前に request_human(approval_action:"kickback", target_criteria) でチャット承認を求め、確認IDと返答原文を受け取る。
+   - 上流が再び `FINAL` になったとき、ダイジェストがピンと異なれば下流は `SUPERSEDED` へ移り、`rebase` で再開する。
+   - ダイジェストがピンと同じ（上流を元に戻した）場合、乗せ直す差分が無いため、下流は次のツール呼出し時に `DRAFTING` へ自動復帰する。`session.thawed` に `reason: "upstream_final_unchanged"` の記録が残る。
 4. **チェーンラウンド予算管理 (`chain round budget`)**:
    - チェーン全体の累積ラウンド数（`computeChainRounds`）を `score_submit` 時に自動検査。
    - 予算超過時:
