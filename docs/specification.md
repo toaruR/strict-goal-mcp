@@ -1,4 +1,4 @@
-<!-- spec-doc:last-reviewed-commit=56b69f6161d3c57e8fc20f7183b7456a65c2ade5 (strict-goal-mcp) reviewed-at=2026-09-19 -->
+<!-- spec-doc:last-reviewed-commit=49126cac93b51c783d715da3ce4836a4efaee549 reviewed-at=2026-10-18 -->
 
 # 仕様書
 
@@ -12,6 +12,12 @@
 - **通信モード**:
   - `stdio`（標準入出力 JSON-RPC 2.0、クライアント統合用）
   - `streamable-http`（HTTP デーモンモード、`http://127.0.0.1:<port>/mcp`）
+- **CLI 起動オプション** (`node strict-goal/server/main.js`):
+  - 既定は `stdio` で起動する。
+  - `--http` を付けると HTTP サーバとして起動する。
+  - `--port <n>`（既定 `8971`）と `--host <addr>`（既定 `127.0.0.1`）で待受先を変える。
+  - 待受開始時、サーバは `strict-goal HTTP server listening on http://<host>:<port>/mcp` を標準エラーへ出す。
+  - `--data-dir <dir>` でデータ保存先を直接指定する。
 - **ランタイム要件**:
   - Node.js >= 20.0.0（CI自動検証: Node.js 24.x）
   - 外部依存ゼロ（`node:fs`, `node:crypto`, `node:http` 等の標準組込モジュールのみで稼働）
@@ -52,6 +58,17 @@
    - 上流セッションの確定成果物が変更（改変）された場合、下流セッションは直ちに `SUPERSEDED` 状態へ遷移し、追加のコミットや採点は拒絶（`E_SUPERSEDED`）される。
 2. **リベース (`rebase`)**:
    - `escalate(action: "rebase")` により、改定された上流との差分を自動検査し、影響を受けた評価基準のみを特定して再採点対象とし、状態を `DRAFTING` へ復帰させる。
+   - v1 セッションでは、`upstream` 根拠の抜粋が新しい上流本文に残る基準を引き継ぐ。
+   - v2 セッション（§3.3）では、サーバが新旧の上流成果物から変更キーを導出する。
+     - `plan` 上流はタスク ID 単位（`upstream:<id>`）、`fileset` 上流はファイルパス単位（`artifact:<path>`）で比較する。
+     - タスク・ファイル以外の部分が変わった場合、または差分を導出できない場合は「不明」とみなす。
+   - v2 で基準を引き継ぐ条件は次のとおり。1つでも欠けると、その基準を再採点対象にする（fail-closed）。
+     - 前周の採点に `dependency_declaration` と `context_key` がある。
+     - 宣言した依存キーがすべて既知のキーである。
+     - 依存キーが変更キーに含まれない。
+     - `upstream` 根拠の抜粋が新しい上流本文に残っている。
+   - `criterion_dependency_graph`（依存元 → 依存先の基準 ID）があれば、無効化を依存先の基準へ伝播する。
+   - v2 のリベース結果は `session.verified_reuse`（新しい上流ダイジェストと引継ぎ基準 ID）に残る。次の `score_submit` がこれを参照し、消去する。
 3. **差し戻し (`kickback`)**:
    - 実装中に上流仕様の欠陥を発見した場合、`escalate(action: "kickback")` を提起する。下流セッションは `FROZEN` 状態（`E_FROZEN`）で凍結され、上流セッションの再改定を行う。実行前に request_human(approval_action:"kickback", target_criteria) でチャット承認を求め、確認IDと返答原文を受け取る。
 4. **チェーンラウンド予算管理 (`chain round budget`)**:
@@ -59,12 +76,29 @@
    - 予算超過時:
      - 採点合格（`verdict === "FINAL"` / `"FINAL_WITH_RELAXATION"`）の場合: `FINAL` を維持し、`warnings: ["chain_budget_exceeded"]` を付与。
      - 採点不合格（`verdict !== "FINAL"`）の場合: `verdict: "REVISE"`, `state: "ESCALATED"` へ自動遷移し、エスカレーション情報（`detail: { reason: "chain_budget_exhausted", ... }`）とチャット承認用の確認IDと next_action を発行。追加の request_human は不要。
-     - 追加ラウンド消費後も超過が継続した場合は `E_CHAIN_BUDGET_EXHAUSTED` エラーを返出。
-   - `escalate(action: "resolve", resolution: "continue")` により、セッションおよびチェーン全体に追加ラウンド枠（既定 +6周）が付与（`grantExtraRounds`）され、状態が `DRAFTING` へ復帰。
+     - 累積ラウンド数が実効上限（基本予算 + 付与済み追加枠）を超えた不合格提出は `E_CHAIN_BUDGET_EXHAUSTED` で拒否する。
+     - 追加枠を使い切って再び上限に達した場合も、サーバは採点を保存して `ESCALATED` へ遷移し、新しい確認IDを発行する。
+   - `escalate(action: "resolve", resolution: "continue")` により、セッションに +3周、チェーン予算超過時はチェーン全体にも追加ラウンド枠（既定 +6周）が付与（`grantExtraRounds`）され、状態が `DRAFTING` へ復帰。
+   - 追加枠は承認ごとに累積加算する（回数制限なし）。各付与は `extra_rounds_granted` イベントとしてチェーン監査に残る。
+   - 消費済みの確認IDの再利用と、同一要求の再送による二重加算は拒否する。
+
+### 2.1.1 上流セッションの自動解決 (`loop_open`)
+- `upstream` は `session_id` だけで指定できる。`artifact_digest` を省略すると、サーバが上流セッションの現在の成果物ダイジェストで補う。
+- `loop_mode: "implement"` で `upstream` を省略すると、サーバが `index.json` から `FINAL` / `FINAL_WITH_RELAXATION` の `plan` セッションを探す。
+  - 候補が複数ある場合、`updated_at`（無ければ `created_at`）が最新のものを選ぶ。
+  - 候補が無い場合は `E_UPSTREAM_REQUIRED` を返す。
+- `loop_mode: "plan"` で `upstream` を省略すると `E_UPSTREAM_REQUIRED` を返す（自動解決しない）。
+- 補完・自動解決後のピンは、従来どおり4項目の上流検査（`validatePin`）を通す。
 
 ### 2.2 fileset の証跡照合仕様
 - **マニフェスト照合**: サーバはワークスペースの実ファイルを直接走査しない（設計原則 A3: クライアント完全隔離）ため、`readArtifactContent` が返す成果物本文はマニフェスト JSON テキスト（`sha256-<digest>.manifest.json`）となる。
-- **locator 根拠の制約**: `locator` 根拠の `excerpt` は個別ファイル本文ではなく、マニフェスト JSON テキスト内の実在文字列（`"path": "..."` 等）と照合される。
+- **locator 根拠の照合順序**:
+  1. サーバは `excerpt` をマニフェスト JSON テキストと照合する。
+  2. 一致しない場合、マニフェストの各 `path` をワークスペース根から読み、個別ファイル本文と照合する。
+  - ワークスペース根は、データ保存先が `<workspace>/.strict-goal` ならその親、それ以外はデータ保存先自身とする。
+  - 読み込めないファイルは照合対象から外す。
+- **抜粋照合の揺れ吸収 (`matchesExcerpt`)**: `locator` / `upstream` 根拠の照合は、NFC 正規化・改行統一・行末空白除去の後に部分一致を見る。一致しない場合、連続する空白・改行を1個の空白に畳んで再照合する。
+- **v2 強制ステージの厳密照合**: v2 強制ステージ（§3.3）では、採点前の事前検証で `locator` の `excerpt` がコミット時の保存バイトにそのまま含まれることを要求する。揺れ吸収と個別ファイル照合は適用しない。不一致は `E_EVIDENCE_EXCERPT_MISMATCH` で拒否する。
 - **実行・テスト根拠**: 個別ファイルのコード実装やテスト結果の正当性は、`kind: "command"` 根拠（終了コード 0、標準出力ハッシュ、`target_digest`）によって証明する。
 
 ---
@@ -106,6 +140,108 @@
     - ルーブリック基準の `priority` (0〜3) 降順、スコア昇順でソートし、重要基準の修正課題を最優先（上位3件）でエージェントへ提示。
 11. **初回提出課題義務付け (`policy.min_first_round_must_fix`)**:
     - Round 1 では最低指定件数（既定 1〜2件）の `pass_score` 未満（must_fix）の申告を義務付け、満たさない場合は `E_FIRST_ROUND_UNCRITICAL` で拒否。
+12. **採点の事前検証と拒否記録 (`score_submit`)**:
+    - サーバは採点処理の前に、入力スキーマ・根拠の形・`artifact_digest` の一致を検査する。
+    - 保存済み成果物の本文ダイジェストが記録と食い違う場合は `E_COMMITTED_DIGEST_MISMATCH` で拒否する（fileset は対象外）。
+    - 事前検証の失敗は `rounds/<round>.rejected/<seq>.json` に `event_type: "rejected_prevalidation"` として残る。
+    - 拒否記録は `submission_id` と入力全体のダイジェスト（`payload_digest`）を持つ。同じ組の再送では記録を増やさない。
+    - 過去に拒否された同じ `submission_id`・同じ入力の再送には、前回と同じエラーコードを返す。
+
+### 3.3 v2 評価ポリシー（ラウンド削減）と課題台帳
+v2 評価ポリシーは、条件変化と品質改善を区別し、未解決課題を台帳で追跡する仕組みである。ラウンドとトークンの削減を目的とする。移行手順の詳細は [strict-goal-round-reduction-migration.md](strict-goal-round-reduction-migration.md) にある。
+
+#### ステージとセッションへの固定
+- 環境変数 `STRICT_GOAL_ROUND_REDUCTION_STAGE` が新規セッションのステージを決める。既定は `v1`。
+- ステージは `v1` / `observe-only` / `dual-read` / `enforce-new-session` / `default-on` の5種類。未知の値は `E_SESSION_POLICY_INVALID` になる。
+- `loop_open(create)` は `session.json` の `evaluation_policy`（`schema_version`, `policy_version`, `stage`）にステージを固定する。
+  - `v1` は `schema_version: 1`、それ以外は `schema_version: 2` になる。
+- 再開・reopen・kickback は作成時のポリシーを保つ。環境変数の変更は新規セッションだけに効く。
+- `evaluation_policy` を持たない旧セッションは、読み込み時に v1 として扱う。ファイルは書き換えない。
+- 固定値の組み合わせが矛盾するセッションは `E_SESSION_POLICY_INVALID` で読み込みを拒否する。
+- サーバはステージを自動で進めない。
+
+| ステージ | 挙動 |
+|---|---|
+| `v1` | 従来の採点・完了判定のみ。 |
+| `observe-only` | v2 の評価コンテキストと課題台帳を記録する。完了判定は v1 のまま。 |
+| `dual-read` | `observe-only` に加え、v2 で拒否される提出を `warnings`（`v2_` 接頭辞）で知らせる。 |
+| `enforce-new-session` / `default-on` | v2 の要件を強制する（以下「v2 強制ステージ」）。 |
+
+#### 評価コンテキスト (`evaluation_context`)
+- `score_submit` は任意入力 `evaluation_context.snapshot` を受け取る。5種のダイジェスト（`artifact_digest`, `scope_digest`, `rubric_digest`, `environment_digest`, `test_selection_digest`）を持つ。
+- v1 セッションへの `evaluation_context` または `dependency_declaration` の送信は `E_SESSION_POLICY_INVALID` で拒否する。
+- v2 強制ステージでは5種すべてが必須である。`artifact_digest` と `rubric_digest` はセッションの値と一致しなければならない。違反は `E_EVALUATION_CONTEXT_INVALID` になる。
+- `dual-read` で `evaluation_context` が無い場合、`warnings` に `v2_context_required` が付く。
+- 受理したスナップショットは `evaluation-context.json` にハッシュ連鎖付きで追記する。
+- v2 の非強制ステージで `evaluation_context` が無い場合、サーバは成果物・ルーブリックのダイジェストだけを記録する。残りは `unknown_fields` として残す。
+
+#### 条件変化の承認束縛
+- サーバは前回のスナップショットと比べ、スコープ・ルーブリック・環境・テスト選択のダイジェスト変化を検出する。
+- 変化がある場合、`evaluation_context.condition_changes[]` に同じ `reason`・変更前後のダイジェスト・`approval_id` が必要である。
+- `approval_id` は、`approval-bindings.jsonl` 内の未消費・期限内の承認束縛1件と一致しなければならない。
+- 違反時のエラーは次のとおり。
+
+| 変化 | エラー |
+|---|---|
+| `scope_change` | `E_SCOPE_APPROVAL_REQUIRED` |
+| `rubric_change` | `E_RUBRIC_APPROVAL_REQUIRED` |
+| `environment_change` | `E_ENVIRONMENT_APPROVAL_REQUIRED` |
+| `test_selection_change` | `E_TEST_SELECTION_CHANGED` |
+
+- v2 強制ステージ以外では、これらは拒否にならない。`dual-read` だけ `warnings` に出す。
+- 採点を受理すると、使った承認束縛を消費済みとして追記する。
+- 承認束縛を作る MCP ツール経路は現時点で無い（`recordApprovalBinding` はサーバ内部関数）。（要確認: 承認束縛の作成手段）
+
+#### 品質差分 (`quality_delta`)
+- 受理した採点の記録と応答は `quality_delta` を持つ。
+  - `artifact_improved`: 条件変化が無く、加重平均が前周より上がった場合に `true`。
+  - `condition_changed`: 承認済みの条件変化を含む場合に `true`。
+
+#### 合格未満スコアの束縛
+- v2 強制ステージでは、`pass_score` 未満の基準に次の3点を要求する。欠けると `E_ISSUE_BINDING_REQUIRED` で拒否する。
+  - `locator` と `excerpt` が空でない `locator` 根拠（アンカー）
+  - 1件以上の根拠
+  - `none` 以外の `weakness`（解消条件）
+- `dual-read` ではこの違反を `warnings` に出すだけにする。
+
+#### 依存宣言と評価の再利用
+- 各採点は任意の `dependency_declaration` を持てる。宣言は成果物パス・上流契約 ID・スコープ・ルーブリック条項・根拠種別・検証環境キーの6配列からなる。
+- 成果物パスと上流契約 ID が両方空の宣言は無効として扱う。
+- v2 強制ステージでは、サーバが基準ごとに `context_key` を算出する。入力は基準 ID・ルーブリック・依存値・環境・根拠集合のダイジェストである。
+- 次の条件をすべて満たす基準は `evaluation_basis: "reused"` になる。それ以外は `"fresh"` になる。
+  - 前周に合格し、`context_key` とスコアが前周と同じ。
+  - 直前のリベースがその基準を引継ぎ対象にした（`verified_reuse`）。
+  - `locator` 根拠を含む。
+- 全基準が `reused` のまま `FINAL` になる場合、サーバは全基準を `fresh` に戻す。
+
+#### 課題台帳 (`issue-ledger.jsonl`)
+- v2 セッション（`schema_version: 2`）では、不合格の基準ごとに課題 `ISS-score-<criterion_id>` を台帳へ追記する。
+- 各イベントは連番と前イベントのハッシュを持つ（追記専用のハッシュ連鎖）。
+- 不正な遷移は `E_ISSUE_STATE_INVALID` で拒否する。
+
+```mermaid
+stateDiagram-v2
+    [*] --> open: opened
+    open --> open: reaffirmed / duplicated
+    open --> resolved: resolved
+    resolved --> open: reopened
+```
+
+- 応答の `issue_summary` は未解決の blocking 課題を最大3件 `must_fix` に並べる。
+  - 並び順は重大度の降順、影響基準数の降順、初出の古い順。
+  - `unresolved_count`、表示外の件数、`ledger_ref`（パス・イベント数・先頭ハッシュ）も返す。
+- v2 強制ステージでは、未解決の blocking 課題が残る間は `FINAL` を出さない（`E_ISSUE_STATE_INVALID`）。`dual-read` では `warnings` に出す。
+
+#### ラウンド計測
+- v2 セッションの受理記録は `metrics` を持つ。フェーズ・周回・スナップショットダイジェスト・fresh/reused 件数・無効化理由・課題イベント・トークン・時間内訳を含む。
+- 観測できない値は `unknown` とする。0 や推定値で埋めない。
+
+#### サーバ経路に未接続の部品
+次の部品はモジュールとテストだけがあり、MCP ツールからは呼ばれない。（要確認: 接続予定の有無）
+- `evaluation/contracts.js`: `IssueRecord` / `CriterionEvaluation` / `ChangeReason` の契約検査（`E_EVALUATION_CONTRACT`）。スキーマは `schemas/evaluation-v2.json`。
+- `runtime/preflight.js`: 実行中のソースがリポジトリ内の期待ファイルと実パスで一致するかの検査（`E_RUNTIME_PREFLIGHT`）。
+- `metrics/round_reduction.js` の `evaluateReleaseGate` と `rollout/readiness.js`: A/B 比較（介入 A〜D）とテスト件数から `ready` / `hold` を返す報告。ステージやポリシーは変更しない。
+- `judge/round_store.js` のページング（`pageRejectedSubmissions` / `pageUnresolvedIssues`）: `limit` 1〜100 とカーソルによる一覧取得。
 
 ---
 
@@ -116,9 +252,9 @@
 | `loop_open` | セッションの新規開設（`mode: "create"`）または既存セッションの再開（`mode: "resume"`） | `mode`, `loop_mode`, `task`, `rubric_preset`, `upstream`, `label`, `workspace_dir`, `allow_ephemeral` | `session_id`, `state`, `round`, `next_action`, `rubric` |
 | `loop_state` | 現在の状態、周回番号、アクティブな基準、履歴、または有界射影の取得 | `session_id`, `include` (`["rubric", "history", "upstream", "chain"]`), `projection` (`"skill_state"`) | `state`, `round`, `next_action`, `last_evaluation`, `skillState` |
 | `artifact_commit` | 成果物（Markdown文字列、JSON、ファイルパス参照、またはfilesetマニフェスト）のコミット | `session_id`, `expected_round`, `change_note`, `content` または `source_path` または `files`, `addresses`, `test_inventory` | `state`, `artifact_digest`, `diff`, `warnings`, `next_action: "score_submit"` |
-| `score_submit` | ルーブリック全基準に対する採点・理由・弱点・エビデンスの提出 | `session_id`, `expected_round`, `artifact_digest`, `scores` (`[{ criterion_id, score, rationale, weakness, evidence }]`) | `verdict` (`ITERATING` / `FINAL` / `REVISE`), `weighted_mean`, `min_score`, `must_fix`, `next_action`, `escalation`, `warnings` |
+| `score_submit` | ルーブリック全基準に対する採点・理由・弱点・エビデンスの提出 | `session_id`, `expected_round`, `artifact_digest`, `scores` (`[{ criterion_id, score, rationale, weakness, evidence, dependency_declaration? }]`), `evaluation_context?` | `verdict` (`ITERATING` / `FINAL` / `REVISE`), `weighted_mean`, `min_score`, `must_fix`, `quality_delta`, `issue_summary`（v2）, `next_action`, `escalation`, `warnings` |
 | `rubric_amend` | 基準や閾値の変更（40文字以上の理由と緩和ログ記録） | `session_id`, `reason`, `amendments` (`add`, `modify`, `remove`) | `state`, `rubric_version`, `rubric_diff`, `is_final_reachable` |
-| `escalate` | 人間への支援要請、上流リベース、キックバック、セッション再開 | `session_id`, `action`; 全ての承認は `escalation_id`, `human_reply`。resolveは `resolution`、kickbackは `target_criteria` を指定し、reopenは目的付き確認を使う | `state`, `escalation_id`, `resolution`, `chain` |
+| `escalate` | 人間への支援要請、上流リベース、キックバック、セッション再開 | `session_id`, `action`（`request_human` / `resolve` / `abort` / `reopen` / `rebase` / `kickback`）; `request_human` は `approval_channel: "chat"` と `approval_action`（`resolve` / `kickback` / `reopen`）。全ての承認は `escalation_id`, `human_reply`。resolveは `resolution`、kickbackは `target_criteria` を指定し、reopenは目的付き確認を使う | `state`, `escalation_id`, `resolution`, `chain` |
 | `audit_export` | 改ざん検知可能な監査 JSON（セッション単位またはチェーン全体）の出力 | `session_id`, `scope` (`session` / `chain`), `include_artifacts`, `include_rejected`, `include_diffs` | `export` (`path`, `sha256`, `schema`) |
 | `invoke_subagent` | 孤立した子セッションでエフェメラルなサブエージェントを実行し結果を取得 | `prompt`, `agent_type`, `runner` (`"auto"` / `"agy"` / `"claude"` / `"codex"`), `workspace_dir`, `timeout_sec` | `ok`, `output`, `conversation_id`, `subagent_session_id`, `exit_code`, `duration_ms` |
 
@@ -126,12 +262,26 @@ STALLED時の標準承認はチャットでの明示的な返答を待ち、確�
 
 `kickback` も `escalation_id` と `human_reply` で承認できる。`request_human` に `target_criteria` を渡すと差し戻し専用の確認を作り、同じ対象基準と明示的な返答で実行する。差し戻し用のチャット承認要求に限り `FINAL` / `FINAL_WITH_RELAXATION` からも受け付ける。
 
+- **承認経路の統一**: 全ての承認（STALLED の resolve、自動 `ESCALATED`、kickback、reopen）は確認IDと返答原文で行う。
+  - 旧トークン方式は廃止した。エラーコード `E_TOKEN_INVALID` も削除した。廃止パラメータは入力検証で拒否する。
+  - 旧サーバが作った保留中の承認記録も、確認IDとチャット返答で処理できる。消費時に現在の監査形式へ正規化する。
+  - `approval_action` を省略した場合、`target_criteria` があれば `kickback`、無ければ `resolve` として扱う。
+- **事前検査の順序**: kickback は確認を消費する前に前提条件を検査する（`prepareKickback`）。前提条件エラーでは確認は保留のまま残る。
+- **承認待ちの復元**: 承認待ちのセッションでは、`score_submit` の応答・`loop_state`・`loop_open(resume)` が保留中の `next_action`（確認ID付きの `escalate` 呼出し雛形）を返す。
+
+- **入力の許容と自動整理**:
+  - `score_submit`: `weakness` の `"None"` / `"none."` / `"N/A"` / `"NA"` / 空文字は `"none"` に正規化する。正規化後も `"none"` は満点（10点）のときだけ受理する。
+  - `rubric_amend`: `reason` が無く `change_note` がある場合、`change_note` を `reason` として扱う。
+  - `rubric_amend`: 基準を削除すると、`last_evaluation.must_fix` から削除済み基準の項目を除く。
+  - `artifact_commit`（`plan`）: 本文全体が ` ```json ... ``` ` のコードフェンスで囲まれている場合、フェンスを外して JSON として解析する。
+
 - **監査スキーマ識別子 (URN)**:
   - 単体セッション監査: `urn:strict-goal:schema:audit:v1`
   - 連鎖監査: `urn:strict-goal:schema:audit-chain:v1`
   - 同梱の `strict-goal/server/verify_audit.js` により、オフラインで監査ログの完全性・再計算検証が可能。
 - **スケルトン自動充填 (`next_action.input_skeleton`)**:
   - `score_submit` や `artifact_commit` 等のレスポンスには、そのまま埋めて送信可能な `input_skeleton` が事前充填される。全エビデンス形式（`locator`, `command`, `upstream`）の具体例と必須条件が示され、クライアント/エージェントがサーバ内部ソースを探索して `E_VALIDATION` を繰り返す手戻りを防止。
+  - `score_submit` 用の雛形は、ルーブリックの全基準を1件ずつ `scores[]` に展開する。`auto` 基準には `command` と `locator`、`manual` 基準には `locator` の根拠雛形を入れる。
 
 ### 4.1 静的 HTML ダッシュボード自動生成 (`persistSession`)
 セッション状態を変更する全操作の実行時、`src/store/persist.js` 経由でダッシュボードが自動再生成される。
@@ -144,6 +294,8 @@ STALLED時の標準承認はチャットでの明示的な返答を待ち、確�
 - **不変仕様 $P$ (`immutable_spec`)**: `task`, `loop_mode`, `criteria_summary`, `allowed_tools`
 - **カノニカル状態 $\Sigma_t$ (`canonical_state`)**: `session_id`, `round`, `state`, `must_fix`, `trial_history`, `counters`, `policy`
 - **最新観測 $O_t$ (`recent_observation`)**: コミット受信（`commit_ack`）または評価結果判定（`eval_verdict`）の要約
+- **課題台帳の反映**: 課題台帳にイベントがある場合、`canonical_state.must_fix` は台帳の未解決課題（最大3件）になる。`unresolved_count`、`undisplayed_issue_ids`、`ledger_ref` も加わる。
+- **承認待ちの反映**: 保留中の承認がある場合、`recent_observation` は承認待ちの要約と保留中の `next_action` を持つ。
 - **試行履歴 (`trial_history.json`)**: セッション中に訪問したファイル（`visited_files`）および棄却された仮説（`failed_hypotheses`）を記録し、エージェントの堂々巡り探索を防止。
 
 ### 4.3 動的ワークスペースルーティングとセッションレジストリ
@@ -165,20 +317,37 @@ AIエージェントおよび人間の開発者が自律的かつ自然言語で
 - **自然言語トリガー**:
   - 「`strict-goalで` 〇〇を実装して」「`厳格モードで` 〇〇して」「`サボらずに` 〇〇して」などの人語指示を検知し自動起動。
 - **トークン消費量集計スキル**:
-  - `session-tokens`: Antigravity (AGY) セッションおよび起動された全サブエージェントのトークン消費（キャッシュ入力・非キャッシュ入力・出力・合計）を精密集計。
-  - `codex-session-tokens`: Codex セッションのトークン消費を集計。
+  - `session-tokens`: セッションおよび起動された全サブエージェントのトークン消費（キャッシュ入力・非キャッシュ入力・出力・合計）を精密集計。配置先ごとに実装が異なる。
+    - `.claude/skills/session-tokens`: Claude Code のセッション jsonl とサブエージェント jsonl を集計する。サブエージェントの種別は `meta.json` の `agentType` をラベルに使う。
+    - `.agents/skills/session-tokens`: Antigravity (AGY) の sqlite/protobuf 記録を集計する。
+  - `codex-session-tokens`: Codex セッションのトークン消費を集計。子 rollout に親履歴由来の `session_meta` が後続で含まれていても、最初に出現した `session_meta` をその rollout 自身の識別子として扱う。
 
 ### 5.2 階層型サブエージェント体系とライフサイクル委譲規約
-親エージェントのコンテキスト肥大化とトークン消費（$\mathcal{O}(T^2)$ 爆発）を防ぐため、5種類の役割特化型サブエージェントを標準提供。
+親エージェントのコンテキスト肥大化とトークン消費（$\mathcal{O}(T^2)$ 爆発）を防ぐため、6種類の役割特化型サブエージェントを標準提供。正本は `strict-goal/agents/` にあり、`.claude/agents/`・`.agents/agents/`・`.codex/agents/*.toml` へ配布する。
 
 - **エージェント定義**:
+  - `sg-designer`: 設計フェーズ監督。`loop_open(design)` から `FINAL` までの周回を統括する。
+    - 執筆・修正はまず `helper.js design-draft` / `design-fix`（§5.3）で外部 CLI に任せる。終了コード 2（`NO_CONFIG`）なら自分で執筆する。
+    - `design-fix` には `-` を指定し、must_fix を heredoc で標準入力から渡す。
+    - 採点は `sg-verifier` に委譲する。
+    - 設計フェーズの完了で止まり、`plan` / `implement` へ自動で進まない。
   - `sg-implementer`: 実装フェーズ監督。`plan` のタスクDAGを解析し、`sg-worker` への順次委譲とテスト検証・周回提出を統括。
   - `sg-worker`: 単一タスク / must_fix 修正担当。strict-goal ツールを持たず、コード編集と単体テスト通過のみを行う極小コンテキスト作業者。
   - `sg-coder`: 単体自律実装。中規模タスクを単一サブエージェントで自律周回完遂。
   - `sg-scout`: コードベース探索・事実収集。ステートレスに事実のみを報告し親のコンテキストを節約。
   - `sg-verifier`: テスト実行・客観検証・採点提出担当。エビデンス収集と `score_submit` を専任実行。
+    - 設計レビューでは3種の反例プローブ（`time_state_trace`, `policy_trace`, `complexity_trace`）を行う。
+    - ラウンド2以降に `.strict-goal/evidence/<session>/<round>/impact.json` があれば、記載の `checks` を `helper.js design-check` で検証する。無ければこの検証を省く。
+    - 採点前に、課題・スコープ・ルーブリック等の有界プローブで v2 の束縛（§3.3）を確認する。
+- **承認の受け渡し**: サブエージェントは確認ID・理由・提案操作を親へ返す。ユーザーへのチャット確認は親が行う。
+- **Codex 向けの state-only 委譲**: `spawn_agent` が使える環境（Codex）だけに適用する規約である。
+  - 子は `spawn_agent(..., fork_turns="none")` で起動し、親の会話履歴を引き継がせない。履歴なしで起動できない場合は黙って継承せず、非互換として報告する。
+  - 子へのメッセージは `{ skill_state, transaction, paths, output_contract }` だけにする。成果物全文・会話記録・テスト出力は埋め込まない。
+  - トランザクションごとに新しい子を起動し、前の子を再利用しない。
+  - 記載先は `.agents/skills/strict-goal/SKILL.md`、`.codex/skills/strict-goal/SKILL.md`、`.codex/agents/sg-implementer.toml`。`.claude/` と `.agents/` の `sg-implementer.md` には書かない。
 - **SKILL.state & ライフサイクル委譲規約（親の直接作業厳禁）**:
   - **直接作業の禁止**: 親エージェントは自己採点、エビデンス抽出、ハッシュ計算、テスト試行錯誤を直接行わず、執筆・修正を `sg-worker`、検証・採点を `sg-verifier` に全フェーズ（`design`, `plan`, `implement`）で委譲する。
+  - **フェーズ別の監督**: strict-goal スキルは `design` を `sg-designer`、`implement` を `sg-implementer` に委譲する。各フェーズは完了時点で止まり、次フェーズへの移行は親が判断する。
   - **状態外出しの徹底**: 過去ログを遡らず、`loop_state(projection: "skill_state")` の有界三つ組 $(P, \Sigma_t, O_t)$ のみで現在地と次アクションを決定する。
 
 ### 5.3 補助CLIツール (`strict-goal/server/helper.js`)
@@ -190,6 +359,20 @@ AIエージェントおよび人間の開発者が自律的かつ自然言語で
 - `node strict-goal/server/helper.js digest <file>`: ファイルの SHA-256 ダイジェストを出力。
 - `node strict-goal/server/helper.js design-check "<check-command...>"`: 契約テストや型検査コマンドを実行し、`design_check_evidence`（kind: command, exit_code, output_sha256, output_excerpt, target_digest）を出力して終了コードを伝播。
 - `node strict-goal/server/helper.js subagent <agent_type> "<prompt>"`: 各エージェントCLI（agy, claude, codex）を直接起動・実行。
+  - `invoke_subagent` ツールも同じ CLI 名（拡張子なし）を使う。Windows では `.cmd` を解決するためシェル経由で起動する。
+- `node strict-goal/server/helper.js design-draft <path> "<prompt>" | -`: 設定済みの外部 CLI で設計書を新規作成する。
+- `node strict-goal/server/helper.js design-fix <path> "<must_fix>" | -`: 設定済みの外部 CLI で must_fix を設計書へ反映する。
+  - 設定ファイルの探索順は、環境変数 `STRICT_GOAL_CONFIG`、`strict-goal.config.json`、`.strict-goal/config.json`（いずれもカレントディレクトリ基準）。
+  - 設定ファイルの `design.draft_command` / `design.fix_command` がコマンドテンプレートになる。例は `strict-goal.config.json.example`。`strict-goal.config.json` は Git 管理外とする。
+  - 該当テンプレートが無い場合、`NO_CONFIG` を標準エラーへ出し、終了コード 2 で終わる。
+  - 値に `-` を渡すと、helper は値を標準入力から読む。値が空なら終了コード 1 になる。
+  - helper は値を常に外部 CLI の標準入力へ流す。同時に一時ファイルへ書き、実行後に削除する。
+  - テンプレート変数は次のとおり。
+    - 共通: `{path}` / `{output_path}`（設計書パス）、`{input_file}`（一時ファイルパス）
+    - `design-draft`: `{prompt}` / `{task}`（値）、`{prompt_file}`
+    - `design-fix`: `{must_fix}` / `{text}`（値）、`{must_fix_file}`
+  - `{prompt}` / `{must_fix}` の直埋めは、改行や `" & | < > ^ %` を含む値で cmd.exe の引数分割が壊れる。標準入力か `{*_file}` を使う。
+  - 外部 CLI の標準出力・標準エラー・終了コードをそのまま返す。
 
 ### 5.4 Round 1 即時終了防止・反復推敲強制メカニズム (Anti-Round-1 Finalization)
 エージェントの自己評価バイアスによる初回（Round 1）での安易な合格判定と即時終了を防止するため、サーバーサイドで以下の強制規則を適用する。
@@ -207,6 +390,10 @@ AIエージェントおよび人間の開発者が自律的かつ自然言語で
 
 #### 1. 設計フェーズプリセット (`design` vs `design.harness`)
 設計対象のドメイン・責務境界に応じた2種類のプリセットを提供し、LLM がプロンプトの意味的責務境界から自律選択する。
+両プリセットとも、次の基準の9点アンカーに具体的な検査対象を足している。
+- `numeric_roundtrip`: 時間経過に伴う内部状態のスライドを含む状態遷移シミュレーションを、往復チェックに1本以上含める。
+- `internal_consistency`: 型定義・本文・既定値一覧の設定名集合の一致、同期/非同期の一致、最悪計算量と明記オーダーの整合を要求する。
+- `interface_completeness`: 本文が使う設定名が公開 API 定義にすべて存在することを要求する。
 - **汎用ソフトウェア・クラス設計 (`design` / サブセット・全8基準)**:
   単一クラス、アルゴリズム、データ構造、APIエンドポイント、業務ロジック等の設計向け。ハーネス固有のメタ要件を排除し、局所仕様に集中させて過剰記述を抑止。
   1. `scope_adherence` (weight: 3, auto): 課題に無い成果物種別（配布物・CI・運用手順等）の節が0件であり、範囲外事項は末尾の1行リストに退避されている。
@@ -265,6 +452,8 @@ AIエージェントおよび人間の開発者が自律的かつ自然言語で
 ### 5.6 バージョン管理と確認方法
 - **単一情報源 (Single Source of Truth)**:
   - `strict-goal/server/package.json` の `version`（`strict-goal/server/src/version.js` が自動ロード、`NAME = 'strict-goal'`）
+  - `scripts/sync-version.mjs` が `package.json` の版を `strict-goal/plugin.json` へ写す。`npm version` 後の `postversion` と `sync-version` スクリプトから実行する。
+  - `test/version.test.js` は固定値ではなく、両マニフェストの一致と SemVer 形式を検査する。
 - **CLI からの確認**:
   - `node strict-goal/server/main.js --version` (または `-v`): `strict-goal <version>` を出力し終了コード 0。
   - `node strict-goal/server/helper.js version` (または `--version`, `-v`): `strict-goal <version>` を出力し終了コード 0。
@@ -283,3 +472,19 @@ AIエージェントおよび人間の開発者が自律的かつ自然言語で
 - **環境変数フォールバック**:
   - データディレクトリ: `STRICT_GOAL_DATA` || `RUBRIC_LOOP_DATA` || `PLUGIN_DATA` || プロジェクトルート `.strict-goal` || XDG
   - プラグインルート: `STRICT_GOAL_ROOT` || `RUBRIC_LOOP_ROOT` || `PLUGIN_ROOT`
+
+---
+
+## 用語集
+
+- **確認ID (`escalation_id`)**: サーバが発行する、保留中の人間承認の識別子。1回だけ消費できる。
+- **返答原文 (`human_reply`)**: 承認時にエージェントが渡す、ユーザーのチャット返答そのもの。
+- **v2 評価ポリシー**: セッション作成時に固定する、ラウンド削減用の評価規則（§3.3）。
+- **ステージ (`stage`)**: v2 評価ポリシーの段階。`v1` から `default-on` までの5種類。
+- **v2 強制ステージ**: `enforce-new-session` と `default-on` の総称。v2 の要件違反を拒否する。
+- **評価コンテキスト (`evaluation_context`)**: 採点時の成果物・スコープ・ルーブリック・環境・テスト選択のダイジェストの組。
+- **条件変化**: 評価コンテキストのうち、成果物以外のダイジェストの変化。承認束縛が必要になる。
+- **承認束縛 (approval binding)**: 条件変化1件を変更前後のダイジェストに結び付けた承認記録。1回だけ消費できる。
+- **課題台帳 (`issue-ledger.jsonl`)**: 課題の開設・再確認・解決・再開をハッシュ連鎖で追記する記録。
+- **依存宣言 (`dependency_declaration`)**: 採点がどの成果物パス・上流契約などに依存するかの宣言。評価の再利用判定に使う。
+- **評価の再利用 (`evaluation_basis: "reused"`)**: 依存が変わっていない基準について、前周の評価を引き継いだことを示す区分。

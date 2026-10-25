@@ -67,7 +67,7 @@ export function scoreSubmitSkeleton(sessionId, round, artifactDigest, rubric) {
 
 export function artifactCommitSkeleton(sessionId, round, requiredAddress, budgetBytes) {
   return {
-    ...(budgetBytes ? { artifact_budget_bytes: budgetBytes, note: 'check byte size before committing (e.g. wc -c); over budget is a warning, but it costs a round to fix' } : {}),
+    ...(budgetBytes ? { artifact_budget_bytes: budgetBytes, note: 'advisory size target, not a limit: never cut content a criterion requires to stay under it; trim only out-of-scope sections and duplication' } : {}),
     session_id: sessionId ?? '<session_id>',
     submission_id: '<unique 8-128 chars>',
     expected_round: round ?? 1,

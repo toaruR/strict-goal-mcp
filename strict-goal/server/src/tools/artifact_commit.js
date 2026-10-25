@@ -318,7 +318,8 @@ export function buildWarningHints(warnings, artifact) {
     if (w === 'over_budget') {
       hints[w] =
         `bytes ${artifact.bytes} exceed artifact_budget_bytes ${artifact.budget_bytes} by ${artifact.over_budget_by}. ` +
-        'This is a warning, not a rejection: score this round as-is and trim in the next round. ' + FROZEN_NOTE;
+        'This is a warning, not a rejection: score this round as-is. Next round, trim only out-of-scope sections and duplication; ' +
+        'never cut content a criterion requires (that reopens must_fix and costs more rounds than the bytes save). ' + FROZEN_NOTE;
     } else if (w === 'near_total_rewrite' || w === 'suspicious_shrink' || w === 'destructive_overwrite') {
       hints[w] = 'Check that the committed body is the intended full artifact (not a placeholder or a partial file). ' +
         'If it is correct, proceed to score_submit. ' + FROZEN_NOTE;
