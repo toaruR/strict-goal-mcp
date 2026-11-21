@@ -1,4 +1,4 @@
-// AT-4: 停滞打ち切り。docs/design-rubric-loop-mcp.md §13 AT-4。
+// AT-4: 停滞打ち切り。docs/spec/design-rubric-loop-mcp.md §13 AT-4。
 // 設計書は改善量が epsilon 未満に細かく減衰する例(8.10→8.20→8.28→8.35)を挙げるが、
 // スコアは整数のみ許可されるため本テストは改善量0が3周連続する単純化版で代替する
 // （stall_window/epsilon の判定ロジック自体は stall.test.js で単体検証済み）。

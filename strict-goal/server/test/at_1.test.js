@@ -1,4 +1,4 @@
-// AT-1: 正常収束（design モード単体）。docs/design-rubric-loop-mcp.md §13 AT-1。
+// AT-1: 正常収束（design モード単体）。docs/spec/design-rubric-loop-mcp.md §13 AT-1。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';

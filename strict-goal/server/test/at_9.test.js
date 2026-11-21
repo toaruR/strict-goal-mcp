@@ -1,4 +1,4 @@
-// AT-9: サーバ起動失敗時のスキル単独動作。docs/design-rubric-loop-mcp.md §13 AT-9。
+// AT-9: サーバ起動失敗時のスキル単独動作。docs/spec/design-rubric-loop-mcp.md §13 AT-9。
 // #1-4(スキルがツール不在を検知し会話内で縮退モードに入り、UNVERIFIED-COMPLETEを出す)は
 // プラグイン/スキルのプロンプト運用であってサーバコードではないため、
 // 本テストではコード検証可能な #5-6(サーバ復旧後の再投入で初めてFINALが出て、

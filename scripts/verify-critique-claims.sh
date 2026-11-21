@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 指摘妥当性判定（docs/plans/design-rubric-scope-and-verification.md）の事実主張を再現検証する。
+# 指摘妥当性判定（docs/plans/archive/design-rubric-scope-and-verification.md）の事実主張を再現検証する。
 # 使い方: bash scripts/verify-critique-claims.sh
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

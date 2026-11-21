@@ -1,4 +1,4 @@
-// AT-18: MCPサーバ起動失敗時のスキル単独動作。docs/design-rubric-loop-mcp.md §13 AT-18。
+// AT-18: MCPサーバ起動失敗時のスキル単独動作。docs/spec/design-rubric-loop-mcp.md §13 AT-18。
 // このシナリオは「rubric-loop MCPサーバが利用不能な状態で、モデルがSKILL.mdの
 // 縮退指示に従って自己申告のみで成果物を書く」という、サーバ本体(src/**)を一切経由しない
 // モデル/エージェントの振る舞いテストであり、node --testでコードとして検証できる対象が無い。
@@ -10,6 +10,6 @@ import { test } from 'node:test';
 
 test(
   'AT-18: MCPサーバ起動失敗時のスキル単独動作は、SKILL.md未実装かつサーバコードを経由しないモデル振る舞いのため自動テスト対象外',
-  { skip: 'SKILL.mdが未実装で、シナリオ自体がサーバコード(src/**)を経由しないモデル/エージェントの振る舞い検証のため。docs/design-rubric-loop-mcp.md §13 AT-18参照。' },
+  { skip: 'SKILL.mdが未実装で、シナリオ自体がサーバコード(src/**)を経由しないモデル/エージェントの振る舞い検証のため。docs/spec/design-rubric-loop-mcp.md §13 AT-18参照。' },
   () => {},
 );

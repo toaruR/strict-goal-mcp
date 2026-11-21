@@ -1,3 +1,7 @@
+---
+type: research
+owner: ai
+---
 # 合議: strict-goalのround・時間・token消費を品質を保って減らす
 
 日時: 2026-10-16 22:07:55 JST
@@ -42,7 +46,7 @@ strict-goal MCPのround/時間/token削減を検討。実装はせず、以下�
 
 合格条件と途中の減点理由のずれ、承認済み上流変更後の再評価と同一digest増点禁止の衝突を確認した。一方、最終roundでもREADMEの実在する不一致が修正されており、後半の全roundが無駄だったとは言えない。token実測はなく、Claude CodeとCodexの性能差・削減率は未確定。
 
-一次記録の詳細: [strict-goal-round-investigation-2026-10-16.md](../strict-goal-round-investigation-2026-10-16.md)
+一次記録の詳細: [strict-goal-round-investigation-2026-10-16.md](../research/2026-10-16-strict-goal-round-investigation.md)
 
 ### 共通する方向性
 

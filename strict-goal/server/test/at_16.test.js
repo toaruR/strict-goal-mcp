@@ -1,4 +1,4 @@
-// AT-16: チェーン予算の超過。docs/design-rubric-loop-mcp.md §13 AT-16。
+// AT-16: チェーン予算の超過。docs/spec/design-rubric-loop-mcp.md §13 AT-16。
 // 28周上限（design 9 + plan 6 + implement 12 = 27周、第13周提出で28周到達）
 // 不合格時は verdict:"REVISE", state:"ESCALATED", reason:"chain_budget_exhausted"
 // 予算枯渇のたびに escalate(resolve, continue) の新しい承認で+6周（limit 28 -> 34 -> 40）

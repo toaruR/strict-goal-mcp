@@ -1,5 +1,5 @@
-// 実装計画 (docs/plans/impl-plan-rubric-scope-and-verification.plan.json) が
-// 上流設計書 (docs/plans/design-rubric-scope-and-verification.md) を覆っているかを機械検査する。
+// 実装計画 (docs/plans/archive/impl-plan-rubric-scope-and-verification.plan.json) が
+// 上流設計書 (docs/plans/archive/design-rubric-scope-and-verification.md) を覆っているかを機械検査する。
 //
 // 3検査を行い、1件でも落ちたら終了コード 1。
 //   A. 見出し網羅  : 設計書の全見出しが、いずれかのタスクの design_refs から参照されているか、
@@ -10,8 +10,8 @@
 //                    または依存の先行タスクの changes[].path に現れる（参照だけして触らない refs を検出）。
 import { readFileSync } from 'node:fs';
 
-const PLAN = 'docs/plans/impl-plan-rubric-scope-and-verification.plan.json';
-const DESIGN = 'docs/plans/design-rubric-scope-and-verification.md';
+const PLAN = 'docs/plans/archive/impl-plan-rubric-scope-and-verification.plan.json';
+const DESIGN = 'docs/plans/archive/design-rubric-scope-and-verification.md';
 
 // 分析・判定のための節であり、実装を要する決定を含まない見出し。
 const EXEMPT_HEADINGS = new Map([

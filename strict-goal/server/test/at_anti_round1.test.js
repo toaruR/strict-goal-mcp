@@ -1,5 +1,5 @@
 // AT-01〜AT-03: Round 1 即時終了防止・反復推敲強制受け入れテスト
-// docs/plans/design-anti-round1-final.md §14
+// docs/plans/archive/design-anti-round1-final.md §14
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';

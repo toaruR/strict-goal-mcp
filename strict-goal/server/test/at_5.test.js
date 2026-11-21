@@ -1,4 +1,4 @@
-// AT-5: max_rounds 到達。docs/design-rubric-loop-mcp.md §13 AT-5。
+// AT-5: max_rounds 到達。docs/spec/design-rubric-loop-mcp.md §13 AT-5。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';

@@ -37,7 +37,7 @@ const payload = {
         },
         {
           kind: 'command',
-          command: 'Select-String -Path docs/plans/design-anti-round1-final.md -Pattern "E_MIN_ROUNDS_NOT_REACHED"',
+          command: 'Select-String -Path docs/plans/archive/design-anti-round1-final.md -Pattern "E_MIN_ROUNDS_NOT_REACHED"',
           exit_code: 0,
           output_excerpt: 'docs\\plans\\design-anti-round1-final.md:32:- `E_MIN_ROUNDS_NOT_REACHED`: `round < policy.min_rounds` であり、スコア条件を満たしていても FINAL への遷移を拒絶。',
           output_sha256: '8d53727e9e3d200cc06fd886017f2e6ef76b5ade1965736454e02caf6a753b0c'

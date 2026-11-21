@@ -18,10 +18,10 @@ function runCmd(cmd) {
   }
 }
 
-const cmdCoverage = runCmd('pwsh -c "Get-Content docs/plans/plan-anti-round1-final.json | Select-String -Pattern F-01 | Select-Object -First 3"');
-const cmdDag = runCmd('node -e "import { checkPlan } from \'./strict-goal/server/src/artifact/plan_checks.js\'; import fs from \'fs\'; console.log(\'DAG_ORDER:\' + checkPlan(JSON.parse(fs.readFileSync(\'docs/plans/plan-anti-round1-final.json\'))).join(\',\'));"');
-const cmdVerify = runCmd('pwsh -c "Get-Content docs/plans/plan-anti-round1-final.json | Select-String -Pattern verify-doc | Select-Object -First 3"');
-const cmdCreep = runCmd('node -e "import { checkDesignRefs } from \'./strict-goal/server/src/artifact/design_refs.js\'; import fs from \'fs\'; checkDesignRefs(\'.strict-goal\', JSON.parse(fs.readFileSync(\'docs/plans/plan-anti-round1-final.json\')), { session_id: \'rl_01M2CA46TVTZ9NX5PCWXDJVH3M\', artifact_digest: \'sha256:cebb8f7ea094038bdd53f7297709c652c7f52ac269aeb89295552e54d40dfdf9\' }); console.log(\'CHECK_REFS_SUCCESS_ROUND2\');"');
+const cmdCoverage = runCmd('pwsh -c "Get-Content docs/plans/archive/plan-anti-round1-final.json | Select-String -Pattern F-01 | Select-Object -First 3"');
+const cmdDag = runCmd('node -e "import { checkPlan } from \'./strict-goal/server/src/artifact/plan_checks.js\'; import fs from \'fs\'; console.log(\'DAG_ORDER:\' + checkPlan(JSON.parse(fs.readFileSync(\'docs/plans/archive/plan-anti-round1-final.json\'))).join(\',\'));"');
+const cmdVerify = runCmd('pwsh -c "Get-Content docs/plans/archive/plan-anti-round1-final.json | Select-String -Pattern verify-doc | Select-Object -First 3"');
+const cmdCreep = runCmd('node -e "import { checkDesignRefs } from \'./strict-goal/server/src/artifact/design_refs.js\'; import fs from \'fs\'; checkDesignRefs(\'.strict-goal\', JSON.parse(fs.readFileSync(\'docs/plans/archive/plan-anti-round1-final.json\')), { session_id: \'rl_01M2CA46TVTZ9NX5PCWXDJVH3M\', artifact_digest: \'sha256:cebb8f7ea094038bdd53f7297709c652c7f52ac269aeb89295552e54d40dfdf9\' }); console.log(\'CHECK_REFS_SUCCESS_ROUND2\');"');
 
 const scores = [
   {
@@ -32,7 +32,7 @@ const scores = [
     evidence: [
       {
         kind: 'command',
-        command: 'pwsh -c "Get-Content docs/plans/plan-anti-round1-final.json | Select-String -Pattern F-01 | Select-Object -First 3"',
+        command: 'pwsh -c "Get-Content docs/plans/archive/plan-anti-round1-final.json | Select-String -Pattern F-01 | Select-Object -First 3"',
         exit_code: cmdCoverage.exit_code,
         output_excerpt: cmdCoverage.output_excerpt,
         output_sha256: cmdCoverage.output_sha256
@@ -85,7 +85,7 @@ const scores = [
     evidence: [
       {
         kind: 'command',
-        command: 'pwsh -c "Get-Content docs/plans/plan-anti-round1-final.json | Select-String -Pattern verify-doc | Select-Object -First 3"',
+        command: 'pwsh -c "Get-Content docs/plans/archive/plan-anti-round1-final.json | Select-String -Pattern verify-doc | Select-Object -First 3"',
         exit_code: cmdVerify.exit_code,
         output_excerpt: cmdVerify.output_excerpt,
         output_sha256: cmdVerify.output_sha256
@@ -93,7 +93,7 @@ const scores = [
       {
         kind: 'locator',
         locator: 't006-verify-r2',
-        excerpt: '          "command": "node strict-goal/server/helper.js verify-doc docs/plans/design-anti-round1-final.md",'
+        excerpt: '          "command": "node strict-goal/server/helper.js verify-doc docs/plans/archive/design-anti-round1-final.md",'
       }
     ]
   },

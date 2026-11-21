@@ -42,7 +42,7 @@ test('helper.js test-run: test_inventory と command_evidence を出力する', 
 });
 
 test('helper.js verify-doc: 完全な文書に対して exit 0 と score: 9 を返す', () => {
-  const docPath = path.resolve(__dirname, '..', '..', '..', 'docs', 'plans', 'design-anti-round1-final.md');
+  const docPath = path.resolve(__dirname, '..', '..', '..', 'docs', 'plans', 'archive', 'design-anti-round1-final.md');
   const res = runHelper(['verify-doc', docPath]);
   assert.equal(res.status, 0);
   const parsed = JSON.parse(res.stdout);

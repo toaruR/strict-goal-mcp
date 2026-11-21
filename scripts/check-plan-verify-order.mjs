@@ -9,7 +9,7 @@ import { existsSync } from 'node:fs';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-const PLAN = 'docs/plans/impl-plan-rubric-scope-and-verification.plan.json';
+const PLAN = 'docs/plans/archive/impl-plan-rubric-scope-and-verification.plan.json';
 const plan = JSON.parse(readFileSync(PLAN, 'utf8'));
 const byId = new Map(plan.tasks.map((t) => [t.id, t]));
 

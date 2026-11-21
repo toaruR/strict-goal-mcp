@@ -1,4 +1,4 @@
-// AT-8: モデルの自己申告を無効化する。docs/design-rubric-loop-mcp.md §13 AT-8。
+// AT-8: モデルの自己申告を無効化する。docs/spec/design-rubric-loop-mcp.md §13 AT-8。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';

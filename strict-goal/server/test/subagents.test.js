@@ -223,8 +223,8 @@ test('sg-verifier.md (正本および配布コピー) に impact.json 読込・d
 });
 
 test('サブエージェント関連の設計計画書が存在する', () => {
-  const plan1 = path.resolve(repoRoot, 'docs', 'plans', 'subagent-implementation-plan.md');
-  const plan2 = path.resolve(repoRoot, 'docs', 'plans', 'hierarchical-task-subagent-plan.md');
+  const plan1 = path.resolve(repoRoot, 'docs', 'plans', 'archive', 'subagent-implementation-plan.md');
+  const plan2 = path.resolve(repoRoot, 'docs', 'plans', 'archive', 'hierarchical-task-subagent-plan.md');
   assert.ok(existsSync(plan1), `${plan1} does not exist`);
   assert.ok(existsSync(plan2), `${plan2} does not exist`);
 });

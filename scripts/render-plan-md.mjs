@@ -4,8 +4,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
-const SRC = 'docs/plans/impl-plan-rubric-scope-and-verification.plan.json';
-const OUT = 'docs/plans/impl-plan-rubric-scope-and-verification.md';
+const SRC = 'docs/plans/archive/impl-plan-rubric-scope-and-verification.plan.json';
+const OUT = 'docs/plans/archive/impl-plan-rubric-scope-and-verification.md';
 
 const raw = readFileSync(SRC);
 const plan = JSON.parse(raw.toString('utf8'));
@@ -22,7 +22,7 @@ L.push('> 編集は JSON 側に行い、本ファイルは再生成する（`--c
 L.push('');
 L.push('| 項目 | 値 |');
 L.push('|---|---|');
-L.push(`| 上流設計書 | \`docs/plans/design-rubric-scope-and-verification.md\` |`);
+L.push(`| 上流設計書 | \`docs/plans/archive/design-rubric-scope-and-verification.md\` |`);
 L.push(`| plan_version | ${plan.plan_version} |`);
 L.push(`| タスク数 | ${plan.tasks.length} |`);
 L.push(`| 見積ラウンド合計 | ${plan.tasks.reduce((n, t) => n + t.estimate_rounds, 0)} |`);

@@ -90,7 +90,7 @@ LLMエージェントがプロンプト内の自己反省（「段階的に考�
 | `artifact_commit` | 周回の成果物全文（Markdown等）または fileset のコミット | `session_id`, `expected_round`, `change_note`, `content` または `files`, `addresses` |
 | `score_submit` | ルーブリック全基準に対する自己評価・理由・弱点・根拠の提出 | `session_id`, `scores` (`[{ criterion_id, score, rationale, weakness, evidence }]`) |
 | `rubric_amend` | 厳格なポリシーと40文字以上の理由ログを伴う基準・閾値の変更 | `session_id`, `reason` (40文字以上), `amendments` |
-| `escalate` | 人間への支援要請（[チャット承認](docs/chat-approval.md)）、上流リベース、差し戻し、再開 | `session_id`, `action`; 全ての承認: `escalation_id`, `human_reply`; resolveには`resolution`、kickbackには`target_criteria`も必要 |
+| `escalate` | 人間への支援要請（[チャット承認](docs/spec/chat-approval.md)）、上流リベース、差し戻し、再開 | `session_id`, `action`; 全ての承認: `escalation_id`, `human_reply`; resolveには`resolution`、kickbackには`target_criteria`も必要 |
 | `audit_export` | 検証用監査JSON（セッション単位またはチェーン全体）の出力 | `session_id`, `scope` (`session` / `chain`), `include_artifacts` |
 | `invoke_subagent` | 孤立した子セッションでエフェメラルなサブエージェントを実行し結果を取得 | `prompt`, `agent_type`, `runner` (`"auto"` / `"agy"` / `"claude"` / `"codex"`), `workspace_dir`, `timeout_sec` |
 

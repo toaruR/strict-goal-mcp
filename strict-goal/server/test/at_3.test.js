@@ -1,4 +1,4 @@
-// AT-3: ごまかし検出②：根拠の捏造と使い回し。docs/design-rubric-loop-mcp.md §13 AT-3。
+// AT-3: ごまかし検出②：根拠の捏造と使い回し。docs/spec/design-rubric-loop-mcp.md §13 AT-3。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';

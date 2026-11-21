@@ -1,4 +1,4 @@
-// AT-2: ごまかし検出①：成果物不変でスコアだけ上昇。docs/design-rubric-loop-mcp.md §13 AT-2。
+// AT-2: ごまかし検出①：成果物不変でスコアだけ上昇。docs/spec/design-rubric-loop-mcp.md §13 AT-2。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync } from 'node:fs';

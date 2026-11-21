@@ -1,4 +1,4 @@
-// AT-17: 途中モードからの再開（実装セッションのハンドル1個）。docs/design-rubric-loop-mcp.md §13 AT-17。
+// AT-17: 途中モードからの再開（実装セッションのハンドル1個）。docs/spec/design-rubric-loop-mcp.md §13 AT-17。
 // 「上流が消えていた場合」の設計書の例は state:"DRAFTING", orphan:true, warnings:["upstream_missing"]
 // という優雅な縮退を期待するが、実際は src/chain/supersede.js の checkSupersede が
 // upstream セッションディレクトリの不在を toolName に関係なく即 E_UPSTREAM_NOT_FOUND で

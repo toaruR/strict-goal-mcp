@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { pinSessionPolicy, enforceV2 } from '../src/policy/session_policy.js';
 
 const readme = fs.readFileSync(fileURLToPath(new URL('../../README.md', import.meta.url)), 'utf8');
-const migration = fs.readFileSync(fileURLToPath(new URL('../../../docs/strict-goal-round-reduction-migration.md', import.meta.url)), 'utf8');
+const migration = fs.readFileSync(fileURLToPath(new URL('../../../docs/guides/strict-goal-round-reduction-migration.md', import.meta.url)), 'utf8');
 
 test('documented stage names and defaults match policy', () => {
   for (const stage of ['v1', 'observe-only', 'dual-read', 'enforce-new-session', 'default-on']) {

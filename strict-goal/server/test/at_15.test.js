@@ -1,4 +1,4 @@
-// AT-15: 実装モードのごまかし検出（結果の使い回し・アサート弱化）。docs/design-rubric-loop-mcp.md §13 AT-15。
+// AT-15: 実装モードのごまかし検出（結果の使い回し・アサート弱化）。docs/spec/design-rubric-loop-mcp.md §13 AT-15。
 // (a)(b) command根拠のtarget_digest不一致・欠落はどちらも同じE_EVIDENCE_TARGET(src/evidence/verify.js)、
 // (c) テストファイルのsha256変更にdiffsが無ければE_TEST_MUTATED_WITHOUT_DIFF(R5)、
 // (d) test_inventoryがgreenでないのにauto基準へpass_score以上を付けるとE_TEST_NOT_GREEN(R4)になる。

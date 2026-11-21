@@ -1,4 +1,4 @@
-// AT-14: 実装モードのごまかし検出（テスト削除）。docs/design-rubric-loop-mcp.md §13 AT-14。
+// AT-14: 実装モードのごまかし検出（テスト削除）。docs/spec/design-rubric-loop-mcp.md §13 AT-14。
 // fileset は artifact_commit に結線済み(CLAUDE.mdの訂正済みハマりポイント参照)なので、
 // 公開ツール経由で design→plan→implement の implement 側を直接検証する。
 import { test } from 'node:test';

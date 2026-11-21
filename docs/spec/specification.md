@@ -1,3 +1,7 @@
+---
+type: spec
+owner: ai
+---
 <!-- spec-doc:last-reviewed-commit=49126cac93b51c783d715da3ce4836a4efaee549 reviewed-at=2026-10-18 -->
 
 # 仕様書
@@ -150,7 +154,7 @@
     - 過去に拒否された同じ `submission_id`・同じ入力の再送には、前回と同じエラーコードを返す。
 
 ### 3.3 v2 評価ポリシー（ラウンド削減）と課題台帳
-v2 評価ポリシーは、条件変化と品質改善を区別し、未解決課題を台帳で追跡する仕組みである。ラウンドとトークンの削減を目的とする。移行手順の詳細は [strict-goal-round-reduction-migration.md](strict-goal-round-reduction-migration.md) にある。
+v2 評価ポリシーは、条件変化と品質改善を区別し、未解決課題を台帳で追跡する仕組みである。ラウンドとトークンの削減を目的とする。移行手順の詳細は [strict-goal-round-reduction-migration.md](../guides/strict-goal-round-reduction-migration.md) にある。
 
 #### ステージとセッションへの固定
 - 環境変数 `STRICT_GOAL_ROUND_REDUCTION_STAGE` が新規セッションのステージを決める。既定は `v1`。

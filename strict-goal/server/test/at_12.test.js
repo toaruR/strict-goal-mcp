@@ -1,5 +1,5 @@
 import { approvalFields } from './helpers/chat-approval.js';
-// AT-12: 上流変更による下流の失効と部分再検証。docs/design-rubric-loop-mcp.md §13 AT-12。
+// AT-12: 上流変更による下流の失効と部分再検証。docs/spec/design-rubric-loop-mcp.md §13 AT-12。
 // escalate action:"reopen" は公開ツールとして実装済み。上流の reopen は escalate 経由で実行する。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

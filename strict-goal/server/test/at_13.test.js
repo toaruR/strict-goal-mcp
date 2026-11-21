@@ -1,5 +1,5 @@
 import { approvalFields } from './helpers/chat-approval.js';
-// AT-13: 差し戻し（implement → plan）。docs/design-rubric-loop-mcp.md §13 AT-13。
+// AT-13: 差し戻し（implement → plan）。docs/spec/design-rubric-loop-mcp.md §13 AT-13。
 // implement(fileset)はartifact_commitに未結線のため、kickback.test.jsと同じdesign/planの2セッション
 // チェーンでkickback/budget機構そのもの(下流→上流の差し戻し・凍結・上限)を検証する。
 // 監査JSONのkickbacks[]フィールドは設計書の例({downstream_state_after,upstream_state_after,resolved_at})

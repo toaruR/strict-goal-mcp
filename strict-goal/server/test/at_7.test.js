@@ -1,4 +1,4 @@
-// AT-7: rubric の緩和を検出してエスカレーション。docs/design-rubric-loop-mcp.md §13 AT-7。
+// AT-7: rubric の緩和を検出してエスカレーション。docs/spec/design-rubric-loop-mcp.md §13 AT-7。
 // escalate.js の resolution 名は "approve_relaxation" ではなく "relax_rubric"、
 // 遷移先も DRAFTING ではなく SCORING（escalate_core.test.js で確定済みの実装挙動）。
 import { test } from 'node:test';

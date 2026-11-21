@@ -1,3 +1,7 @@
+---
+type: research
+owner: ai
+---
 # 追補合議: strict-goal改善案へのagy参加
 
 日時: 2026-10-16 22:53:05 JST
@@ -15,7 +19,7 @@
 - 元の `deliberate` はpartialのまま保存する。今回でagyの意見を追加したが、Claude・Codexはagyの新回答へ再反論していない。3者全員の相互反論を再実行した結果とは扱わない。
 
 元の合議: [2026-10-16-strict-goal-round-reduction.md](./2026-10-16-strict-goal-round-reduction.md)  
-一次記録の調査: [strict-goal-round-investigation-2026-10-16.md](../strict-goal-round-investigation-2026-10-16.md)
+一次記録の調査: [strict-goal-round-investigation-2026-10-16.md](../research/2026-10-16-strict-goal-round-investigation.md)
 
 | round | ok | error_code | exit_code | stdout_truncated | timed_out | workdir_check | duration_ms |
 |---|---|---|---|---|---|---|---:|

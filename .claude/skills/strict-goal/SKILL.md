@@ -228,4 +228,4 @@ Degraded-mode requirements per mode:
 3. Call reopen with its pending escalation_id and verbatim human_reply. The confirmation is bound to the finalized artifact digest; the server records the decision and returns DRAFTING with the next round.
 
 A typed kickback or reopen confirmation can be resolved with abort only when the user explicitly chooses termination. Refusing the proposed action does not itself authorize abort. Wrong or consumed IDs, empty replies, changed targets, and invalid preconditions are rejected; precondition failures preserve the pending confirmation.
-See docs/chat-approval.md for the approval contract and examples.
+See docs/spec/chat-approval.md for the approval contract and examples.

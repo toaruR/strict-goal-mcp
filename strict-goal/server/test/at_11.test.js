@@ -1,4 +1,4 @@
-// AT-11: 上流の版を知らずに下流を開こうとする。docs/design-rubric-loop-mcp.md §13 AT-11。
+// AT-11: 上流の版を知らずに下流を開こうとする。docs/spec/design-rubric-loop-mcp.md §13 AT-11。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readdirSync } from 'node:fs';

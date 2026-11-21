@@ -1,4 +1,4 @@
-// AT-10: 3モード連鎖の正常系。docs/design-rubric-loop-mcp.md §13 AT-10。
+// AT-10: 3モード連鎖の正常系。docs/spec/design-rubric-loop-mcp.md §13 AT-10。
 // 設計書の手順8はimplement作成直後・commit/score前にaudit_exportを呼ぶ流れなので、
 // 本テストもそれに合わせてimplementセッションはloop_openで作成するところまでに留める
 // (fileset自体はartifact_commitに結線済みで、公開ツール経由でFINALまで到達できることは別途確認済み)。

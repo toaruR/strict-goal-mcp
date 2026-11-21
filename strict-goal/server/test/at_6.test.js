@@ -1,4 +1,4 @@
-// AT-6: セッション再開。docs/design-rubric-loop-mcp.md §13 AT-6。
+// AT-6: セッション再開。docs/spec/design-rubric-loop-mcp.md §13 AT-6。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';
