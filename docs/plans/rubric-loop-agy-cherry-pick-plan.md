@@ -109,32 +109,14 @@ Expected: 全件 PASS（`error_codes.test.js` は台帳と実装の一致を見�
 - Modify: `rubric-loop/server/src/tools/escalate.js`（分岐追加、153行目 `else {` の直前）
 - Modify: `rubric-loop/server/src/mcp/envelope.js`（`reopened` 受け渡し2行）
 - Modify: `rubric-loop/server/test/at_12.test.js`（workaround 除去＋公開ツール経由に書換え）
-- Test: 非 FINAL からの reopen → `E_STATE_VIOLATION` を追加
+- Test: 非 FINAL からの再開承認要求 → `E_STATE_VIOLATION` を追加
 
-**Step 1: reopen 分岐を挿入**（`kickback` 分岐の次、最終 `else` の前）
+**Step 1: チャット承認後にreopenを実行する**
 
-```js
-    } else if (input.action === 'reopen') {
-      if (session.state !== 'FINAL' && session.state !== 'FINAL_WITH_RELAXATION') {
-        fail('E_STATE_VIOLATION', 'reopen is only valid in FINAL or FINAL_WITH_RELAXATION', {
-          state: session.state,
-        });
-      }
-      const previousFinalDigest = session.current_artifact?.digest ?? null;
-      session.state = 'DRAFTING';
-      session.round += 1;
-      session.reopened = [
-        ...(session.reopened ?? []),
-        { at: new Date().toISOString(), by: 'human', reason: input.note, previous_final_digest: previousFinalDigest },
-      ];
-      // A10: FINAL からは request_human を経由できずペンディングトークンが存在し得ないため、
-      // kickback と同じく実トークン照合はせず system event を記録する（存在検査は assertActionInputs 済み）。
-      const { record } = recordSystemEvent(sDir, { reason: 'reopen', resolution: 'reopen' });
-      escalationInfo = toEscalationInfo(record, '');
-    } else {
-```
-
-（`recordSystemEvent`・`toEscalationInfo` は import・定義済み。新規 import 不要。`human_token` の存在検査は `assertActionInputs` 47–49行目に存在済み。FSM は `states.js:76,85` で FINAL 系からの reopen を許可済みなので FSM 変更不要。`TOOL_ERRORS.escalate` への追加コードは不要＝`E_STATE_VIOLATION` は登録済みのはず。Step 4 の `error_codes.test.js` で裏取りする）
+- FINAL系の状態からrequest_human(approval_action:"reopen", approval_channel:"chat")を許可する。確定成果物のdigestを保留確認に保存し、ESCALATEDへ移す。
+- ユーザーの明示的な返答後、reopen(escalation_id, human_reply)で確認ID・目的・digest・未消費状態を検査する。確認なしの直接再開や別操作の確認流用を拒否する。
+- 確認を消費して返答を監査へ記録し、DRAFTINGへ移してroundを1増やす。reopenedに時刻・理由・previous_final_digestを追記する。
+- 失敗時は確認を消費せず、next_actionから再取得できることを検証する。秘密ファイル方式の代替経路は設けない。
 
 **Step 2: envelope に `reopened` を追加**（`escalation` と同じパターン）
 
@@ -149,7 +131,7 @@ Expected: 全件 PASS（`error_codes.test.js` は台帳と実装の一致を見�
 
 **Step 3: at_12 の workaround を公開ツール経由に書換え**
 
-- `at_12.test.js` の `writeSessionRaw` による「reopen 相当」再現（184–199行目付近）を `escalate({input:{..., action:'reopen', human_token:'...'}, persistence})` に置換
+- `at_12.test.js` のrequest_human(approval_action:"reopen")から返された確認IDを使い、`writeSessionRaw` による「reopen 相当」再現（184–199行目付近）を `escalate({input:{..., action:'reopen', escalation_id:'esc_01', human_reply:'再開を承認します'}, persistence})` に置換
 - 先頭コメント2–3行目（「reopen(T042)は未実装のため」）を更新
 - agy 版 at12 Step-1 の表明を移植：`state === 'DRAFTING'`、`round` が +1、`reopened[0].previous_final_digest` が再オープン前の digest と一致
 

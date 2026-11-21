@@ -1785,7 +1785,7 @@
     {
       "id": "T040",
       "title": "escalate の request_human / resolve / abort を実装する",
-      "intent": "STALLED から request_human で ESCALATED に移り escalations/esc_NN.token を生成する。resolve は human_token 必須で continue / accept_as_is / approve_relaxation / abort の4分岐を持ち、トークンは1回で消費される。応答にトークン値を載せない。",
+      "intent": "STALLED から request_human で ESCALATED に移り escalations/esc_NN.json を生成する。resolve は escalation_id と human_reply 必須で continue / accept_as_is / relax_rubric / abort の4分岐を持ち、確認IDは返答原文とともに1回で消費される。秘密ファイルを生成せずチャットで明示的な返答を待つ。",
       "design_refs": [
         "6.4.6 `escalate`",
         "7.3 打ち切りとエスカレーションの出口",
@@ -1803,24 +1803,24 @@
           "note": "action ディスパッチと ESCALATED 遷移"
         },
         {
-          "path": "rubric-loop/server/src/escalation/token.js",
+          "path": "rubric-loop/server/src/escalation/approval.js",
           "kind": "add",
-          "note": "token ファイルの生成・照合・消費"
+          "note": "確認JSONの生成・確認IDの検査・返答原文の記録・一度だけの消費"
         },
         {
           "path": "rubric-loop/server/test/escalate_core.test.js",
           "kind": "add",
-          "note": "4分岐とトークン消費を検査"
+          "note": "4分岐と確認IDの消費を検査"
         }
       ],
       "acceptance": [
-        "STALLED で request_human を呼ぶと state が ESCALATED になり escalations/esc_01.token が作られること",
-        "応答本文に human_token の値が一切含まれないこと",
-        "誤った human_token で resolve すると E_TOKEN_INVALID になり state が ESCALATED のままであること",
-        "正しい human_token の resolve/continue で state が DRAFTING、実効 max_rounds が +3、停滞カウンタが 0 になること",
-        "同じ human_token を再利用すると E_TOKEN_INVALID になること",
+        "STALLED で request_human を呼ぶと state が ESCALATED になり escalations/esc_01.json が作られること",
+        "応答に確認ID・概要・next_actionが含まれ、承認後に返答原文を監査へ記録すること",
+        "誤った escalation_id と human_reply で resolve すると E_RESOLUTION_NOT_APPLICABLE になり state が ESCALATED のままであること",
+        "正しい escalation_id と human_reply の resolve/continue で state が DRAFTING、実効 max_rounds が +3、停滞カウンタが 0 になること",
+        "同じ escalation_id と human_reply を再利用すると E_RESOLUTION_NOT_APPLICABLE になること",
         "resolve/accept_as_is で state が FINAL_WITH_RELAXATION になり監査に赤旗が立つこと",
-        "resolve/approve_relaxation の後、次の score_submit が閾値を満たせば FINAL_WITH_RELAXATION になること",
+        "resolve/relax_rubric の後、次の score_submit が閾値を満たせば FINAL_WITH_RELAXATION になること",
         "DRAFTING で resolution を渡すと E_RESOLUTION_NOT_APPLICABLE になること",
         "abort で state が ABORTED（終端）になること"
       ],
@@ -1957,7 +1957,7 @@
     {
       "id": "T044",
       "title": "MRTR による人間承認を実装する",
-      "intent": "サーバ発の要求が廃止された前提で、MRTR（Multi Round-Trip Requests）を使って escalate の人間承認をクライアント往復として表現する。往復が成立しないホストでは token ファイル方式に縮退する。",
+      "intent": "サーバ発の要求が廃止された前提で、MRTR（Multi Round-Trip Requests）を使って escalate の人間承認をクライアント往復として表現する。往復が成立しないホストではチャット確認とnext_actionを返す。",
       "design_refs": [
         "18.3 MRTR による人間承認（`escalate` の強化）",
         "18.4 適合上の限界（正直に）"
@@ -1969,7 +1969,7 @@
         {
           "path": "rubric-loop/server/src/mcp/mrtr.js",
           "kind": "add",
-          "note": "MRTR の往復とタイムアウト、token 方式へのフォールバック"
+          "note": "MRTRの往復とチャットによる保留確認の解決"
         },
         {
           "path": "rubric-loop/server/test/mrtr.test.js",
@@ -1979,8 +1979,8 @@
       ],
       "acceptance": [
         "MRTR に対応するホストでは escalate の承認が往復1回で完了すること",
-        "MRTR 非対応のホストでは token ファイル方式に自動で縮退し warnings に mrtr_unavailable が出ること",
-        "どちらの経路でも human_token の値が応答本文に載らないこと",
+        "MRTR 非対応のホストでは チャット確認とnext_actionを返すこと",
+        "どちらの経路でも確認IDとユーザー返答原文が監査に記録されること",
         "サーバ発のリクエスト（server-initiated request）を1箇所も使っていないこと"
       ],
       "verify": [
@@ -2367,7 +2367,7 @@
         "round が design モードの max_rounds 12 に達したとき verdict が STALLED になること",
         "verdict_reason が max_rounds_reached であること",
         "毎周改善している場合でも max_rounds では止まること",
-        "延長が escalate と human_token を経由しないと起きないこと"
+        "延長が escalateに渡す確認IDと返答原文 を経由しないと起きないこと"
       ],
       "verify": [
         {
@@ -2432,7 +2432,7 @@
       "acceptance": [
         "重みを下げる rubric_amend が relaxation として rubric_diff に記録されること",
         "その後に全基準 9 以上を出しても verdict が ESCALATED、verdict_reason が relaxation_pending_approval になること",
-        "resolve/approve_relaxation の後の提出で FINAL_WITH_RELAXATION になること",
+        "resolve/relax_rubric の後の提出で FINAL_WITH_RELAXATION になること",
         "FINAL には到達しないこと"
       ],
       "verify": [
@@ -2942,7 +2942,7 @@
       "acceptance": [
         "loop_state の E_SESSION_NOT_FOUND が再現され、状態違反が構造的に起きないことが確認されること",
         "rubric_amend の E_STATE_VIOLATION, E_CONCURRENT, E_THRESHOLD_IMMUTABLE, E_RELAXATION_UNACKNOWLEDGED, E_VALIDATION の5件が再現されること",
-        "escalate の E_STATE_VIOLATION, E_TOKEN_INVALID, E_RESOLUTION_NOT_APPLICABLE, E_VALIDATION, E_UPSTREAM_NOT_FOUND, E_UPSTREAM_DIGEST_MISMATCH, E_CHAIN_BUDGET_EXHAUSTED の7件が再現されること",
+        "escalate の E_STATE_VIOLATION, E_RESOLUTION_NOT_APPLICABLE, E_VALIDATION, E_UPSTREAM_NOT_FOUND, E_UPSTREAM_DIGEST_MISMATCH, E_CHAIN_BUDGET_EXHAUSTED の7件が再現されること",
         "audit_export の E_SESSION_NOT_FOUND と E_VALIDATION の2件が再現されること",
         "7ツールで再現したコードの重複排除後の集合に E_INTERNAL を足すと 42 件になること"
       ],

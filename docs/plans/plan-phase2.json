@@ -145,7 +145,7 @@
         "round が design モードの max_rounds 12 に達したとき verdict が STALLED になること",
         "verdict_reason が max_rounds_reached であること",
         "毎周改善している場合でも max_rounds では止まること",
-        "延長が escalate と human_token を経由しないと起きないこと"
+        "延長が escalateに渡す確認IDと返答原文 を経由しないと起きないこと"
       ],
       "verify": [
         {
@@ -204,7 +204,7 @@
       "acceptance": [
         "重みを下げる rubric_amend が relaxation として rubric_diff に記録されること",
         "その後に全基準 9 以上を出しても verdict が ESCALATED、verdict_reason が relaxation_pending_approval になること",
-        "resolve/approve_relaxation の後の提出で FINAL_WITH_RELAXATION になること",
+        "resolve/relax_rubric の後の提出で FINAL_WITH_RELAXATION になること",
         "FINAL には到達しないこと"
       ],
       "verify": [

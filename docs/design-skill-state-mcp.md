@@ -416,7 +416,7 @@ statement: 収束条件と打ち切り条件が数値で決まっており、無
 3. **停滞打ち切り判定 (`STALLED`)**:
    直近 3 周（`stall_window: 3`）の加重平均スコアの最大値と最小値の差が $0.25$（`stall_epsilon: 0.25`）未満の場合、進捗が停滞したとみなし、FSM は `STALLED` へ遷移する。
 4. **上限到達判定 (`ESCALATED`)**:
-   セッション単体の周回数が 12 周（`max_rounds: 12`）に達したか、チェーン全体の周回数が 28 周（`chain_max_rounds: 28`）を超過した場合、FSM は `ESCALATED` へ遷移し、人間にトークンを提示して介入を要求する。
+   セッション単体の周回数が12周（`max_rounds: 12`）に達した場合は`STALLED`になり、request_humanでチャット承認を求める。チェーン全体が28周（`chain_max_rounds: 28`）に達して不合格の場合は自動で`ESCALATED`へ遷移し、確認IDとnext_actionを返す。既存の確認IDとユーザーの返答原文でresolveを行い、秘密ファイルによる承認は使わない。
 
 ---
 

@@ -78,7 +78,7 @@
 | A7 | 同一 `session_id` に同時アクセスする並行クライアントがありうる | 仕様外 | `PLUGIN_DATA` 上のロックファイル + 楽観ロック（`expected_round`）で衝突を `E_CONCURRENT` として弾く（§8.4） |
 | A8 | ホストが話す MCP リビジョンは 2026-07-28 か 2025-11-25 のいずれか | Agent Plugins 1.0.0 は **MCP のリビジョンを規定していない**（クライアント任せ） | `server/discover` で両版を広告し、ツール表面と判定ロジックを**リビジョン非依存**にする。MRTR など新版限定機能は必ず旧版向けの代替経路を持たせる（§18.3） |
 | A9 | モデルは成果物ファイルの SHA-256 を自分で計算できる（`sha256sum` 等が使える） | 仕様外 | サーバは**ハッシュの真正性を検証しない**。`fileset` のマニフェストは申告であり、サーバが担保するのは内部整合性と再現手順の記録に限る。真正性が要る場面では監査者が `manifest_command` を再実行する（§19.5.3 / §19.8.4） |
-| A10 | 1つのチェーンは1人の人間の管理下にある | 仕様外（認証機構が無いため） | `human_token` は**速度制限であってセキュリティ境界ではない**という既存の立場を、差し戻し・再オープンにもそのまま適用する。多人数運用は §1.3 のスコープ外 |
+| A10 | 1つのチェーンは1人の人間の管理下にある | 仕様外（認証機構が無いため） | `escalation_id` と `human_reply` は**速度制限であってセキュリティ境界ではない**という既存の立場を、差し戻し・再オープンにもそのまま適用する。多人数運用は §1.3 のスコープ外 |
 
 ### 1.3 スコープ外
 
@@ -97,7 +97,7 @@
 | F1 | **自己採点の甘え** | 「まあ9点でいいだろう」と根拠なしに全項目9点を出し、その周で FINAL を宣言 | `score_submit` が各スコアに `evidence` を**必須**（`minItems:1`）。`verification:"auto"` の基準は `evidence.kind:"command"` のみ受理。判定はサーバの閾値ロジック（§6） | `E_EVIDENCE_REQUIRED` / `E_EVIDENCE_KIND` |
 | F2 | **周回中にループを忘れる** | 3周目あたりで PLAN/VERIFY を省略し、雑談に戻る | 全ツール応答に `next_action`（次に呼ぶべきツール名と入力の骨格）を埋め込む。状態機械が順序違反を構造的に弾く（§4）。`loop_state` はいつでも呼べる復帰専用ツール | `E_STATE_VIOLATION`（`expected_tools` 付き） |
 | F3 | **コンテキスト圧縮で rubric ごと消える** | 長い周回で rubric 本文が要約に飲まれ、基準が曖昧化 | rubric は `PLUGIN_DATA` に永続。`loop_state` が rubric 全文とアンカーを再供給。`ITERATING` 応答は**最低点3基準の全文アンカー**を必ず同梱（§6.4） | （常時再供給。欠落しない） |
-| F4 | **基準を後から緩める** | 通らない基準の重みを下げる／アンカーを甘くする／基準を消す | rubric は content-addressed & 版管理。変更は `rubric_amend` 経由のみで、**緩和方向の変更**（重み減・基準削除・アンカー緩和・閾値変更）は `relaxation` として記録され、以後そのセッションは `FINAL` に到達不能（`FINAL_WITH_RELAXATION` は人間の承認トークン必須、§7.3） | `E_THRESHOLD_IMMUTABLE` / 判定 `ESCALATED` |
+| F4 | **基準を後から緩める** | 通らない基準の重みを下げる／アンカーを甘くする／基準を消す | rubric は content-addressed & 版管理。変更は `rubric_amend` 経由のみで、**緩和方向の変更**（重み減・基準削除・アンカー緩和・閾値変更）は `relaxation` として記録され、以後そのセッションは `FINAL` に到達不能（`FINAL_WITH_RELAXATION` は人間の明示的なチャット承認必須、§7.3） | `E_THRESHOLD_IMMUTABLE` / 判定 `ESCALATED` |
 | F5 | **成果物が変わってないのにスコアだけ上がる** | 同じ文書を出し直して「今読み返したら9点だった」 | `score_submit` は直前に `artifact_commit` された `artifact_digest` に束縛。**digest 不変で1点でも上昇**した提出は拒否 | `E_SCORE_INFLATION`（上がった基準 id を列挙） |
 | F6 | **早期 FINAL 宣言** | モデルが「もう十分」と言って停止 | `FINAL` はサーバのみが出す語。ツール出力の `verdict` 以外に FINAL を名乗る経路が無い。閾値未満なら `ITERATING` と `must_fix` が強制的に返る（§6.3） | `verdict:"ITERATING"` |
 | F7 | **無限ループ** | 微修正を延々繰り返して終わらない | `max_rounds`（既定12）到達で `STALLED`。停滞検知（既定 N=3 周、加重平均改善 < 0.25）でも `STALLED`。どちらも `escalate` でしか抜けられない（§7） | `verdict:"STALLED"` |
@@ -113,7 +113,7 @@
 | F17 | **上流の欠陥を下流で辻褄合わせする** | 計画の依存順が間違っているのに、実装側で順番を勝手に変えて設計書と乖離させる | `escalate(action:"kickback")` で上流を再オープンし、下流は `FROZEN` になる。下流だけ進める経路が無い（§19.4） | `E_FROZEN` |
 | F18 | **計画に設計外の作業を混ぜる** | 設計書に無い機能を「ついでに」計画へ足す | `plan` 成果物の全タスクに `design_refs` を必須化し、参照先が**ピンした上流設計書に実在すること**をサーバが照合する（§19.5.2） | `E_PLAN_DESIGN_REF` |
 | F19 | **テストを消す・skip する・アサートを弱めて green にする** | 落ちるテストを削除／`skip` を増やす／`toBe` を `toBeDefined` に緩めて「全部通った」と主張 | `test_inventory` の前周差分をサーバが取り、説明なき削除・skip 増を拒否。変更したテストファイルには差分の添付を必須化（§19.8.2 / §19.8.3） | `E_TEST_REGRESSION` / `E_TEST_MUTATED_WITHOUT_DIFF` / `E_TEST_NOT_GREEN` |
-| F20 | **3モード合計での暴走** | 設計12周・計画8周・実装16周を使い切り、さらに差し戻しで上限がリセットされて終わらない | チェーン合計の上位予算 `chain_max_rounds`（既定28）と差し戻し上限 `chain_max_kickbacks`（既定2）。上乗せは人間承認で1回だけ（§19.10.2） | `E_CHAIN_BUDGET_EXHAUSTED` / `ESCALATED（chain_budget_exhausted）` |
+| F20 | **3モード合計での暴走** | 設計12周・計画8周・実装16周を使い切り、さらに差し戻しで上限がリセットされて終わらない | チェーン合計の上位予算 `chain_max_rounds`（既定28）と差し戻し上限 `chain_max_kickbacks`（既定2）。予算枯渇のたびに人間承認で追加できる（§19.10.2） | `E_CHAIN_BUDGET_EXHAUSTED` / `ESCALATED（chain_budget_exhausted）` |
 
 ---
 
@@ -276,7 +276,7 @@ rubric は「基準の配列」+「不変ポリシー」。基準ごとに **id 
 |---|---|---|
 | `addition` | 基準の追加 / `weight` 増加 / `anchors.9` が既存文言を包含したまま伸びる | 許可。`FINAL` 到達可 |
 | `clarification` | `description` / `verify_hint` / `title` のみの変更 | 許可。`FINAL` 到達可 |
-| `relaxation` | 基準の削除 / `weight` 減少 / `anchors.9` の既存文言が失われる / `verification` を `auto`→`manual` | 許可するが `relaxation_count += 1`。以後、閾値を満たしても `FINAL` は出ず **`ESCALATED`（`reason:"relaxation_pending_approval"`）**。人間が `escalate(resolution:"approve_relaxation", human_token)` を出して初めて `FINAL_WITH_RELAXATION` |
+| `relaxation` | 基準の削除 / `weight` 減少 / `anchors.9` の既存文言が失われる / `verification` を `auto`→`manual` | 許可するが `relaxation_count += 1`。以後、閾値を満たしても `FINAL` は出ず **`ESCALATED`（`reason:"relaxation_pending_approval"`）**。人間が `escalate(resolution:"relax_rubric", escalation_id, human_reply)` を出して初めて `FINAL_WITH_RELAXATION` |
 | `policy_change` | `policy.*` の変更 | **常に拒否**（`E_THRESHOLD_IMMUTABLE`）。閾値はセッション開始時に固定 |
 
 「基準を書き換えて通す」経路は、**塞がれる（policy）** か **監査に残り人間の承認を要する（relaxation）** の2択しか無い。
@@ -1201,35 +1201,168 @@ MCP 2026-07-28 で `inputSchema` / `outputSchema` は JSON Schema 2020-12 の任
 
 ```json
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["session_id", "submission_id", "action", "note"],
+  "required": [
+    "session_id",
+    "submission_id",
+    "action",
+    "note"
+  ],
   "properties": {
-    "session_id": { "type": "string", "pattern": "^rl_[0-9A-HJKMNP-TV-Z]{26}$" },
-    "submission_id": { "type": "string", "minLength": 8, "maxLength": 128 },
-    "action": {
-      "enum": ["request_human", "resolve", "abort", "reopen", "rebase", "kickback"]
+    "session_id": {
+      "type": "string",
+      "pattern": "^rl_[0-9A-HJKMNP-TV-Z]{26}$"
     },
-    "note": { "type": "string", "minLength": 40, "maxLength": 4000 },
-    "resolution": { "enum": ["continue", "accept_as_is", "relax_rubric", "abort"] },
-    "human_token": { "type": "string", "minLength": 16, "maxLength": 256 },
-    "upstream_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-    "upstream_content": { "type": "string", "maxLength": 1000000 },
+    "submission_id": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "request_human",
+        "resolve",
+        "abort",
+        "reopen",
+        "rebase",
+        "kickback"
+      ]
+    },
+    "note": {
+      "type": "string",
+      "minLength": 40,
+      "maxLength": 4000
+    },
+    "resolution": {
+      "type": "string",
+      "enum": [
+        "continue",
+        "accept_as_is",
+        "relax_rubric",
+        "abort"
+      ]
+    },
+    "upstream_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "upstream_content": {
+      "type": "string",
+      "maxLength": 1000000
+    },
     "target_criteria": {
-      "type": "array", "minItems": 1, "uniqueItems": true,
-      "items": { "type": "string", "pattern": "^[a-z0-9_]{1,40}$" }
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9_]{1,40}$"
+      }
+    },
+    "approval_channel": {
+      "type": "string",
+      "enum": [
+        "chat"
+      ],
+      "description": "Use chat approval."
+    },
+    "escalation_id": {
+      "type": "string",
+      "pattern": "^esc_[0-9]{2,}$"
+    },
+    "human_reply": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000,
+      "description": "Verbatim explicit user reply to this approval request. Wait for the reply before resolving."
+    },
+    "approval_action": {
+      "type": "string",
+      "enum": [
+        "resolve",
+        "kickback",
+        "reopen"
+      ],
+      "description": "Purpose of request_human; defaults to kickback when target_criteria is supplied, otherwise resolve."
     }
   },
   "allOf": [
-    { "if": { "properties": { "action": { "const": "resolve" } }, "required": ["action"] },
-      "then": { "required": ["resolution", "human_token"] } },
-    { "if": { "properties": { "action": { "const": "reopen" } }, "required": ["action"] },
-      "then": { "required": ["human_token"] } },
-    { "if": { "properties": { "action": { "const": "kickback" } }, "required": ["action"] },
-      "then": { "required": ["human_token", "target_criteria"] } },
-    { "if": { "properties": { "action": { "const": "rebase" } }, "required": ["action"] },
-      "then": { "required": ["upstream_digest"] } }
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "const": "resolve"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "then": {
+        "required": [
+          "resolution",
+          "escalation_id",
+          "human_reply"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "enum": [
+              "kickback",
+              "reopen"
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "then": {
+        "required": [
+          "escalation_id",
+          "human_reply"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "const": "kickback"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "then": {
+        "required": [
+          "target_criteria"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "const": "rebase"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "then": {
+        "required": [
+          "upstream_digest"
+        ]
+      }
+    }
   ]
 }
 ```
@@ -1238,43 +1371,114 @@ MCP 2026-07-28 で `inputSchema` / `outputSchema` は JSON Schema 2020-12 の任
 
 ```json
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["ok", "session_id", "state", "round", "rubric_version", "persistence", "escalation", "next_action", "warnings"],
+  "required": [
+    "ok",
+    "session_id",
+    "state",
+    "round",
+    "rubric_version",
+    "persistence",
+    "escalation",
+    "next_action",
+    "warnings"
+  ],
   "properties": {
-    "ok": { "const": true },
-    "session_id": { "type": "string" },
-    "state": { "enum": ["ESCALATED", "DRAFTING", "FINAL_WITH_RELAXATION", "ABORTED", "FINAL"] },
-    "round": { "type": "integer" },
-    "rubric_version": { "type": "integer" },
-    "persistence": { "enum": ["durable", "ephemeral"] },
+    "ok": {
+      "type": "boolean"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "ESCALATED",
+        "DRAFTING",
+        "SCORING",
+        "FINAL_WITH_RELAXATION",
+        "ABORTED",
+        "FINAL",
+        "FROZEN"
+      ]
+    },
+    "round": {
+      "type": "integer"
+    },
+    "rubric_version": {
+      "type": "integer"
+    },
+    "persistence": {
+      "type": "string",
+      "enum": [
+        "durable",
+        "ephemeral"
+      ]
+    },
     "escalation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["escalation_id", "created_at", "token_path", "reason"],
+      "required": [
+        "escalation_id",
+        "created_at",
+        "reason"
+      ],
       "properties": {
-        "escalation_id": { "type": "string" },
-        "created_at": { "type": "string", "format": "date-time" },
-        "token_path": {
-          "type": "string",
-          "description": "人間が開くファイルの絶対パス。トークン値そのものは応答に含めない"
+        "escalation_id": {
+          "type": "string"
         },
-        "reason": { "type": "string" },
+        "created_at": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
         "summary_for_human": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["rounds", "weighted_mean_trend", "blocking_criteria"],
+          "required": [
+            "rounds",
+            "weighted_mean_trend",
+            "blocking_criteria"
+          ],
           "properties": {
-            "rounds": { "type": "integer" },
-            "weighted_mean_trend": { "type": "array", "items": { "type": "number" } },
-            "blocking_criteria": { "type": "array", "items": { "type": "string" } }
+            "rounds": {
+              "type": "integer"
+            },
+            "weighted_mean_trend": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "blocking_criteria": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
           }
+        },
+        "channel": {
+          "type": "string",
+          "enum": [
+            "chat",
+            "mrtr",
+            "system"
+          ]
         }
       }
     },
-    "next_action": { "type": "object" },
-    "warnings": { "type": "array", "items": { "type": "string" } }
+    "next_action": {
+      "type": "object"
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
   }
 }
 ```
@@ -1283,15 +1487,14 @@ MCP 2026-07-28 で `inputSchema` / `outputSchema` は JSON Schema 2020-12 の任
 
 | code | 条件 |
 |---|---|
-| `E_STATE_VIOLATION` | `FINAL` / `ABORTED` で呼ばれた |
-| `E_TOKEN_INVALID` | `human_token` がファイル内の値と不一致、または既に消費済み |
-| `E_RESOLUTION_NOT_APPLICABLE` | `ESCALATED` 以外で `action:"resolve"` |
-| `E_VALIDATION` | `note` 20文字未満、`resolve` で `resolution`/`human_token` 欠落、`kickback` で `target_criteria` 欠落 |
+| `E_STATE_VIOLATION` | 終了済み状態で通常操作を呼出し、再開要求をFINAL系以外で呼出し、または保留確認を重複要求。FINAL系では目的付きreopen・kickback承認要求のみ許可 |
+| `E_RESOLUTION_NOT_APPLICABLE` | 承認待ち以外で承認を反映、確認ID不一致・消費済み、目的または対象不一致 |
+| `E_VALIDATION` | noteが40文字未満、resolveのresolution欠落、承認ID・返答原文の欠落、kickbackのtarget_criteria欠落、廃止済み入力 |
 | `E_UPSTREAM_NOT_FOUND` | `rebase` / `kickback` で上流セッションを解決できない |
 | `E_UPSTREAM_DIGEST_MISMATCH` | `rebase` の `upstream_digest` が上流の現在の確定成果物と一致しない |
 | `E_CHAIN_BUDGET_EXHAUSTED` | `kickback` がチェーン予算または `chain_max_kickbacks`（2回）を超える |
 
-> **human_token の位置づけ（正直な限界）**: トークンはツール応答には載せず、ファイルにのみ書く。これは「モデルが自分で承認する」事故を防ぐ**速度制限であって、セキュリティ境界ではない**。シェルを持つエージェントは読める。狙いは (a) 承認が明示的な操作になること、(b) 監査 JSON に `token_read_at` と `resolution` が残ること、の2点。
+> **チャット承認の限界**: サーバーは確認ID・返答の存在・未消費状態・操作の前提を検査し、human_replyとresolutionを監査に残す。発言者の認証は行わない。実際にユーザーへ確認して返答を待つ責任はエージェントにある。全経路の契約は docs/chat-approval.md を参照する。
 
 ---
 
@@ -1446,19 +1649,19 @@ MCP 2026-07-28 で `inputSchema` / `outputSchema` は JSON Schema 2020-12 の任
 
 ```
 STALLED になったら、モデルが取れる行動は escalate だけ。
-  escalate(action:"request_human")  → ESCALATED、token ファイル生成
+  escalate(action:"request_human")  → ESCALATED、確認IDとチャット承認用next_action生成
   escalate(action:"abort")          → ABORTED（終端）
 
-ESCALATED から戻る道は human_token 必須:
+ESCALATED から戻る道は確認IDとユーザー返答原文が必須:
   resolve/continue           → DRAFTING、max_rounds += extra_rounds（既定 +3）、停滞カウンタ 0 クリア
   resolve/accept_as_is       → FINAL_WITH_RELAXATION（閾値未達のまま人間責任で確定。監査に赤旗）
-  resolve/approve_relaxation → 緩和承認。次の score_submit が閾値を満たせば FINAL_WITH_RELAXATION
+  resolve/relax_rubric → 緩和承認。次の score_submit が閾値を満たせば FINAL_WITH_RELAXATION
   resolve/abort              → ABORTED
 ```
 
 **無限ループにも早期終了にもならない根拠**:
 - 早期終了しない: `FINAL` はサーバのみが出し、条件は `min_score>=9 AND weighted_mean>=9.0`。モデルの `self_verdict_note` は判定式に一切入らない（F6）。
-- 無限にならない: `max_rounds` と `stall_window` の**2系統**で必ず止まる。`max_rounds` の延長は人間の `human_token` を消費する形でしか起きない。
+- 無限にならない: `max_rounds` と `stall_window` の**2系統**で必ず止まる。`max_rounds` の延長は保留中の確認IDと明示的なチャット返答を消費する形でしか起きない。
 
 ---
 
@@ -1493,7 +1696,6 @@ $PLUGIN_DATA/rubric-loop/
     │       └── 2.json
     ├── escalations/
     │   ├── esc_01.json
-    │   └── esc_01.token             # 人間が開くファイル。応答には値を載せない
     ├── exports/
     │   └── audit-20260904T093012Z.json
     ├── rebases/                     # loop_mode が plan/implement のときのみ（§19.3.3）
@@ -1798,7 +2000,7 @@ description: 設計・実装計画・実装を、サーバ側の rubric 判定�
 ## 上流が間違っていると気づいたら
 
 下流で辻褄を合わせない。`escalate{action:"kickback", target_criteria:[…], note:"欠陥の説明"}` を
-提案し、人間の承認トークンを求める。あなたのセッションは凍結され、上流が直ってから再開する。
+提案し、request_human(approval_action:"kickback", target_criteria) でチャット承認を求め、返答後に確認ID・返答原文・同じ対象基準でkickbackを実行する。あなたのセッションは凍結され、上流が直ってから再開する。
 
 ## 文脈を失ったとき
 
@@ -2107,9 +2309,8 @@ AT-1〜AT-9 は単一モード（`loop_mode:"design"` 相当）のループ、AT
 | 2 | round 6: 同様（`8.28`, improvement 0.08） | `verdict:"ITERATING"`, `stall.rounds_without_improvement:2` |
 | 3 | round 7: 同様（`8.35`, improvement 0.07） | **`verdict:"STALLED"`**, `verdict_reason:"no_improvement"`, `state:"STALLED"`, `next_action.tool:"escalate"`, `round` は 7 のまま |
 | 4 | `artifact_commit{S, 7, …}` | `E_STATE_VIOLATION`, `expected_tools:["loop_state","escalate","audit_export"]` |
-| 5 | `escalate{S, action:"request_human", note:"3周スコアが動かない。基準 self-hosting の解釈で詰まっている"}`（MRTR 対応クライアントなら `resultType:"input_required"` が返り、人間の回答を付けた再試行で解決する。以下は非対応クライアントの経路） | `state:"ESCALATED"`, `escalation.token_path:".../escalations/esc_01.token"`, `escalation.summary_for_human.weighted_mean_trend:[8.10,8.20,8.28,8.35]`, `blocking_criteria:["self-hosting","audit"]`。**トークン値は応答に含まれない** |
-| 6 | `escalate{S, action:"resolve", resolution:"continue", human_token:"<誤った値>", note:"続行"}` | **`E_TOKEN_INVALID`**, `state:"ESCALATED"` のまま |
-| 7 | `escalate{S, action:"resolve", resolution:"continue", human_token:"<ファイルの値>", extra_rounds:3, note:"self-hosting の解釈を人間が指定した。続行してよい"}` | `state:"DRAFTING"`, `round:8`, `policy 実効 max_rounds:15`, `stall.rounds_without_improvement:0`, トークンは消費済み（再利用は `E_TOKEN_INVALID`） |
+| 6 | `escalate{S, action:"resolve", resolution:"continue", escalation_id:"esc_01", human_reply:"提示された操作を承認します", note:"続行"}` | **`E_RESOLUTION_NOT_APPLICABLE`**, `state:"ESCALATED"` のまま |
+| 7 | `escalate{S, action:"resolve", resolution:"continue", escalation_id:"esc_01", human_reply:"提示された操作を承認します", extra_rounds:3, note:"self-hosting の解釈を人間が指定した。続行してよい"}` | `state:"DRAFTING"`, `round:8`, `policy 実効 max_rounds:15`, `stall.rounds_without_improvement:0`, トークンは消費済み（再利用は `E_RESOLUTION_NOT_APPLICABLE`） |
 
 ### AT-5: max_rounds 到達
 
@@ -2142,9 +2343,9 @@ AT-1〜AT-9 は単一モード（`loop_mode:"design"` 相当）のループ、AT
 | 2 | 同上 + `acknowledge_relaxation:true` | `ok:true`, `rubric_version:2`, `classification:"relaxation"`, `relaxation_count:1`, **`final_reachable:false`**, `warnings:["FINAL は人間承認まで出ません"]` |
 | 3 | `rubric_amend{…, criteria に policy を含めて送る}` | `E_VALIDATION`（入力に `policy` プロパティが無く `additionalProperties:false`）。仮に受理経路があっても `E_THRESHOLD_IMMUTABLE` |
 | 4 | round 6: `artifact_commit` → `score_submit`（全13基準 9以上, `weighted_mean:9.3`） | **`verdict:"ESCALATED"`**, `verdict_reason:"relaxation_pending_approval"`, `state:"ESCALATED"`（**FINAL にはならない**） |
-| 5 | `escalate{S, action:"resolve", resolution:"approve_relaxation", human_token:"<ファイルの値>", note:"基準削除を人間が承認した"}` | `state:"DRAFTING"`, `relaxation_approved:true`, `next_action.tool:"artifact_commit"` |
+| 5 | resolve(resolution:"relax_rubric", escalation_id:"esc_01", human_reply:"基準緩和を承認します") | state:"SCORING", next_action.tool:"score_submit" |
 | 6 | round 7: `artifact_commit` → `score_submit`（全9以上） | `verdict:"FINAL_WITH_RELAXATION"`, `state:"FINAL_WITH_RELAXATION"` |
-| 7 | `audit_export{S}` | `rubric_versions[1].classification:"relaxation"`, `escalations[0].resolution:"approve_relaxation"`, `summary.relaxations:1`。**緩めた事実が監査に残る** |
+| 7 | `audit_export{S}` | `rubric_versions[1].classification:"relaxation"`, `escalations[0].resolution:"relax_rubric"`, `summary.relaxations:1`。**緩めた事実が監査に残る** |
 
 ### AT-8: モデルの自己申告を無効化する
 
@@ -2236,8 +2437,11 @@ loop_open{mode:"create", submission_id:"f", loop_mode:"design",
 前提: rl_…BBB(plan) が FINAL、rl_…CCC(implement) が round 8 で DRAFTING、
       CCC のピンは sha256:4d2b…
 
+0. escalate{session_id:"rl_…BBB", action:"request_human", approval_channel:"chat", approval_action:"reopen", note:"<再改訂を提案する理由。40文字以上>"}
+   → ESCALATED、確認IDを取得してユーザーの明示的な返答を待つ。
+
 1. escalate{session_id:"rl_…BBB", submission_id:"g", action:"reopen",
-            human_token:"…", note:"T004 の依存が逆で実装できない（40文字以上の説明）"}
+            escalation_id:"esc_01", human_reply:"提示された操作を承認します", note:"T004 の依存が逆で実装できない（40文字以上の説明）"}
    → {state:"DRAFTING", round:5, reopened:[{by:"human", previous_final_digest:"sha256:4d2b…"}]}
 
 2. loop_state{session_id:"rl_…CCC"}
@@ -2271,8 +2475,11 @@ loop_open{mode:"create", submission_id:"f", loop_mode:"design",
 ### AT-13: 差し戻し（implement → plan）
 
 ```
+0. escalate{session_id:"rl_…CCC", action:"request_human", approval_channel:"chat", approval_action:"kickback", target_criteria:["dependency_soundness"], note:"<上流の欠陥を説明する理由。40文字以上>"}
+   → ESCALATED、確認IDを取得して同じ対象基準への差し戻しについて明示的な返答を待つ。
+
 1. escalate{session_id:"rl_…CCC", submission_id:"i", action:"kickback",
-            target_criteria:["dependency_soundness"], human_token:"…",
+            target_criteria:["dependency_soundness"], escalation_id:"esc_01", human_reply:"提示された操作を承認します",
             note:"T004 が T007 の成果物を前提にしているが依存が逆向きで実装順に並べると失敗する"}
    → {state:"FROZEN", freeze_reason:"kicked_back",
       upstream:{session_id:"rl_…BBB", state_after:"DRAFTING"}}
@@ -2282,7 +2489,7 @@ loop_open{mode:"create", submission_id:"f", loop_mode:"design",
       must_fix:[{criterion_id:"dependency_soundness",
                  origin:"kickback", from_session:"rl_…CCC"}]}
 
-3. escalate{session_id:"rl_…CCC", submission_id:"j", action:"kickback", …} を3回目
+3. request_human{session_id:"rl_…CCC", approval_action:"kickback", target_criteria:[…], …} で3回目の差し戻しを提案
    → {error:{code:"E_CHAIN_BUDGET_EXHAUSTED", detail:{check:"kickbacks", used:2, limit:2}}}
 
 4. audit_export{session_id:"rl_…CCC", scope:"chain"}
@@ -2373,18 +2580,20 @@ score_submit{session_id:"rl_…CCC", submission_id:"m", expected_round:13, …}
    next_action:"escalate"}
 
 escalate{session_id:"rl_…CCC", submission_id:"n", action:"resolve",
-         resolution:"continue", human_token:"…", note:"あと少しで通る見込み（40文字以上）"}
+         resolution:"continue", escalation_id:"esc_01", human_reply:"提示された操作を承認します", note:"あと少しで通る見込み（40文字以上）"}
 → {state:"DRAFTING", round:14, chain:{limit:34, granted_extra_rounds:6}}
 
-2回目の continue
-→ {error:{code:"E_RESOLUTION_NOT_APPLICABLE",
-          detail:{reason:"extra_rounds_already_granted"}}}
+追加予算も使い切った場合（chain_rounds = 34）
+score_submit → {verdict:"REVISE", state:"ESCALATED",
+                escalation:{reason:"chain_budget_exhausted"}}
+新しい確認IDで2回目の continue
+→ {state:"DRAFTING", round:20, chain:{limit:40, granted_extra_rounds:12}}
 
 対照: 予算超過時でも合格していれば
 score_submit → {verdict:"PASS", state:"FINAL", warnings:["chain_budget_exceeded"]}
 ```
 
-**期待**: 予算超過は不合格時のみエスカレーション。合格は潰さない。上乗せは1回だけ。
+**期待**: 予算枯渇は不合格時のみエスカレーション。合格は潰さない。新しい人間承認ごとに上乗せでき、同じ承認の再利用や同じリクエストの再送では二重加算しない。
 
 ### AT-17: 途中モードからの再開（実装セッションのハンドル1個）
 
@@ -2627,7 +2836,7 @@ design プリセットは `interface_completeness` / `packaging_conformance` / `
 | 基準 | コマンド | 合格条件 | この改訂での結果 |
 |---|---|---|---|
 | `interface_completeness` | `python tools/check-schemas.py docs/design-rubric-loop-mcp.md` | fenced JSON が全件 `json.loads` を通り、`$schema` が draft 2020-12 のものは `Draft202012Validator.check_schema` を通る | JSON ブロック **35件が全件パース**、スキーマ **17件が妥当**、失敗0 |
-| `interface_completeness` | `python tools/check-instances.py docs/design-rubric-loop-mcp.md` | §6.4.1 / §6.4.3 / §6.4.6 / §19.5.2 のスキーマに、受理されるべき／拒否されるべきインスタンスを当てて期待どおりになる | **27件中27件が期待どおり**（design に upstream を渡すと拒否、plan に upstream が無いと拒否、`content` と `files` の同時指定は拒否、`rebase` は `human_token` 無しで受理、など） |
+| `interface_completeness` | `python tools/check-instances.py docs/design-rubric-loop-mcp.md` | §6.4.1 / §6.4.3 / §6.4.6 / §19.5.2 のスキーマに、受理されるべき／拒否されるべきインスタンスを当てて期待どおりになる | **27件中27件が期待どおり**（design に upstream を渡すと拒否、plan に upstream が無いと拒否、`content` と `files` の同時指定は拒否、`rebase` は `escalation_id` と `human_reply` 無しで受理、など） |
 | `interface_completeness` | `python tools/check-errorcodes.py docs/design-rubric-loop-mcp.md` | `E_*` について「使われているのに定義が無い」「定義されているのに使われない」がともに0件 | **定義42件・使用42件・差分0** |
 | `packaging_conformance` | `python tools/check-plugin.py plugin.json mcp.json` | §9.2 / §9.3 の実物が Agent Plugins 1.0.0 のスキーマを通り、`command` が単一実行トークンで、`args`/`env`/`cwd` 以外に変数展開が無く、資格情報らしき値が無い | exit 0 |
 | `defaults_decided` | `grep -n '実装時に決める\|TBD\|後で決める' docs/design-rubric-loop-mcp.md \| grep -v '禁止語句\|grep -\|anchors'` | 出力なし（exit 1） | 出力なし。残る9件はすべて**禁止語句そのものを引用・検査している行**であり、アンカー定義・却下理由・この表の行である |
@@ -2707,7 +2916,7 @@ design プリセットは `interface_completeness` / `packaging_conformance` / `
 | `stall_window`（モード別） | design 3 / plan 2 / implement 4 |
 | `stall_epsilon`（モード別） | design 0.25 / plan 0.25 / implement 0.20（implement を下げた理由は §19.10.1） |
 | チェーン予算 `chain_max_rounds` | 28（単純合計 36 より小さく取る。§19.10.2） |
-| チェーン上乗せ `chain_extra_rounds` | 6（人間承認で**1回だけ**） |
+| チェーン上乗せ `chain_extra_rounds` | 6（新しい人間承認ごとに累積加算） |
 | 差し戻し上限 `chain_max_kickbacks` | 2 |
 | チェーンハンドル | サーバ発行の ULID、`ch_` 前置（例 `ch_01JQ8Z9K7M3N4P5R6S7T8V9WXY`） |
 | `fileset` の上限 | ファイル 5000 件 / パス 1024 バイト / マニフェスト全体 2 MB |
@@ -2779,19 +2988,19 @@ escalate(action:"request_human") を受けたサーバ:
                         schema:{ resolution:enum, note:string } }]
        requestState には escalation_id を入れる（MRTR ではサーバが自前の識別子を requestState に埋める）
     → 人間が答えると、クライアントが inputResponses を付けて同じ要求を再試行
-    → サーバは resolution を適用し resultType:"complete" を返す。human_token は不要
+    → サーバは resolution を適用し resultType:"complete" を返し、回答を監査に記録する
 
-  クライアントが MRTR 非対応
-    → 従来どおり state:"ESCALATED" にして escalations/<id>.token を書き、
-      人間が値を転記して escalate(action:"resolve", human_token:…) を呼ぶ
+  クライアントが MRTR 非対応、または approval_channel:"chat" を指定
+    → state:"ESCALATED" にして確認ID・概要・next_actionを返す
+    → ユーザーの返答後に escalate(action:"resolve", escalation_id, human_reply, resolution) を呼ぶ
 ```
 
-どちらの経路でも、監査 JSON の `escalations[]` には `{escalation_id, channel:"mrtr"|"token_file", resolution, resolved_at}` が残る。**承認の事実と経路が記録される**という保証は経路によらず同じ。
+どちらの経路でも、監査 JSON の `escalations[]` には `{escalation_id, channel:"mrtr"|"chat", resolution, resolved_at}` が残る。**承認の事実と経路が記録される**という保証は経路によらず同じ。
 
 ### 18.4 適合上の限界（正直に）
 
 - **`server/discover` と `resultType` と `CacheableResult` は MCP SDK 層の責務**であり、本設計書はサーバ実装がそれらを満たすことを要求するに留まる。ツール表面（§6）はその上に乗る。
-- **2025-11-25 以前のクライアント**は `server/discover` を呼ばず、`resultType` を省略した結果を返す実装と話す。サーバは両リビジョンを受理する（`protocolVersions` に両方を広告）が、**旧クライアントでは MRTR 経路が使えない**のでトークンファイル方式に落ちる（§18.3）。ここは縮退であり、判定の厳密さは変わらない。
+- **2025-11-25 以前のクライアント**は `server/discover` を呼ばず、`resultType` を省略した結果を返す実装と話す。サーバは両リビジョンを受理する（`protocolVersions` に両方を広告）が、**旧クライアントでは MRTR 経路が使えない**のでチャット確認を返す（§18.3）。ここは縮退であり、判定の厳密さは変わらない。
 - **Agent Plugins 1.0.0 は MCP のリビジョンを規定していない**（`mcp.json` は transport と起動方法だけを宣言する）。したがって「どのリビジョンで話すか」は**クライアント任せ**であり、本設計はそこに依存しない。両リビジョンで同じツール表面・同じ判定になるように作ってある。
 
 
@@ -2891,10 +3100,10 @@ escalate(action:"request_human") を受けたサーバ:
 
 `FINAL` は終端なので、上流が変わる経路は**明示的な再オープンのみ**である。
 
-- `escalate(action:"reopen", human_token)` — 上流自身の人間が開け直す。
-- `escalate(action:"kickback", human_token)` — 下流からの差し戻し（§19.4）。
+- `escalate(action:"reopen", escalation_id, human_reply)` — 上流自身の人間が開け直す。
+- `escalate(action:"kickback", escalation_id, human_reply)` — 下流からの差し戻し（§19.4）。
 
-どちらも `human_token` を要求し、`state` を `FINAL` → `DRAFTING`（`round += 1`）に戻し、`session.reopened[]` に `{at, by, reason, previous_final_digest}` を積む。**黙って上流が変わることはない。**
+どちらも request_human(approval_action:"reopen" または "kickback") で保留確認を作り、チャットで明示的な返答を得てから実行する。確認IDと返答原文を要求し、上流をDRAFTING（round += 1）へ戻す。reopenではreopenedに改訂理由とprevious_final_digestを記録する。
 
 #### 19.3.2 失効の検出
 
@@ -2968,7 +3177,9 @@ artifact_commit → score_submit → サーバが判定
 実装中に設計の欠陥が見つかる、は現実に起きる。握りつぶす（下流で辻褄を合わせる）と、設計書と実装が乖離したまま両方 `FINAL` になる。これを塞ぐ。
 
 ```
-escalate{action:"kickback", note:"<欠陥の説明。40文字以上>", human_token, target_criteria:[...]}
+escalate{action:"request_human", approval_channel:"chat", approval_action:"kickback", target_criteria:[...], note:"<欠陥の説明。40文字以上>"}
+→ ESCALATED、確認IDを取得してユーザーの明示的な返答を待つ。
+escalate{action:"kickback", note:"<承認した差し戻しの説明。40文字以上>", escalation_id, human_reply, target_criteria:[...]}
 ```
 
 | 対象 | 効果 |
@@ -3204,7 +3415,7 @@ FROZEN ──escalate{action:"abort"}──▶ ABORTED（下流を捨てる判�
 | `escalate` | 追加 | 出力 `rebase_result`（`carried_over` / `must_reverify` / `new_round`） |
 | `audit_export` | 追加 | `scope:"session"\|"chain"`。`chain` では `audit_version:2` の連鎖監査 JSON（§19.13.2） |
 
-`rebase` が `human_token` を要求しない理由: rebase は**現在の合格を下げる方向の操作**であり、それ自体では何も緩まない。再確認の提出と採点は必ず通る（§19.3.3 手順4）。一方 `reopen` / `kickback` は**すでに出た FINAL を覆す**ので人間の承認を要る側に置いた。
+`rebase` が `escalation_id` と `human_reply` を要求しない理由: rebase は**現在の合格を下げる方向の操作**であり、それ自体では何も緩まない。再確認の提出と採点は必ず通る（§19.3.3 手順4）。一方 `reopen` / `kickback` は**すでに出た FINAL を覆す**ので人間の承認を要る側に置いた。
 
 #### 19.6.6 追加エラーコード
 
@@ -3250,7 +3461,7 @@ FROZEN ──escalate{action:"abort"}──▶ ABORTED（下流を捨てる判�
 | 3 | `artifact_commit` | 成果物（`content` または `files`）を登録し digest を確定して `SCORING` へ遷移する | §6.4.3 | §6.4.3 | `E_STATE_VIOLATION`, `E_CONCURRENT`, `E_VALIDATION`, `E_ADDRESS_MISSING`, `E_ARTIFACT_KIND_MISMATCH`, `E_MANIFEST_UNVERIFIABLE`, `E_TEST_INVENTORY_REQUIRED`, `E_TEST_MUTATED_WITHOUT_DIFF`, `E_PLAN_SCHEMA`, `E_PLAN_INVALID`, `E_PLAN_DESIGN_REF`, `E_FROZEN`, `E_SUPERSEDED`（13件） |
 | 4 | `score_submit` | 全基準のスコアと根拠を提出する。**判定を返す唯一のツール** | §6.4.4 | §6.4.4 | `E_VALIDATION`, `E_STATE_VIOLATION`, `E_CONCURRENT`, `E_DIGEST_MISMATCH`, `E_INCOMPLETE_SCORES`, `E_EVIDENCE_REQUIRED`, `E_EVIDENCE_KIND`, `E_EVIDENCE_NOT_FOUND`, `E_EVIDENCE_STALE`, `E_EVIDENCE_TARGET`, `E_SCORE_INFLATION`, `E_SCORE_JUMP`, `E_WEAKNESS_REQUIRED`, `E_TEST_REGRESSION`, `E_TEST_NOT_GREEN`, `E_UPSTREAM_NOT_ALLOWED`, `E_FROZEN`, `E_SUPERSEDED`, `E_CHAIN_BUDGET_EXHAUSTED`（19件） |
 | 5 | `rubric_amend` | rubric を新しい版として変更し、緩和方向の変更を監査に残す | §6.4.5 | §6.4.5 | `E_STATE_VIOLATION`, `E_CONCURRENT`, `E_THRESHOLD_IMMUTABLE`, `E_RELAXATION_UNACKNOWLEDGED`, `E_VALIDATION`（5件） |
-| 6 | `escalate` | 正常フロー外の判断（人間呼び出し・解決・打ち切り・再開・rebase・差し戻し）を記録つきで行う | §6.4.6 | §6.4.6 | `E_STATE_VIOLATION`, `E_TOKEN_INVALID`, `E_RESOLUTION_NOT_APPLICABLE`, `E_VALIDATION`, `E_UPSTREAM_NOT_FOUND`, `E_UPSTREAM_DIGEST_MISMATCH`, `E_CHAIN_BUDGET_EXHAUSTED`（7件） |
+| 6 | `escalate` | 正常フロー外の判断（人間呼び出し・解決・打ち切り・再開・rebase・差し戻し）を記録つきで行う | §6.4.6 | §6.4.6 | `E_STATE_VIOLATION`, `E_RESOLUTION_NOT_APPLICABLE`, `E_VALIDATION`, `E_UPSTREAM_NOT_FOUND`, `E_UPSTREAM_DIGEST_MISMATCH`, `E_CHAIN_BUDGET_EXHAUSTED`（7件） |
 | 7 | `audit_export` | 監査 JSON をセッション単位またはチェーン単位で書き出す | §6.4.7 | §6.4.7 | `E_SESSION_NOT_FOUND`, `E_VALIDATION`（`scope:"chain"` で `chain_id` を解決できない）（2件） |
 
 **エラーコードの総数の突き合わせ**: 本書で定義されているコードは、§6.3 の共通6件 ＋ 各ツールの個別エラー表17件 ＋ §19.6.6 の3モード追加19件 ＝ **42件**。上の表に列挙したのべ件数は61で、差の20は複数ツールで共有されるコード（`E_VALIDATION` / `E_STATE_VIOLATION` / `E_CONCURRENT` / `E_SESSION_NOT_FOUND` / `E_UPSTREAM_*` / `E_FROZEN` / `E_SUPERSEDED` / `E_CHAIN_BUDGET_EXHAUSTED`）の重複である。重複を除くと41件で、これに全ツール共通の `E_INTERNAL` を足すと定義済み42件と一致する。**定義されているのに使われないコードも、使われているのに定義が無いコードも無い**（検査コマンドは §14.3.4）。
@@ -3804,7 +4015,7 @@ R5: changed_test_files のうち、test_inventory.diffs[] に対応する file �
       └── escalate(resolve) ──▶ DRAFTING | FINAL_WITH_RELAXATION | ABORTED
 
   ── 3モード拡張で追加 ────────────────────────────────────────────────
-  FINAL ──escalate(reopen|kickback, human_token)──▶ DRAFTING   （上流側）
+  FINAL ──escalate(reopen|kickback, escalation_id, human_reply)──▶ DRAFTING   （上流側）
   任意の状態 ──上流ピンのdigest不一致を検出──▶ SUPERSEDED ──escalate(rebase)──▶ DRAFTING
   任意の状態 ──下流がkickbackを発行──▶ FROZEN ──上流が再FINAL──▶ SUPERSEDED
   FROZEN ──escalate(abort)──▶ ABORTED
@@ -3859,7 +4070,7 @@ R5: changed_test_files のうち、test_inventory.diffs[] に対応する file �
 | 名前 | 既定 | 定義 |
 |---|---|---|
 | `chain_max_rounds` | **28** | チェーンに属する全セッションの `round` の合計（再オープン後の周も加算。rebase による据え置き周は加算しない） |
-| `chain_extra_rounds` | **6** | エスカレーション解決で `continue` を選んだとき、1回だけ上乗せできる量 |
+| `chain_extra_rounds` | **6** | 予算枯渇時のエスカレーション解決で `continue` を選んだとき、新しい人間承認ごとに上乗せする量 |
 | `chain_max_kickbacks` | **2** | 1チェーンで許す差し戻しの回数 |
 
 **28 にした理由**: 単純合計 36 より小さい値にしないと上位予算の意味が無い。一方で「設計10 + 計画6 + 実装12」は現実的に起こりうる正常系なので、それ（28）は通す必要がある。28 は「全モードが各上限いっぱいまで暴走することは許さないが、1モードが上限まで使い切っても他が普通なら通る」水準である。
@@ -3870,14 +4081,18 @@ R5: changed_test_files のうち、test_inventory.diffs[] に対応する file �
 score_submit の判定（§7.1）の最後に:
 
   chain_rounds = Σ(チェーン内の全セッションの round)
-  if chain_rounds > chain_max_rounds:
+  limit = chain_max_rounds + granted_extra_rounds
+  if chain_rounds >= limit:
       verdict は通常どおり計算する（合格なら FINAL にする ← 予算超過で合格を潰さない）
-      不合格なら state = ESCALATED（reason: "chain_budget_exhausted"）
+      不合格で chain_rounds == limit なら state = ESCALATED（reason: "chain_budget_exhausted"）
+      不合格で chain_rounds > limit なら E_CHAIN_BUDGET_EXHAUSTED（承認なしの上限超過）
       detail: { chain_rounds, limit, per_session:[{session_id, loop_mode, round}] }
 
-  escalate(resolve, resolution:"continue") で chain_extra_rounds を1回だけ加算
-  2回目の continue は E_RESOLUTION_NOT_APPLICABLE（detail.reason:"extra_rounds_already_granted"）
+  escalate(resolve, resolution:"continue") の新しい人間承認ごとに chain_extra_rounds を累積加算
+  追加後の予算も尽きたら再び ESCALATED となり、次の承認で追加できる
 ```
+
+人間承認の回数には固定上限を設けない。各回の確認IDは一度だけ消費し、同じ `submission_id` の再送は保存済み応答を返す。`granted_extra_rounds` は累積値なので、既存チェーンで付与済みの追加予算も引き続き加算の基点として使う。承認なしに実効上限を超えた不合格採点は従来どおり `E_CHAIN_BUDGET_EXHAUSTED` で拒否する。
 
 **予算超過で合格を潰さない**のは意図的である。予算は「無限に回るのを止める」ためのもので、「良い成果物を落とす」ためのものではない。潰すと、上限直前で慌てて自己採点を甘くする圧力が生まれる。
 
@@ -3889,7 +4104,7 @@ score_submit の判定（§7.1）の最後に:
 |---|---|
 | 停滞（モード別 `stall_window`） | 既存どおり `STALLED` → `escalate` |
 | `max_rounds` 超過 | 既存どおり `ESCALATED` |
-| `chain_max_rounds` 超過 | `ESCALATED（chain_budget_exhausted）` → `continue`（+6, 1回限り）/ `accept_as_is` / `abort` |
+| `chain_max_rounds` 超過 | `ESCALATED（chain_budget_exhausted）` → `continue`（新しい人間承認ごとに+6）/ `accept_as_is` / `abort` |
 | 上流が消えた | `ESCALATED（upstream_missing）` → `rebase`（本文再投入）/ `abort` |
 | 差し戻し上限 | `escalate(kickback)` が `E_CHAIN_BUDGET_EXHAUSTED` |
 
@@ -4229,7 +4444,7 @@ loop_open{ mode:"resume", submission_id:"…", session_id:"rl_01JQA…CCC" }
           "from_session": "rl_01JQAZCCCCCCCCCCCCCCCCCCCC",
           "target_criteria": ["dependency_soundness"],
           "note": "T004 が T007 の成果物を前提にしているが依存が逆向きで、実装順に並べると T004 が失敗する",
-          "at": "2026-09-04T15:40:00Z", "channel": "token_file", "resolved_at": "2026-09-04T16:10:00Z" }
+          "at": "2026-09-04T15:40:00Z", "channel": "chat", "resolved_at": "2026-09-04T16:10:00Z" }
       ],
       "rebases": [],
       "final": {
@@ -4334,7 +4549,7 @@ loop_open{ mode:"resume", submission_id:"…", session_id:"rl_01JQA…CCC" }
         { "escalation_id": "e-imp-1", "action": "kickback", "to_session": "rl_01JQ9ZBBBBBBBBBBBBBBBBBBBB",
           "target_criteria": ["dependency_soundness"],
           "note": "T004 が T007 の成果物を前提にしているが依存が逆向きで、実装順に並べると T004 が失敗する",
-          "human_token_fingerprint": "sha256:0a91…", "channel": "token_file",
+          "human_reply": "指定された上流基準への差し戻しを承認します", "channel": "chat",
           "at": "2026-09-04T15:40:00Z" }
       ],
       "rebases": [
