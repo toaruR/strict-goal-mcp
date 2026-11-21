@@ -14,6 +14,17 @@
 | [設計から実装までのサブエージェント呼び出しフロー (strict-goal-agy)](spec/subagent-workflow.md) | 2026-11-21 |
 | [strict-goal バージョン管理およびバージョン確認仕様書](spec/version-specification.md) | 2026-11-21 |
 
+## 決定記録
+
+| 文書 | 状態 | 更新 |
+|---|---|---|
+| [0001 Round 1 即時終了の防止はサーバ側で強制する](decisions/0001-server-enforced-anti-round1.md) | active | 2026-11-21 |
+| [0002 プロジェクト名を rubric-loop から strict-goal に改める](decisions/0002-rename-to-strict-goal.md) | active | 2026-11-21 |
+| [0003 implement は親・子・孫の3層サブエージェントで実行する](decisions/0003-hierarchical-subagents.md) | active | 2026-11-21 |
+| [0004 規範は拘束力の強い層から割り当てる(散文は最後)](decisions/0004-rubric-binding-layers.md) | active | 2026-11-21 |
+| [0005 起動コマンドは /strict-goal に限り、/goal スキルは置かない](decisions/0005-strict-goal-command-only.md) | active | 2026-11-21 |
+| [0006 人間の承認はトークンファイルではなくチャットの返答で受け付ける](decisions/0006-chat-approval.md) | active | 2026-11-21 |
+
 ## ガイド
 
 | 文書 | 更新 |
@@ -25,8 +36,8 @@
 
 | 文書 | 更新 |
 |---|---|
-| [追補合議: strict-goal改善案へのagy参加](gougi/2026-10-16-strict-goal-round-reduction-agy-supplement.md) | 2026-10-17 |
-| [合議: strict-goalのround・時間・token消費を品質を保って減らす](gougi/2026-10-16-strict-goal-round-reduction.md) | 2026-10-17 |
+| [追補合議: strict-goal改善案へのagy参加](gougi/2026-10-16-strict-goal-round-reduction-agy-supplement.md) | 2026-11-21 |
+| [合議: strict-goalのround・時間・token消費を品質を保って減らす](gougi/2026-10-16-strict-goal-round-reduction.md) | 2026-11-21 |
 | [Agent Plugins 1.0.0 メモ（外部仕様）](research/2026-09-05-agent-plugins-notes.md) | 2026-11-21 |
 | [本ドキュメントについて](research/2026-09-05-memo.md) | 2026-11-21 |
 | [SKILL.state化 検討メモ](research/2026-09-13-skill-state-investigation-memo.md) | 2026-11-21 |

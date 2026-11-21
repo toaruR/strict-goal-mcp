@@ -1,7 +1,8 @@
 ---
 type: plan
-status: done
+status: superseded
 owner: ai
+superseded_by: docs/plans/archive/design-anti-round1-final.md
 ---
 # 評価の独立分離 (Verifier分離) 設計仕様書
 
