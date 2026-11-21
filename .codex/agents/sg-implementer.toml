@@ -1,4 +1,4 @@
-# knowledge-kit version=1.13.0 (sg-implementer.md から自動生成。直接編集せずキット側を直すこと)
+# knowledge-kit version=1.16.0 (sg-implementer.md から自動生成。直接編集せずキット側を直すこと)
 name = "sg-implementer"
 description = "In-loop supervisor for strict-goal implement. Sequentially delegates each plan task to sg-worker, coordinates fileset commits and scoring iterations until the server returns FINAL."
 model = "gpt-5.6-terra"

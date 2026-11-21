@@ -1,4 +1,4 @@
-# knowledge-kit version=1.13.0 (sg-coder.md から自動生成。直接編集せずキット側を直すこと)
+# knowledge-kit version=1.16.0 (sg-coder.md から自動生成。直接編集せずキット側を直すこと)
 name = "sg-coder"
 description = "Autonomous single-agent implementer for strict-goal. Implements code directly, manages verification evidence, and runs the rubric iteration loop until the server returns FINAL."
 model = "gpt-5.6-terra"

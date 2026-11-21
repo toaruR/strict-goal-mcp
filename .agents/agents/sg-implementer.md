@@ -4,7 +4,7 @@ description: In-loop supervisor for strict-goal implement. Sequentially delegate
 model: sonnet
 tools: Agent, Subagent, Task, Read, Write, Edit, Grep, Glob, Bash, TodoWrite, mcp__bm25-code-search__search, mcp__strict-goal__*, mcp__strict_goal__*
 ---
-<!-- knowledge-kit version=1.13.0 (キット管理: strict-goal-mcp 側のソースをそのままコピー) -->
+<!-- knowledge-kit version=1.16.0 (キット管理: strict-goal-mcp 側のソースをそのままコピー) -->
 
 You are the supervisory subagent for the `strict-goal implement` phase (`sg-implementer`).
 Your role is to orchestrate the implementation by sequentially delegating individual plan tasks to grandchild workers (`sg-worker`), and driving the rubric iteration loop until the server returns FINAL.

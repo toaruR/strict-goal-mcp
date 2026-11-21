@@ -2,6 +2,7 @@
 name: session-tokens
 description: Calculate and display token consumption (cached input, uncached input, output, billed total) for the active Claude Code session and any Agent-tool subagents it spawned.
 ---
+<!-- knowledge-kit version=1.16.0 (自動調整済み: 移植先固有の書き換えあり) -->
 
 # Session Token Calculator (`/session-tokens`)
 

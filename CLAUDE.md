@@ -1,12 +1,27 @@
-<!-- knowledge-kit:begin section=general-instructions version=1.12.2 -->
+<!-- knowledge-kit:begin section=general-instructions version=1.16.0 -->
 ## Communication Style
 - Use Caveman mode.
 - Drop filler words, preambles, and recaps.
 - Be extremely concise. Keep explanations under 2 sentences.
 - Full code, minimal chatter.
 
-## プランの保存場所
-planモードで作成したマークダウンファイルは、<プロジェクトルート>docs/plans 以下に保存する。
+## ドキュメント配置ルール
+`docs/` には次の置き場以外にファイルを作らない(ルールの実体: `docs/.docs-policy.json`。整理は `/docs-tidy`)。
+
+| 置き場 | 中身 | frontmatter の type |
+|---|---|---|
+| `docs/spec/` | 今どうなっているか(仕様・アーキ・設計)。書き換えて最新に保つ | `spec` |
+| `docs/decisions/` | なぜそう決めたか(ADR)。書いたら変えない | `decision` |
+| `docs/research/` | 調査・比較・ベンチ。`YYYY-MM-DD-slug.md` | `research` |
+| `docs/guides/` | 人間向けの説明・手順・原理解説 | `guide` |
+| `docs/plans/` | 計画(plan モードの成果物を含む)。`YYYY-MM-DD-slug.md`。終わったら `plans/archive/` | `plan` |
+| `docs/assets/` | 画像 | — |
+| `docs/exports/` | html / pdf / pptx などの派生物(正本と同じ相対パス) | — |
+
+- `.md` の先頭に frontmatter(`type`、plan/decision は `status: draft|active|done|superseded`、`owner: ai|human`)を付ける。日付は書かない(git から分かる)。
+- ファイル名は英小文字・数字・ハイフンの kebab-case。日付付きの複製(`xxx_20261015.md` 等)は作らず、元のファイルを直接更新する。
+- 新しいファイルを作る前に、既存ファイルへの追記で済まないか検討する。
+- ビルド・変換の作業ファイルは `docs/` の外(`.cache/` 等)に置き、最終成果物だけを `docs/exports/` に置く。
 
 ## 返信の言語
 最終的な返信は日本語で出力する。
@@ -30,7 +45,7 @@ The following protocol applies **ONLY during `strict-goal` workflows** (e.g., re
 - **Autonomous Scope Selection**: On `strict-goal design`, select rubric at `loop_open` based on prompt boundaries: generic `design` (8 criteria) for software/classes, or `design.harness` (18 criteria) for agent/harness infrastructure.
 <!-- knowledge-kit:end section=general-instructions -->
 
-<!-- knowledge-kit:begin section=recording-rules version=1.12.2 -->
+<!-- knowledge-kit:begin section=recording-rules version=1.16.0 -->
 ## 知見の記録ルール
 
 **作業中に重要な知見を発見したら、ユーザーの指示を待たず自動で記録すること。**
@@ -44,7 +59,7 @@ The following protocol applies **ONLY during `strict-goal` workflows** (e.g., re
 記録したら「〇〇をハマりポイントに追記しました」と一言報告する。
 <!-- knowledge-kit:end section=recording-rules -->
 
-<!-- knowledge-kit:begin section=gotchas version=1.12.2 -->
+<!-- knowledge-kit:begin section=gotchas version=1.16.0 -->
 ## ハマりポイント
 
 <!--
@@ -60,8 +75,7 @@ The following protocol applies **ONLY during `strict-goal` workflows** (e.g., re
 - **文字列置換パッチのアンカーは行末まで取る**: 短いアンカーは別節と衝突して `MATCH 2` で落ちる。置換で末尾が伸びると後から衝突することもあるため、句点を含む行末までアンカーを取ること。
 - **Bash の長文ヒアドキュメントは途中切断で失敗しうる**: 数百行の日本語・コード混在を `cat >> file <<'EOF'` で流すと `unexpected EOF` になることがある。Write ツールで一時ファイルに書き `cat chunk >> target` で連結し、`grep -n '^## '` で欠落がないか確認すること。
 - **`grep -o 'E_[A-Z0-9_]*'` は語境界なしだと偽陽性を出す**: `XDG_STATE_HOME` を `E_HOME` として拾うため、`\bE_[A-Z][A-Z0-9_]*\b` を使うか出現箇所を1件ずつ確認すること。
-- **`score_submit` の anti-gaming 検査はスコア上昇時のみ発火し、stale が inflation/jump より先行する**: `checkEvidenceStale` / `checkScoreJump` は `currentScore <= previousScore` なら即 return する。スコアを上げて inflation や jump を単独で検証したい場合、根拠 excerpt が前周と同一だと先に `E_EVIDENCE_STALE` が飛ぶため、excerpt を新しい文に変えて stale を回避すること。
-- **1周で3点超のスコア改善は `exit_code: 0` の command 根拠が2件以上必須**: `checkScoreJump` により、急激な加点には終了コード 0 の command 根拠が要求される。
+- **`score_submit` の anti-gaming 検査はスコア上昇時のみ発火し、stale が inflation/jump より先行する**: `checkEvidenceStale` / `checkScoreJump` は `currentScore <= previousScore` なら即 return する。スコアを上げて inflation や jump を単独で検証したい場合、根拠 excerpt が前周と同一だと先に `E_EVIDENCE_STALE` が飛ぶため、excerpt を新しい文に変えて stale を回避すること。また1周で3点超の加点には `exit_code: 0` の command 根拠が2件以上必須（`checkScoreJump`、→ 詳細: @docs/specification.md §3.2）。
 - **散文の「優先順位」は効かないが、`criterion.priority`（0〜3）で `buildMustFix` がソートされる**: 判定は全基準9点以上の最小値ゲートだが、基準に `priority` を設定することで `buildMustFix` が priority 降順・スコア昇順でソートされ、重要課題が優先提示される。
 - **階層サブエージェント実行時のクライアント別探索パスの注意点**: サブエージェント定義は Claude Code が `.claude/agents/`、Codex が `.codex/agents/*.toml`、Antigravity が `.agents/agents/` を参照する。環境ごとに適切なディレクトリへ配置・追跡する必要がある（詳細: `@docs/design-quantitative-evaluation.md`）。
 - **テスト実行環境・アサーション連動・モックに関する注意点**: `node --test` の引数罠（Windows/Node24）、並列ワーカー競合、ESM自動判定差、`subagents.test.js` / プリセット件数等のアサーション同期更新ルール（詳細: `@docs/testing.md`）
@@ -71,4 +85,4 @@ The following protocol applies **ONLY during `strict-goal` workflows** (e.g., re
 - **SKILL.md での `FINAL` 記述は `skill_md.test.js` の正規表現ゲートに合わせる**: `SKILL.md` 内に `FINAL` を含める場合、スキル自身が自称・宣言していないか検査されるため、「サーバが判定した結果が FINAL」「returns FINAL」など `isServerAuthority` に合致する厳密な定型句を用いること。
 - **Windows 上の Node.js `spawnSync` で `.cmd` を呼ぶ際は `shell: true` が必須**: Windows では拡張子なしコマンドや `.cmd` スクリプトを `shell: false` で起動すると `ENOENT` で失敗するため、OS 判定を行い `shell: true`（または `cmd.exe /c`）を指定すること。
 <!-- knowledge-kit:end section=gotchas -->
-- **`strict-goal.config.json` の `{prompt}` / `{must_fix}` を `"..."` に直埋めすると cmd.exe で壊れる**: 改行や `" & | < > ^ %` を含む値は引数分割が崩れる。外部CLIには標準入力（helper が常に値を stdin に流す）か `{prompt_file}` / `{must_fix_file}` / `{input_file}`（一時ファイルパス）で渡すこと。helper 呼び出し側も値に `-` を指定し heredoc で stdin から渡せる。
+- **`strict-goal.config.json` の `{prompt}` / `{must_fix}` を `"..."` に直埋めすると cmd.exe で壊れる**: 改行や `" & | < > ^ %` で引数分割が崩れる。stdin か `{*_file}` で渡し、helper 呼び出し側は `-` ＋ heredoc を使うこと（→ 詳細: @docs/specification.md §5.3）。

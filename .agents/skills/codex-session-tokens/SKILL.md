@@ -2,6 +2,7 @@
 name: codex-session-tokens
 description: Calculate and report token consumption for the active Codex session, including cached input, uncached input, output, billed total, and recursively spawned subagents.
 ---
+<!-- knowledge-kit version=1.16.0 (自動調整済み: 移植先固有の書き換えあり) -->
 
 # Codex Session Token Calculator
 

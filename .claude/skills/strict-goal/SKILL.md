@@ -2,7 +2,7 @@
 name: strict-goal
 description: Run strict-goal design, plan, or implement workflows with iterative fixes until the server returns a passing verdict. Use for strict-goal or "/strict-goal" requests, including Japanese mode names; handle STALLED and upstream kickback decisions through explicit chat approval.
 ---
-<!-- knowledge-kit version=1.13.0 (自動調整済み: 移植先固有の書き換えあり) -->
+<!-- knowledge-kit version=1.16.0 (自動調整済み: 移植先固有の書き換えあり) -->
 
 ## Principles
 

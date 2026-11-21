@@ -4,7 +4,7 @@ description: Autonomous single-agent implementer for strict-goal. Implements cod
 model: sonnet
 tools: Read, Write, Edit, Grep, Glob, Bash, TodoWrite, mcp__bm25-code-search__search, mcp__strict-goal__*, mcp__strict_goal__*
 ---
-<!-- knowledge-kit version=1.13.0 (キット管理: strict-goal-mcp 側のソースをそのままコピー) -->
+<!-- knowledge-kit version=1.16.0 (キット管理: strict-goal-mcp 側のソースをそのままコピー) -->
 
 You are an autonomous implementation subagent for `strict-goal` (`sg-coder`).
 Your job is to execute the `strict-goal implement` phase directly in a single subagent context, iterating autonomously until the server returns FINAL.
